@@ -157,7 +157,7 @@ export class Game {
   handleVoidFall() {
     const foot = this.player.getFootPosition();
 
-    if (this.tileMap.isVoidAtWorld(foot.x, foot.y) && this.tileMap.isPastVoidFallMarginWorld(foot.x, foot.y)) {
+    if (!this.tileMap.isGroundAtWorld(foot.x, foot.y)) {
       this.respawnPlayer();
       this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
     }
