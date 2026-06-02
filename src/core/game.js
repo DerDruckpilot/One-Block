@@ -33,6 +33,7 @@ export class Game {
     this.hud = new Hud(hudElement);
 
     this.lastTimestamp = 0;
+    this.falling = false;
     this.running = false;
   }
 
@@ -64,6 +65,7 @@ export class Game {
   }
 
   update(deltaSeconds) {
+    this.falling = false;
     this.player.update(deltaSeconds, this.input, this.tileMap);
     this.handleVoidFall();
     this.camera.centerOn(this.player.getCenterPosition());
@@ -156,8 +158,10 @@ export class Game {
 
   handleVoidFall() {
     const foot = this.player.getFootPosition();
+    const support = this.tileMap.getSupportStateAtWorld(foot.x, foot.y);
+    this.falling = !support.supported;
 
-    if (!this.tileMap.isGroundAtWorld(foot.x, foot.y)) {
+    if (this.falling) {
       this.respawnPlayer();
       this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
     }
@@ -180,12 +184,19 @@ export class Game {
 
   getDebugState() {
     const input = this.input.getDebugState();
+    const foot = this.player.getFootPosition();
+    const support = this.tileMap.getSupportStateAtWorld(foot.x, foot.y);
 
     return {
       playerX: this.player.x,
       playerY: this.player.y,
       cameraX: this.camera.x,
       cameraY: this.camera.y,
+      supportTileX: support.tile.x,
+      supportTileY: support.tile.y,
+      supported: support.supported,
+      inVoid: support.inVoid,
+      falling: this.falling,
       movementKeys: input.movementKeys,
       lastKey: input.lastKey
     };

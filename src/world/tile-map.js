@@ -57,13 +57,38 @@ export class TileMap {
   }
 
   isVoidAtWorld(x, y) {
-    const tile = this.worldToTile(x, y);
+    const tile = this.getTileAtWorldPosition(x, y);
     return this.isVoid(tile.x, tile.y);
   }
 
   isGroundAtWorld(x, y) {
-    const tile = this.worldToTile(x, y);
+    const tile = this.getTileAtWorldPosition(x, y);
     return this.isGround(tile.x, tile.y);
+  }
+
+  getTileAtWorldPosition(x, y) {
+    return this.worldToTile(x, y);
+  }
+
+  getSupportStateAtWorld(x, y) {
+    const tile = this.getTileAtWorldPosition(x, y);
+    const type = this.getTile(tile.x, tile.y);
+
+    return {
+      tile,
+      type,
+      supported: this.isGround(tile.x, tile.y),
+      inVoid: !this.isGround(tile.x, tile.y)
+    };
+  }
+
+  isPositionSupportedByTile(x, y) {
+    return this.getSupportStateAtWorld(x, y).supported;
+  }
+
+  isPlayerSupported(player) {
+    const foot = player.getFootPosition();
+    return this.isPositionSupportedByTile(foot.x, foot.y);
   }
 
   isAdjacentToCrystal(tilePosition) {
