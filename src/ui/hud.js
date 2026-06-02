@@ -5,7 +5,7 @@ export class Hud {
     this.element = element;
   }
 
-  update({ inventory, hint, debug, debugVisible, resetHoldSeconds }) {
+  update({ inventory, hint, debug, debugEnabled, resetHoldSeconds }) {
     const resources = Object.entries(inventory)
       .filter(([, amount]) => amount > 0)
       .map(([resource, amount]) => `${RESOURCE_LABELS[resource] || resource}: ${amount}`)
@@ -14,15 +14,16 @@ export class Hud {
     this.element.innerHTML = `
       <div><strong>Rohstoffe:</strong><br>${resources || 'noch keine'}</div>
       <div><strong>Log:</strong> ${hint}</div>
-      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>F3: Debug umschalten<br>R halten: Reset</div>
+      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>F2/F3: Debug umschalten<br>R halten: Reset</div>
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
-      ${debugVisible ? `<div class="debug-hud">
+      ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>
         Spieler: ${this.formatNumber(debug.playerX)}, ${this.formatNumber(debug.playerY)}<br>
         Kamera: ${this.formatNumber(debug.cameraX)}, ${this.formatNumber(debug.cameraY)}<br>
         Support-Tile: ${debug.supportTileX}, ${debug.supportTileY}<br>
         supported: ${debug.supported ? 'true' : 'false'}<br>
         void/falling: ${debug.inVoid ? 'void' : 'safe'} / ${debug.falling ? 'falling' : 'stable'}<br>
+        save: ${debug.saveStatus}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>
         Letzter Key: ${debug.lastKey}
       </div>` : ''}
