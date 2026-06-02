@@ -24,27 +24,36 @@ export const TILE_TYPES = {
   crystal: 'crystal'
 };
 
+export const OBJECT_TYPES = {
+  workbench: 'workbench'
+};
+
 export const RESOURCE_LABELS = {
   earth: 'Erde',
   rawWood: 'Rohholz',
   fiber: 'Fasern',
-  grassSeed: 'Grassamen'
+  grassSeed: 'Grassamen',
+  workbench: 'Werkbank'
 };
 
-export const HOTBAR_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
+export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
+export const HOTBAR_RESOURCES = [...BASE_RESOURCES, 'workbench'];
+export const INVENTORY_RESOURCES = [...BASE_RESOURCES, 'workbench'];
 
 export const RESOURCE_SHORT_LABELS = {
   earth: 'ER',
   rawWood: 'RH',
   fiber: 'FA',
-  grassSeed: 'GS'
+  grassSeed: 'GS',
+  workbench: 'WB'
 };
 
 export const RESOURCE_ICONS = {
-  earth: '▣',
-  rawWood: '▥',
-  fiber: '≋',
-  grassSeed: '✣'
+  earth: '[]',
+  rawWood: '||',
+  fiber: '~~',
+  grassSeed: '**',
+  workbench: '#'
 };
 
 export const BASIC_RESOURCE_DROPS = [
@@ -53,3 +62,13 @@ export const BASIC_RESOURCE_DROPS = [
   { resource: 'fiber', amount: 1, weight: 20 },
   { resource: 'grassSeed', amount: 1, weight: 10 }
 ];
+
+export const WORKBENCH_RECIPE = {
+  id: 'workbench',
+  result: 'workbench',
+  resultAmount: 1,
+  costs: {
+    rawWood: 5,
+    fiber: 2
+  }
+};

@@ -66,13 +66,117 @@ body {
   font-size: 12px;
 }
 
+#top-menu {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-bg);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.top-menu-button {
+  min-width: 54px;
+  min-height: 38px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 25, 0.8);
+  color: var(--ui-text);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.top-menu-button.is-active,
+.top-menu-button:hover {
+  border-color: #d9c7ff;
+  background: rgba(96, 70, 150, 0.84);
+}
+
+.menu-panel {
+  position: fixed;
+  top: max(70px, calc(env(safe-area-inset-top) + 70px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 24px));
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: rgba(18, 20, 32, 0.88);
+  backdrop-filter: blur(10px);
+  line-height: 1.35;
+  pointer-events: auto;
+}
+
+.menu-panel[hidden] {
+  display: none;
+}
+
+.menu-panel h2,
+.menu-panel h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.menu-panel h3 {
+  font-size: 15px;
+}
+
+.menu-list {
+  display: grid;
+  gap: 6px;
+}
+
+.menu-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.menu-row.is-missing {
+  color: #ffbebd;
+}
+
+.menu-note {
+  margin-top: 8px;
+  color: #ffded4;
+  font-size: 13px;
+}
+
+.craft-button {
+  width: 100%;
+  min-height: 36px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #ffe082;
+  color: #2a2110;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.craft-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 #hotbar {
   position: fixed;
   left: 50%;
   bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, 82px);
+  grid-template-columns: repeat(5, 82px);
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--ui-border);
@@ -158,11 +262,11 @@ body {
   }
 
   #hotbar {
-    grid-template-columns: repeat(4, 68px);
+    grid-template-columns: repeat(5, 62px);
     gap: 6px;
   }
 
   .hotbar-slot {
-    width: 68px;
+    width: 62px;
   }
 }

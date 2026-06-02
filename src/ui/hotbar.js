@@ -20,7 +20,13 @@ export class Hotbar {
   update({ inventory, activeResource }) {
     if (!this.element) return;
 
-    this.element.innerHTML = HOTBAR_RESOURCES.map((resource, index) => {
+    const visibleResources = HOTBAR_RESOURCES.filter((resource) => (
+      resource !== 'workbench' ||
+      inventory[resource] > 0 ||
+      activeResource === 'workbench'
+    ));
+
+    this.element.innerHTML = visibleResources.map((resource, index) => {
       const isActive = resource === activeResource;
       const label = RESOURCE_LABELS[resource];
       const shortLabel = RESOURCE_SHORT_LABELS[resource];

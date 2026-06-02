@@ -4,7 +4,8 @@ export class ResourceInventory {
       earth: 0,
       rawWood: 0,
       fiber: 0,
-      grassSeed: 0
+      grassSeed: 0,
+      workbench: 0
     };
   }
 
@@ -14,6 +15,10 @@ export class ResourceInventory {
 
   remove(resource, amount = 1) {
     this.resources[resource] = Math.max(0, this.get(resource) - amount);
+  }
+
+  canRemove(resource, amount = 1) {
+    return this.get(resource) >= amount;
   }
 
   get(resource) {

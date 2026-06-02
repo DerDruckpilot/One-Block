@@ -19,9 +19,15 @@
         <div class="hud-title">One Block</div>
         <div id="hud-content">Lade Spiel...</div>
       </section>
+      <nav id="top-menu" aria-label="Menüs">
+        <button id="inventory-button" class="top-menu-button" type="button" aria-label="Inventar">INV</button>
+        <button id="crafting-button" class="top-menu-button" type="button" aria-label="Crafting">CRA</button>
+      </nav>
+      <section id="inventory-panel" class="menu-panel" aria-label="Inventar" hidden></section>
+      <section id="crafting-panel" class="menu-panel" aria-label="Crafting" hidden></section>
       <section id="hotbar" aria-label="Hotbar"></section>
       <section id="help">
-        <strong>Steuerung:</strong> WASD/Pfeile: bewegen &middot; E/Leertaste: Kristall aktivieren &middot; 1-4: Hotbar &middot; B: aktives Item platzieren &middot; P: Debug &middot; R halten: Reset
+        <strong>Steuerung:</strong> WASD/Pfeile: bewegen &middot; E/Leertaste: Kristall aktivieren &middot; I: Inventar &middot; C: Crafting &middot; B: ausgewähltes Item platzieren &middot; P: Debug
       </section>
     </main>
     <script type="module" src="./src/main.js"></script>
