@@ -1,0 +1,12 @@
+{
+  "image": "crystal-placeholder-32.png",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "animations": {
+    "idle": {
+      "frames": [0],
+      "fps": 1
+    }
+  },
+  "notes": "Platzhalter im 32x32-Raster. Später animieren."
+}

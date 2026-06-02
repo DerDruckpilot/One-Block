@@ -1,0 +1,12 @@
+{
+  "image": "player-placeholder-48.png",
+  "frameWidth": 48,
+  "frameHeight": 48,
+  "animations": {
+    "idle_down": {
+      "frames": [0],
+      "fps": 1
+    }
+  },
+  "notes": "Platzhalter im echten 48x48-Raster. Später durch finales Sprite-Sheet ersetzen."
+}
