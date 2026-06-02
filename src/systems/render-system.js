@@ -6,6 +6,8 @@ export class RenderSystem {
   }
 
   renderWorld(tileMap, camera) {
+    this.drawIslandShadow(tileMap, camera);
+
     tileMap.forEachTile((tile) => {
       const screenX = Math.round(tile.x * TILE_SIZE - camera.x);
       const screenY = Math.round(tile.y * TILE_SIZE - camera.y);
@@ -70,14 +72,49 @@ export class RenderSystem {
   }
 
   drawEarthTile(x, y) {
+    this.context.fillStyle = '#5e442a';
+    this.context.fillRect(x, y + 23, TILE_SIZE, 9);
+    this.context.fillStyle = '#43301f';
+    this.context.fillRect(x + 3, y + 29, TILE_SIZE - 6, 5);
+
     this.context.fillStyle = '#7a5834';
-    this.context.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    this.context.fillRect(x, y, TILE_SIZE, 26);
     this.context.fillStyle = '#8f6b3f';
-    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, 22);
     this.context.fillStyle = '#6e4c2e';
-    this.context.fillRect(x + 4, y + 24, 6, 3);
+    this.context.fillRect(x + 4, y + 18, 6, 3);
     this.context.fillRect(x + 20, y + 9, 5, 3);
     this.context.fillStyle = '#69a84f';
     this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 4);
+  }
+
+  drawIslandShadow(tileMap, camera) {
+    const tiles = [];
+    tileMap.forEachTile((tile) => tiles.push(tile));
+
+    if (tiles.length === 0) return;
+
+    const xs = tiles.map((tile) => tile.x);
+    const ys = tiles.map((tile) => tile.y);
+    const minX = Math.min(...xs) * TILE_SIZE - camera.x;
+    const maxX = (Math.max(...xs) + 1) * TILE_SIZE - camera.x;
+    const maxY = (Math.max(...ys) + 1) * TILE_SIZE - camera.y;
+    const width = maxX - minX;
+
+    this.context.save();
+    this.context.globalAlpha = 0.16;
+    this.context.fillStyle = '#223149';
+    this.context.beginPath();
+    this.context.ellipse(
+      Math.round(minX + width / 2),
+      Math.round(maxY + 30),
+      Math.round(width * 0.55),
+      18,
+      0,
+      0,
+      Math.PI * 2
+    );
+    this.context.fill();
+    this.context.restore();
   }
 }

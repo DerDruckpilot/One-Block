@@ -50,7 +50,7 @@ Dieses Repo enthält:
 - neu strukturierte Designdokumente
 - Platzhalter-Assets im korrekten Pixelraster
 - GitHub-Pages-Workflow
-- erste Spielsysteme als Code-Gerüst
+- einen ersten spielbaren Vertical-Slice-Prototyp
 
 Die Demo ist noch kein fertiges Spiel. Sie dient als technischer Startpunkt.
 
@@ -61,10 +61,6 @@ Die Demo ist noch kein fertiges Spiel. Sie dient als technischer Startpunkt.
 | WASD / Pfeiltasten | Bewegen |
 | Shift | Rennen |
 | Leertaste / E | Kristall benutzen |
-| B | Erdblock vor dem Spieler platzieren |
-| 1 | Faust auswählen |
-| 2 | Holzspitzhacke auswählen |
-| 3 | Speer auswählen |
 
 ## Wichtige Dokumente
 

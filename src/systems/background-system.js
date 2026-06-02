@@ -11,9 +11,9 @@ export class BackgroundSystem {
 
   render(context, camera) {
     const gradient = context.createLinearGradient(0, 0, 0, GAME_VIEW.height);
-    gradient.addColorStop(0, '#78c7ff');
-    gradient.addColorStop(0.55, '#bfeaff');
-    gradient.addColorStop(1, '#f8f3d2');
+    gradient.addColorStop(0, '#71c5ff');
+    gradient.addColorStop(0.55, '#bcecff');
+    gradient.addColorStop(1, '#fff0bd');
     context.fillStyle = gradient;
     context.fillRect(0, 0, GAME_VIEW.width, GAME_VIEW.height);
 
