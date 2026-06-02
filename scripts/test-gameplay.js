@@ -10,6 +10,7 @@ import {
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
 import { Player } from '../src/entities/player.js';
+import { SaveSystem } from '../src/systems/save-system.js';
 import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { CrystalSystem } from '../src/systems/crystal-system.js';
@@ -22,6 +23,21 @@ const createSpawnedPlayer = () => new Player(
   PLAYER_SPAWN_TILE.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
   PLAYER_SPAWN_TILE.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
 );
+
+const createMemoryStorage = () => {
+  const data = new Map();
+  return {
+    getItem(key) {
+      return data.get(key) || null;
+    },
+    removeItem(key) {
+      data.delete(key);
+    },
+    setItem(key, value) {
+      data.set(key, value);
+    }
+  };
+};
 
 const map = new TileMap();
 
@@ -279,6 +295,64 @@ const map = new TileMap();
   assert.equal(game.getEarthPlacementPreview().canPlace, false, 'placement preview is invalid without earth');
   assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed without an earth resource');
   assert.equal(game.crystalSystem.lastMessage, 'Nicht genug Erde.', 'missing resource writes a clear log message');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.inventory.add('earth', 3);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryPlaceEarth();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
+  assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
+  assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
+}
+
+{
+  const storage = createMemoryStorage();
+  const saveSystem = new SaveSystem(storage);
+
+  assert.equal(saveSystem.save({ resources: { earth: 1 } }), true, 'save system writes to storage');
+  assert.equal(saveSystem.load().resources.earth, 1, 'save system reads from storage');
+  assert.equal(saveSystem.clear(), true, 'save system clears storage');
+  assert.equal(saveSystem.load(), null, 'cleared save returns null');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.inventory.add('earth', 1);
+  game.saveGame();
+  game.resetHoldSeconds = 2;
+  game.resetGame();
+
+  assert.equal(storage.getItem('one-block-save-v1'), null, 'reset clears the saved game');
+  assert.equal(game.inventory.get('earth'), 0, 'reset restores empty resources');
+  assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.input.pressedThisFrame.add('F3');
+  game.handleDebugToggle();
+  assert.equal(game.debugVisible, true, 'F3 enables debug HUD');
+
+  game.input.pressedThisFrame.add('F3');
+  game.handleDebugToggle();
+  assert.equal(game.debugVisible, false, 'F3 disables debug HUD');
 }
 
 {
