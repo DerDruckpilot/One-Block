@@ -19,4 +19,14 @@ export class ResourceInventory {
   get(resource) {
     return this.resources[resource] || 0;
   }
+
+  load(resources) {
+    for (const resource of Object.keys(this.resources)) {
+      this.resources[resource] = Number(resources?.[resource] || 0);
+    }
+  }
+
+  toJSON() {
+    return { ...this.resources };
+  }
 }

@@ -26,6 +26,20 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.earth);
   }
 
+  loadTiles(tiles) {
+    this.tiles.clear();
+    for (const tile of tiles) {
+      this.tiles.set(keyOf(tile.x, tile.y), tile.type);
+    }
+    this.tiles.set(keyOf(this.crystal.x, this.crystal.y), TILE_TYPES.crystal);
+  }
+
+  toJSON() {
+    const tiles = [];
+    this.forEachTile((tile) => tiles.push(tile));
+    return tiles;
+  }
+
   canPlaceEarth(x, y, blockedTile = null) {
     if (this.getTile(x, y)) return false;
     if (blockedTile && blockedTile.x === x && blockedTile.y === y) return false;

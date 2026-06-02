@@ -14,10 +14,11 @@ import { ResourceInventory } from '../systems/resource-inventory.js';
 import { CrystalSystem } from '../systems/crystal-system.js';
 import { RenderSystem } from '../systems/render-system.js';
 import { BackgroundSystem } from '../systems/background-system.js';
+import { SaveSystem } from '../systems/save-system.js';
 import { Hud } from '../ui/hud.js';
 
 export class Game {
-  constructor(canvas, hudElement) {
+  constructor(canvas, hudElement, options = {}) {
     this.canvas = canvas;
     this.canvas.tabIndex = 0;
     this.context = canvas.getContext('2d');
@@ -30,11 +31,16 @@ export class Game {
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
+    this.saveSystem = new SaveSystem(options.storage);
     this.hud = new Hud(hudElement);
 
     this.lastTimestamp = 0;
     this.falling = false;
+    this.debugVisible = false;
+    this.resetHoldSeconds = 0;
+    this.autosaveSeconds = 0;
     this.running = false;
+    this.loadGame();
   }
 
   start() {
@@ -79,10 +85,16 @@ export class Game {
       this.tryPlaceEarth();
     }
 
+    this.handleDebugToggle();
+    this.handleReset(deltaSeconds);
+    this.handleAutosave(deltaSeconds);
+
     this.hud.update({
       inventory: this.inventory.resources,
       hint: this.crystalSystem.lastMessage,
-      debug: this.getDebugState()
+      debug: this.getDebugState(),
+      debugVisible: this.debugVisible,
+      resetHoldSeconds: this.resetHoldSeconds
     });
   }
 
@@ -96,6 +108,7 @@ export class Game {
 
     if (isCloseToCrystal) {
       this.crystalSystem.use();
+      this.saveGame();
     }
   }
 
@@ -110,6 +123,7 @@ export class Game {
     this.tileMap.setEarth(placement.x, placement.y);
     this.inventory.remove('earth', 1);
     this.crystalSystem.lastMessage = 'Erde platziert.';
+    this.saveGame();
     return true;
   }
 
@@ -164,6 +178,7 @@ export class Game {
     if (this.falling) {
       this.respawnPlayer();
       this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
+      this.saveGame();
     }
   }
 
@@ -172,6 +187,80 @@ export class Game {
     const spawnY = PLAYER_SPAWN_TILE.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET);
     this.player.setPosition(spawnX, spawnY);
     this.player.facing = { x: 0, y: -1 };
+  }
+
+  handleDebugToggle() {
+    if (this.input.wasPressed('F3')) {
+      this.debugVisible = !this.debugVisible;
+    }
+  }
+
+  handleReset(deltaSeconds) {
+    if (this.input.isDown('r')) {
+      this.resetHoldSeconds += deltaSeconds;
+
+      if (this.resetHoldSeconds >= 2) {
+        this.resetGame();
+      }
+      return;
+    }
+
+    this.resetHoldSeconds = 0;
+  }
+
+  resetGame() {
+    this.saveSystem.clear();
+    this.tileMap = new TileMap();
+    this.inventory = new ResourceInventory();
+    this.crystalSystem = new CrystalSystem(this.inventory);
+    this.respawnPlayer();
+    this.resetHoldSeconds = 0;
+    this.autosaveSeconds = 0;
+    this.crystalSystem.lastMessage = 'Speicherstand gelöscht. Neustart am Kristall.';
+  }
+
+  handleAutosave(deltaSeconds) {
+    this.autosaveSeconds += deltaSeconds;
+
+    if (this.autosaveSeconds >= 1) {
+      this.saveGame();
+      this.autosaveSeconds = 0;
+    }
+  }
+
+  loadGame() {
+    const save = this.saveSystem.load();
+    if (!save) return false;
+
+    if (Array.isArray(save.tiles)) {
+      this.tileMap.loadTiles(save.tiles);
+    }
+
+    this.inventory.load(save.resources);
+
+    if (save.player && Number.isFinite(save.player.x) && Number.isFinite(save.player.y)) {
+      this.player.setPosition(save.player.x, save.player.y);
+      this.player.facing = save.player.facing || { x: 0, y: -1 };
+
+      if (!this.tileMap.isPlayerSupported(this.player)) {
+        this.respawnPlayer();
+      }
+    }
+
+    this.crystalSystem.lastMessage = 'Speicherstand geladen.';
+    return true;
+  }
+
+  saveGame() {
+    return this.saveSystem.save({
+      tiles: this.tileMap.toJSON(),
+      resources: this.inventory.toJSON(),
+      player: {
+        x: this.player.x,
+        y: this.player.y,
+        facing: this.player.facing
+      }
+    });
   }
 
   render() {

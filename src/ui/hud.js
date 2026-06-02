@@ -5,7 +5,7 @@ export class Hud {
     this.element = element;
   }
 
-  update({ inventory, hint, debug }) {
+  update({ inventory, hint, debug, debugVisible, resetHoldSeconds }) {
     const resources = Object.entries(inventory)
       .filter(([, amount]) => amount > 0)
       .map(([resource, amount]) => `${RESOURCE_LABELS[resource] || resource}: ${amount}`)
@@ -14,8 +14,9 @@ export class Hud {
     this.element.innerHTML = `
       <div><strong>Rohstoffe:</strong><br>${resources || 'noch keine'}</div>
       <div><strong>Log:</strong> ${hint}</div>
-      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren</div>
-      <div class="debug-hud">
+      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>F3: Debug umschalten<br>R halten: Reset</div>
+      ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
+      ${debugVisible ? `<div class="debug-hud">
         <strong>Debug:</strong><br>
         Spieler: ${this.formatNumber(debug.playerX)}, ${this.formatNumber(debug.playerY)}<br>
         Kamera: ${this.formatNumber(debug.cameraX)}, ${this.formatNumber(debug.cameraY)}<br>
@@ -24,7 +25,7 @@ export class Hud {
         void/falling: ${debug.inVoid ? 'void' : 'safe'} / ${debug.falling ? 'falling' : 'stable'}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>
         Letzter Key: ${debug.lastKey}
-      </div>
+      </div>` : ''}
     `;
   }
 
