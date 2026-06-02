@@ -1,0 +1,20 @@
+{
+  "name": "one-block",
+  "version": "0.1.0",
+  "private": true,
+  "description": "2D Top-Down One-Block Survival Adventure as static PWA.",
+  "type": "module",
+  "scripts": {
+    "start": "npx serve .",
+    "check": "node scripts/check-project.js",
+    "test": "node scripts/check-project.js"
+  },
+  "keywords": [
+    "game",
+    "pwa",
+    "canvas",
+    "pixel-art",
+    "one-block"
+  ],
+  "license": "UNLICENSED"
+}

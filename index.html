@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#8f63ff" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="One Block" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>One Block</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/ui/icon-192.png" />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main id="app" aria-label="One Block Spielbereich">
+      <canvas id="game" width="960" height="540"></canvas>
+      <section id="hud" aria-live="polite">
+        <div class="hud-title">One Block</div>
+        <div id="hud-content">Lade Spiel...</div>
+      </section>
+      <section id="help">
+        <strong>Steuerung:</strong> WASD/Pfeile bewegen · Shift rennen · E/Leertaste Kristall · B Erde platzieren · 1/2/3 Werkzeug
+      </section>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

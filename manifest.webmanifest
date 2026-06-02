@@ -1,0 +1,23 @@
+{
+  "name": "One Block",
+  "short_name": "One Block",
+  "description": "2D Top-Down One-Block Survival Adventure",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#77bdf7",
+  "theme_color": "#8f63ff",
+  "icons": [
+    {
+      "src": "./assets/ui/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./assets/ui/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
