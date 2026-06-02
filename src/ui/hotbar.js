@@ -1,4 +1,5 @@
 import {
+  BASE_RESOURCES,
   HOTBAR_RESOURCES,
   RESOURCE_ICONS,
   RESOURCE_LABELS,
@@ -14,9 +15,9 @@ export class Hotbar {
     if (!this.element) return;
 
     const visibleResources = HOTBAR_RESOURCES.filter((resource) => (
-      resource !== 'workbench' ||
+      BASE_RESOURCES.includes(resource) ||
       inventory[resource] > 0 ||
-      activeResource === 'workbench'
+      activeResource === resource
     ));
 
     this.element.innerHTML = visibleResources.map((resource, index) => {

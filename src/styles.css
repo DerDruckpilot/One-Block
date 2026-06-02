@@ -152,6 +152,19 @@ body {
   font-size: 13px;
 }
 
+.recipe-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.recipe-card {
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .craft-button {
   width: 100%;
   min-height: 36px;
@@ -176,7 +189,7 @@ body {
   bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(5, 82px);
+  grid-template-columns: repeat(6, 78px);
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--ui-border);
@@ -192,7 +205,7 @@ body {
   grid-template-columns: 28px 1fr;
   grid-template-rows: 28px 18px;
   align-items: center;
-  width: 82px;
+  width: 78px;
   height: 58px;
   padding: 5px;
   border: 2px solid rgba(255, 255, 255, 0.22);
@@ -262,11 +275,11 @@ body {
   }
 
   #hotbar {
-    grid-template-columns: repeat(5, 62px);
+    grid-template-columns: repeat(6, 52px);
     gap: 6px;
   }
 
   .hotbar-slot {
-    width: 62px;
+    width: 52px;
   }
 }

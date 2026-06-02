@@ -15,6 +15,10 @@ export class RenderSystem {
       if (tile.type === TILE_TYPES.earth) {
         this.drawEarthTile(screenX, screenY);
       }
+
+      if (tile.type === TILE_TYPES.grass) {
+        this.drawGrassTile(screenX, screenY);
+      }
     });
   }
 
@@ -112,6 +116,23 @@ export class RenderSystem {
     this.context.fillRect(x + 20, y + 9, 5, 3);
     this.context.fillStyle = '#69a84f';
     this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 4);
+  }
+
+  drawGrassTile(x, y) {
+    this.context.fillStyle = '#36552c';
+    this.context.fillRect(x, y + 23, TILE_SIZE, 9);
+    this.context.fillStyle = '#263d20';
+    this.context.fillRect(x + 3, y + 29, TILE_SIZE - 6, 5);
+
+    this.context.fillStyle = '#3f7f3d';
+    this.context.fillRect(x, y, TILE_SIZE, 26);
+    this.context.fillStyle = '#54a34c';
+    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, 22);
+    this.context.fillStyle = '#76c766';
+    this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 5);
+    this.context.fillStyle = '#2f6f35';
+    this.context.fillRect(x + 4, y + 18, 6, 3);
+    this.context.fillRect(x + 20, y + 9, 5, 3);
   }
 
   drawWorkbench(x, y) {

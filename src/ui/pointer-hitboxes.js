@@ -9,7 +9,7 @@ export class PointerHitboxSystem {
     inventoryButton,
     inventoryPanel,
     onBlockedCraft = () => {},
-    onCraftWorkbench = () => {},
+    onCraft = () => {},
     onCraftingToggle = () => {},
     onHotbarSelect = () => {},
     onInventoryToggle = () => {},
@@ -24,7 +24,7 @@ export class PointerHitboxSystem {
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
     this.onBlockedCraft = onBlockedCraft;
-    this.onCraftWorkbench = onCraftWorkbench;
+    this.onCraft = onCraft;
     this.onCraftingToggle = onCraftingToggle;
     this.onHotbarSelect = onHotbarSelect;
     this.onInventoryToggle = onInventoryToggle;
@@ -95,15 +95,16 @@ export class PointerHitboxSystem {
     const hitboxes = [];
 
     if (this.getCraftingOpen()) {
-      const craftButton = this.craftingPanel?.querySelector?.('[data-craft="workbench"]');
-      const craftButtonHitbox = this.createElementHitbox(craftButton, 'craft-workbench', () => {
-        if (craftButton.disabled) {
-          this.onBlockedCraft();
-          return;
-        }
-        this.onCraftWorkbench();
-      });
-      if (craftButtonHitbox) hitboxes.push(craftButtonHitbox);
+      for (const craftButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-craft]') || [])) {
+        const craftButtonHitbox = this.createElementHitbox(craftButton, `craft-${craftButton.dataset.craft}`, () => {
+          if (craftButton.disabled) {
+            this.onBlockedCraft(craftButton.dataset.craft);
+            return;
+          }
+          this.onCraft(craftButton.dataset.craft);
+        });
+        if (craftButtonHitbox) hitboxes.push(craftButtonHitbox);
+      }
 
       const panelHitbox = this.createElementHitbox(this.craftingPanel, 'crafting-panel', () => {});
       if (panelHitbox) hitboxes.push(panelHitbox);

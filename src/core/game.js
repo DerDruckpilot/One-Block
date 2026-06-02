@@ -6,7 +6,8 @@ import {
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
-  TILE_SIZE
+  TILE_SIZE,
+  WORKBENCH_INTERACTION_DISTANCE
 } from '../config/constants.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
@@ -59,7 +60,7 @@ export class Game {
       onBlockedCraft: () => {
         this.crystalSystem.lastMessage = 'Nicht genug Material.';
       },
-      onCraftWorkbench: () => this.tryCraftWorkbench(),
+      onCraft: (recipeId) => this.tryCraft(recipeId),
       onCraftingToggle: () => this.toggleCraftingMenu(),
       onHotbarSelect: (resource) => this.selectAndSaveHotbarResource(resource),
       onInventoryToggle: () => this.toggleInventoryMenu(),
@@ -142,9 +143,12 @@ export class Game {
     });
     this.menuPanels.update({
       craftingOpen: this.craftingOpen,
+      hasWorkbenchAccess: this.hasWorkbenchAccess(),
       inventory: this.inventory,
       inventoryOpen: this.inventoryOpen,
-      workbenchRecipe: this.craftingSystem.getWorkbenchRecipeState()
+      recipeStates: this.craftingSystem.getRecipeStates({
+        hasWorkbenchAccess: this.hasWorkbenchAccess()
+      })
     });
     this.updateMenuButtonStates();
     this.pointerHitboxes.updateHitboxes();
@@ -191,6 +195,12 @@ export class Game {
       }
     }
 
+    if (this.activeHotbarResource === 'grassSeed') {
+      this.tileMap.setGrass(placement.x, placement.y);
+      this.inventory.remove('grassSeed', 1);
+      this.crystalSystem.lastMessage = 'Grassamen gepflanzt.';
+    }
+
     this.saveGame();
     return true;
   }
@@ -205,6 +215,10 @@ export class Game {
 
     if (this.activeHotbarResource === OBJECT_TYPES.workbench) {
       return this.getWorkbenchPlacementPreview(target, playerTile);
+    }
+
+    if (this.activeHotbarResource === 'grassSeed') {
+      return this.getGrassSeedPlacementPreview(target);
     }
 
     if (this.activeHotbarResource !== 'earth') {
@@ -302,6 +316,46 @@ export class Game {
     };
   }
 
+  getGrassSeedPlacementPreview(target = this.player.getFacingTile()) {
+    if (this.inventory.get('grassSeed') <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht genug Grassamen.'
+      };
+    }
+
+    if (this.tileMap.isCrystal(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht auf dem Kristall.'
+      };
+    }
+
+    if (this.tileMap.isGrass(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Tile ist bereits begrünt.'
+      };
+    }
+
+    if (!this.tileMap.isPlantableEarth(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Grassamen brauchen Erde.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: true,
+      message: 'Grassamen können gepflanzt werden.'
+    };
+  }
+
   handleVoidFall() {
     const foot = this.player.getFootPosition();
     const support = this.tileMap.getSupportStateAtWorld(foot.x, foot.y);
@@ -360,13 +414,29 @@ export class Game {
     }
   }
 
-  tryCraftWorkbench() {
-    const result = this.craftingSystem.craftWorkbench();
+  tryCraft(recipeId) {
+    const result = this.craftingSystem.craft(recipeId, {
+      hasWorkbenchAccess: this.hasWorkbenchAccess()
+    });
     this.crystalSystem.lastMessage = result.message;
     if (result.crafted) {
       this.saveGame();
     }
     return result.crafted;
+  }
+
+  tryCraftWorkbench() {
+    return this.tryCraft('workbench');
+  }
+
+  hasWorkbenchAccess() {
+    const foot = this.player.getFootPosition();
+    return this.tileMap.isNearObjectWorld(
+      foot.x,
+      foot.y,
+      OBJECT_TYPES.workbench,
+      WORKBENCH_INTERACTION_DISTANCE
+    );
   }
 
   selectHotbarResource(resource) {
