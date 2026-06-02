@@ -74,6 +74,22 @@ const map = new TileMap();
 }
 
 {
+  const supportedPoint = map.tileToWorld(1, 1);
+  const voidPoint = map.tileToWorld(2, 1);
+
+  assert.equal(
+    map.isPositionSupportedByTile(supportedPoint.x + TILE_SIZE / 2, supportedPoint.y + TILE_SIZE / 2),
+    true,
+    'player stand point on an existing tile is safe'
+  );
+  assert.equal(
+    map.isPositionSupportedByTile(voidPoint.x + TILE_SIZE / 2, voidPoint.y + TILE_SIZE / 2),
+    false,
+    'player stand point directly beside an existing tile is void'
+  );
+}
+
+{
   const player = createSpawnedPlayer();
 
   for (let i = 0; i < 20; i += 1) {
@@ -96,6 +112,27 @@ const map = new TileMap();
 }
 
 {
+  const rowMap = new TileMap();
+  for (let y = 2; y <= 8; y += 1) {
+    rowMap.setEarth(0, y);
+  }
+
+  const onRow = rowMap.tileToWorld(0, 7);
+  const besideRow = rowMap.tileToWorld(1, 7);
+
+  assert.equal(
+    rowMap.isPositionSupportedByTile(onRow.x + TILE_SIZE / 2, onRow.y + TILE_SIZE / 2),
+    true,
+    'long placed tile row is safe on the actual row'
+  );
+  assert.equal(
+    rowMap.isPositionSupportedByTile(besideRow.x + TILE_SIZE / 2, besideRow.y + TILE_SIZE / 2),
+    false,
+    'long placed tile row does not create safe space beside it'
+  );
+}
+
+{
   const lShapeMap = new TileMap();
   lShapeMap.setEarth(2, 0);
   lShapeMap.setEarth(3, 0);
@@ -114,6 +151,36 @@ const map = new TileMap();
     false,
     'missing tiles inside a wider island shape are still void'
   );
+}
+
+{
+  const holeMap = new TileMap();
+  for (let y = 2; y <= 4; y += 1) {
+    for (let x = 2; x <= 4; x += 1) {
+      if (x !== 3 || y !== 3) {
+        holeMap.setEarth(x, y);
+      }
+    }
+  }
+
+  const solid = holeMap.tileToWorld(2, 3);
+  const hole = holeMap.tileToWorld(3, 3);
+
+  assert.equal(
+    holeMap.isPositionSupportedByTile(solid.x + TILE_SIZE / 2, solid.y + TILE_SIZE / 2),
+    true,
+    'built tile inside a structure is safe'
+  );
+  assert.equal(
+    holeMap.isPositionSupportedByTile(hole.x + TILE_SIZE / 2, hole.y + TILE_SIZE / 2),
+    false,
+    'hole inside a built structure is void'
+  );
+}
+
+{
+  const player = createSpawnedPlayer();
+  assert.equal(map.isPlayerSupported(player), true, 'spawned player is supported by a real tile');
 }
 
 {
@@ -152,7 +219,7 @@ const map = new TileMap();
 
   game.handleVoidFall();
 
-  assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'gap inside extended island bounds triggers respawn');
+  assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'gap inside extended island shape triggers respawn');
 }
 
 {

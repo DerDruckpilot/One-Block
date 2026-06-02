@@ -19,6 +19,9 @@ export class Hud {
         <strong>Debug:</strong><br>
         Spieler: ${this.formatNumber(debug.playerX)}, ${this.formatNumber(debug.playerY)}<br>
         Kamera: ${this.formatNumber(debug.cameraX)}, ${this.formatNumber(debug.cameraY)}<br>
+        Support-Tile: ${debug.supportTileX}, ${debug.supportTileY}<br>
+        supported: ${debug.supported ? 'true' : 'false'}<br>
+        void/falling: ${debug.inVoid ? 'void' : 'safe'} / ${debug.falling ? 'falling' : 'stable'}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>
         Letzter Key: ${debug.lastKey}
       </div>

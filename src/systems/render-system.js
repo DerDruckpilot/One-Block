@@ -104,32 +104,16 @@ export class RenderSystem {
   }
 
   drawIslandShadow(tileMap, camera) {
-    const tiles = [];
-    tileMap.forEachTile((tile) => tiles.push(tile));
-
-    if (tiles.length === 0) return;
-
-    const xs = tiles.map((tile) => tile.x);
-    const ys = tiles.map((tile) => tile.y);
-    const minX = Math.min(...xs) * TILE_SIZE - camera.x;
-    const maxX = (Math.max(...xs) + 1) * TILE_SIZE - camera.x;
-    const maxY = (Math.max(...ys) + 1) * TILE_SIZE - camera.y;
-    const width = maxX - minX;
-
     this.context.save();
-    this.context.globalAlpha = 0.16;
+    this.context.globalAlpha = 0.08;
     this.context.fillStyle = '#223149';
-    this.context.beginPath();
-    this.context.ellipse(
-      Math.round(minX + width / 2),
-      Math.round(maxY + 30),
-      Math.round(width * 0.55),
-      18,
-      0,
-      0,
-      Math.PI * 2
-    );
-    this.context.fill();
+
+    tileMap.forEachTile((tile) => {
+      const x = Math.round(tile.x * TILE_SIZE - camera.x);
+      const y = Math.round(tile.y * TILE_SIZE - camera.y);
+      this.context.fillRect(x + 3, y + TILE_SIZE + 14, TILE_SIZE - 6, 8);
+    });
+
     this.context.restore();
   }
 }
