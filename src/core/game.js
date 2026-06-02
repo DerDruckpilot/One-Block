@@ -98,23 +98,60 @@ export class Game {
   }
 
   tryPlaceEarth() {
-    if (this.inventory.get('earth') <= 0) {
-      this.crystalSystem.lastMessage = 'Keine Erde zum Platzieren vorhanden.';
+    const placement = this.getEarthPlacementPreview();
+
+    if (!placement.canPlace) {
+      this.crystalSystem.lastMessage = placement.message;
       return false;
     }
 
-    const target = this.player.getFacingTile();
-    const playerTile = this.player.getTilePosition();
-
-    if (!this.tileMap.canPlaceEarth(target.x, target.y, playerTile)) {
-      this.crystalSystem.lastMessage = 'Hier kann keine Erde platziert werden.';
-      return false;
-    }
-
-    this.tileMap.setEarth(target.x, target.y);
+    this.tileMap.setEarth(placement.x, placement.y);
     this.inventory.remove('earth', 1);
     this.crystalSystem.lastMessage = 'Erde platziert.';
     return true;
+  }
+
+  getEarthPlacementPreview() {
+    const target = this.player.getFacingTile();
+    const playerTile = this.player.getTilePosition();
+
+    if (this.inventory.get('earth') <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht genug Erde.'
+      };
+    }
+
+    if (target.x === playerTile.x && target.y === playerTile.y) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist blockiert.'
+      };
+    }
+
+    if (this.tileMap.getTile(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist blockiert.'
+      };
+    }
+
+    if (!this.tileMap.hasNeighborGround(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Hier kann keine Erde platziert werden.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: true,
+      message: 'Erde kann platziert werden.'
+    };
   }
 
   handleVoidFall() {
@@ -137,6 +174,7 @@ export class Game {
     this.backgroundSystem.render(this.context, this.camera);
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
+    this.renderSystem.renderPlacementPreview(this.getEarthPlacementPreview(), this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
   }
 

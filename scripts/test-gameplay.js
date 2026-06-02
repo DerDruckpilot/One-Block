@@ -132,9 +132,15 @@ const map = new TileMap();
   );
   game.player.facing = { x: 1, y: 0 };
 
+  const preview = game.getEarthPlacementPreview();
+  assert.equal(preview.x, 2, 'placement preview uses the tile in front of the player');
+  assert.equal(preview.y, 0, 'placement preview tracks the player facing direction');
+  assert.equal(preview.canPlace, true, 'placement preview is valid for a free neighbor tile');
+
   assert.equal(game.tryPlaceEarth(), true, 'earth can be placed in front of the player');
   assert.equal(game.tileMap.getTile(2, 0), 'earth', 'placed earth becomes a world tile');
   assert.equal(game.inventory.get('earth'), 1, 'placing earth consumes one earth resource');
+  assert.equal(game.crystalSystem.lastMessage, 'Erde platziert.', 'successful placement writes a clear log message');
 }
 
 {
@@ -144,8 +150,10 @@ const map = new TileMap();
   game.inventory.add('earth', 1);
   game.player.facing = { x: 0, y: -1 };
 
+  assert.equal(game.getEarthPlacementPreview().canPlace, false, 'placement preview is blocked on the crystal');
   assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed on the crystal');
   assert.equal(game.inventory.get('earth'), 1, 'failed placement does not consume earth');
+  assert.equal(game.crystalSystem.lastMessage, 'Zielfeld ist blockiert.', 'blocked target writes a clear log message');
 }
 
 {
@@ -161,6 +169,15 @@ const map = new TileMap();
 
   assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed on an existing tile');
   assert.equal(game.inventory.get('earth'), 1, 'blocked placement does not consume earth');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  assert.equal(game.getEarthPlacementPreview().canPlace, false, 'placement preview is invalid without earth');
+  assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed without an earth resource');
+  assert.equal(game.crystalSystem.lastMessage, 'Nicht genug Erde.', 'missing resource writes a clear log message');
 }
 
 {
