@@ -1,20 +1,12 @@
-import { RESOURCE_LABELS } from '../config/constants.js';
-
 export class Hud {
   constructor(element) {
     this.element = element;
   }
 
-  update({ inventory, hint, debug, debugEnabled, resetHoldSeconds }) {
-    const resources = Object.entries(inventory)
-      .filter(([, amount]) => amount > 0)
-      .map(([resource, amount]) => `${RESOURCE_LABELS[resource] || resource}: ${amount}`)
-      .join('<br>');
-
+  update({ hint, debug, debugEnabled, resetHoldSeconds }) {
     this.element.innerHTML = `
-      <div><strong>Rohstoffe:</strong><br>${resources || 'noch keine'}</div>
       <div><strong>Log:</strong> ${hint}</div>
-      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>P: Debug umschalten<br>R halten: Reset</div>
+      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>1-4: Hotbar<br>B: aktives Item platzieren<br>P: Debug umschalten<br>R halten: Reset</div>
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
       ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>

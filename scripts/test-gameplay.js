@@ -13,8 +13,9 @@ import { Player } from '../src/entities/player.js';
 import { SAVE_KEY, SaveSystem } from '../src/systems/save-system.js';
 import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
-import { CrystalSystem } from '../src/systems/crystal-system.js';
+import { chooseWeightedDrop, CrystalSystem } from '../src/systems/crystal-system.js';
 import { Hud } from '../src/ui/hud.js';
+import { Hotbar } from '../src/ui/hotbar.js';
 
 const inputWith = (...pressedKeys) => ({
   isDown: (...keys) => keys.some((key) => pressedKeys.includes(key))
@@ -80,6 +81,16 @@ const map = new TileMap();
   });
 
   assert.equal(input.wasPressed('b'), true, 'keydown registers earth placement key');
+
+  prevented = false;
+  listeners.keydown({
+    key: '3',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('3'), true, 'keydown registers hotbar slot key');
+  assert.equal(prevented, true, 'hotbar slot key default behavior is prevented');
 
   prevented = false;
   listeners.keydown({
@@ -272,6 +283,53 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  assert.equal(game.activeHotbarResource, 'earth', 'earth is the default active hotbar item');
+  game.input.pressedThisFrame.add('2');
+  game.handleHotbarSelection();
+  assert.equal(game.activeHotbarResource, 'rawWood', 'number keys select hotbar slots');
+
+  game.selectHotbarResource('fiber');
+  assert.equal(game.activeHotbarResource, 'fiber', 'hotbar selection accepts known resources');
+  assert.equal(game.selectHotbarResource('unknown'), false, 'hotbar selection rejects unknown resources');
+  assert.equal(game.activeHotbarResource, 'fiber', 'invalid hotbar resource does not change selection');
+}
+
+{
+  const element = {
+    innerHTML: '',
+    listener: null,
+    addEventListener(type, callback) {
+      if (type === 'click') this.listener = callback;
+    }
+  };
+  let selectedResource = null;
+  const hotbar = new Hotbar(element, (resource) => {
+    selectedResource = resource;
+  });
+
+  hotbar.update({
+    inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5 },
+    activeResource: 'rawWood'
+  });
+
+  assert.equal(element.innerHTML.includes('data-resource="earth"'), true, 'hotbar renders earth slot');
+  assert.equal(element.innerHTML.includes('data-resource="rawWood"'), true, 'hotbar renders raw wood slot');
+  assert.equal(element.innerHTML.includes('is-active'), true, 'hotbar marks the active slot');
+
+  element.listener({
+    target: {
+      closest() {
+        return { dataset: { resource: 'grassSeed' } };
+      }
+    }
+  });
+  assert.equal(selectedResource, 'grassSeed', 'hotbar click reports selected resource');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   game.inventory.add('earth', 2);
   game.player.setPosition(
     1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
@@ -288,6 +346,25 @@ const map = new TileMap();
   assert.equal(game.tileMap.getTile(2, 0), 'earth', 'placed earth becomes a world tile');
   assert.equal(game.inventory.get('earth'), 1, 'placing earth consumes one earth resource');
   assert.equal(game.crystalSystem.lastMessage, 'Erde platziert.', 'successful placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('earth', 2);
+  game.selectHotbarResource('rawWood');
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.getEarthPlacementPreview().canPlace, false, 'non-earth active item blocks placement preview');
+  assert.equal(game.tryPlaceEarth(), false, 'non-earth active item cannot place earth');
+  assert.equal(game.tileMap.getTile(2, 0), null, 'non-earth active item does not add a tile');
+  assert.equal(game.inventory.get('earth'), 2, 'non-earth active item does not consume earth');
+  assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'non-placeable item writes a clear log message');
 }
 
 {
@@ -333,6 +410,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
   game.inventory.add('earth', 3);
+  game.selectHotbarResource('earth');
   game.player.setPosition(
     1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -350,6 +428,11 @@ const map = new TileMap();
   assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
   assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
+
+  loadedGame.selectHotbarResource('fiber');
+  loadedGame.saveGame();
+  const reloadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(reloadedGame.activeHotbarResource, 'fiber', 'active hotbar slot loads from local storage');
 }
 
 {
@@ -455,17 +538,30 @@ const map = new TileMap();
 }
 
 {
+  assert.equal(chooseWeightedDrop(0).resource, 'earth', 'weighted drops start with earth');
+  assert.equal(chooseWeightedDrop(0.49).resource, 'earth', 'earth covers the first 50 percent');
+  assert.equal(chooseWeightedDrop(0.50).resource, 'rawWood', 'raw wood starts after earth weight');
+  assert.equal(chooseWeightedDrop(0.69).resource, 'rawWood', 'raw wood covers the next 20 percent');
+  assert.equal(chooseWeightedDrop(0.70).resource, 'fiber', 'fiber starts after raw wood weight');
+  assert.equal(chooseWeightedDrop(0.89).resource, 'fiber', 'fiber covers the next 20 percent');
+  assert.equal(chooseWeightedDrop(0.90).resource, 'grassSeed', 'grass seed covers the final 10 percent');
+
   const inventory = new ResourceInventory();
-  const crystal = new CrystalSystem(inventory);
+  const randomValues = [0.10, 0.55, 0.75, 0.95];
+  const crystal = new CrystalSystem(inventory, () => randomValues.shift());
   const allowedResources = new Set(['earth', 'rawWood', 'fiber', 'grassSeed']);
 
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 4; i += 1) {
     const drop = crystal.use();
     assert.equal(allowedResources.has(drop.resource), true, 'crystal drops only base resources');
   }
 
   const totalResources = Object.values(inventory.resources).reduce((sum, amount) => sum + amount, 0);
-  assert.equal(totalResources, 20, 'crystal interactions add resources to the HUD inventory model');
+  assert.equal(totalResources, 4, 'crystal interactions add resources to the HUD inventory model');
+  assert.equal(inventory.get('earth'), 1, 'weighted crystal sequence can drop earth');
+  assert.equal(inventory.get('rawWood'), 1, 'weighted crystal sequence can drop raw wood');
+  assert.equal(inventory.get('fiber'), 1, 'weighted crystal sequence can drop fibers');
+  assert.equal(inventory.get('grassSeed'), 1, 'weighted crystal sequence can drop grass seeds');
 }
 
 console.log('Gameplay-Basics OK.');
