@@ -14,8 +14,10 @@ import { SAVE_KEY, SaveSystem } from '../src/systems/save-system.js';
 import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { chooseWeightedDrop, CrystalSystem } from '../src/systems/crystal-system.js';
+import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
+import { MenuPanels } from '../src/ui/menu-panels.js';
 
 const inputWith = (...pressedKeys) => ({
   isDown: (...keys) => keys.some((key) => pressedKeys.includes(key))
@@ -91,6 +93,26 @@ const map = new TileMap();
   });
   assert.equal(input.wasPressed('3'), true, 'keydown registers hotbar slot key');
   assert.equal(prevented, true, 'hotbar slot key default behavior is prevented');
+
+  prevented = false;
+  listeners.keydown({
+    key: 'I',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('i'), true, 'keydown registers inventory key');
+  assert.equal(prevented, true, 'inventory key default behavior is prevented');
+
+  prevented = false;
+  listeners.keydown({
+    key: 'C',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('c'), true, 'keydown registers crafting key');
+  assert.equal(prevented, true, 'crafting key default behavior is prevented');
 
   prevented = false;
   listeners.keydown({
@@ -324,6 +346,133 @@ const map = new TileMap();
     }
   });
   assert.equal(selectedResource, 'grassSeed', 'hotbar click reports selected resource');
+
+  hotbar.update({
+    inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5, workbench: 1 },
+    activeResource: 'workbench'
+  });
+  assert.equal(element.innerHTML.includes('data-resource="workbench"'), true, 'hotbar shows workbench once available');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.input.pressedThisFrame.add('i');
+  game.handleMenuToggles();
+  assert.equal(game.inventoryOpen, true, 'I opens inventory');
+  assert.equal(game.craftingOpen, false, 'opening inventory keeps crafting closed');
+  game.input.consumeFramePresses();
+
+  game.input.pressedThisFrame.add('i');
+  game.handleMenuToggles();
+  assert.equal(game.inventoryOpen, false, 'I closes inventory');
+  game.input.consumeFramePresses();
+
+  game.input.pressedThisFrame.add('c');
+  game.handleMenuToggles();
+  assert.equal(game.craftingOpen, true, 'C opens crafting');
+  assert.equal(game.inventoryOpen, false, 'opening crafting keeps inventory closed');
+  game.input.consumeFramePresses();
+
+  game.input.pressedThisFrame.add('c');
+  game.handleMenuToggles();
+  assert.equal(game.craftingOpen, false, 'C closes crafting');
+}
+
+{
+  const elementClassList = () => {
+    const classes = new Set();
+    return {
+      contains: (name) => classes.has(name),
+      toggle(name, enabled) {
+        if (enabled) classes.add(name);
+        else classes.delete(name);
+      }
+    };
+  };
+
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game(
+    { getContext: () => ({}) },
+    { innerHTML: '' },
+    {
+      craftingButton: { addEventListener(type, callback) { this.click = callback; }, classList: elementClassList() },
+      inventoryButton: { addEventListener(type, callback) { this.click = callback; }, classList: elementClassList() }
+    }
+  );
+
+  game.inventoryButton.click();
+  assert.equal(game.inventoryOpen, true, 'inventory icon opens inventory');
+  game.inventoryButton.click();
+  assert.equal(game.inventoryOpen, false, 'inventory icon closes inventory');
+
+  game.craftingButton.click();
+  assert.equal(game.craftingOpen, true, 'crafting icon opens crafting');
+  game.craftingButton.click();
+  assert.equal(game.craftingOpen, false, 'crafting icon closes crafting');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+
+  assert.equal(crafting.getWorkbenchRecipeState().canCraft, false, 'workbench recipe needs resources');
+  assert.equal(crafting.craftWorkbench().crafted, false, 'crafting fails without resources');
+
+  inventory.add('rawWood', 5);
+  inventory.add('fiber', 2);
+  const result = crafting.craftWorkbench();
+
+  assert.equal(result.crafted, true, 'workbench can be crafted with enough resources');
+  assert.equal(inventory.get('rawWood'), 0, 'workbench crafting consumes raw wood');
+  assert.equal(inventory.get('fiber'), 0, 'workbench crafting consumes fibers');
+  assert.equal(inventory.get('workbench'), 1, 'workbench crafting adds a workbench item');
+  assert.equal(result.message, 'Werkbank hergestellt.', 'workbench crafting returns a clear log message');
+}
+
+{
+  const inventoryPanel = { hidden: true, innerHTML: '' };
+  const craftingPanel = {
+    hidden: true,
+    innerHTML: '',
+    addEventListener(type, callback) {
+      if (type === 'click') this.listener = callback;
+    }
+  };
+  let craftedId = null;
+  const inventory = new ResourceInventory();
+  inventory.add('rawWood', 4);
+  const menus = new MenuPanels({
+    craftingPanel,
+    inventoryPanel,
+    onCraftWorkbench(id) {
+      craftedId = id;
+    }
+  });
+  const crafting = new CraftingSystem(inventory);
+
+  menus.update({
+    craftingOpen: true,
+    inventory,
+    inventoryOpen: true,
+    workbenchRecipe: crafting.getWorkbenchRecipeState()
+  });
+
+  assert.equal(inventoryPanel.hidden, false, 'inventory panel opens');
+  assert.equal(inventoryPanel.innerHTML.includes('Erde'), true, 'inventory panel lists base resources');
+  assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
+  assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
+  assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
+
+  craftingPanel.listener({
+    target: {
+      closest() {
+        return { dataset: { craft: 'workbench' }, disabled: false };
+      }
+    }
+  });
+  assert.equal(craftedId, 'workbench', 'crafting panel click reports workbench craft action');
 }
 
 {
@@ -371,6 +520,82 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  game.inventory.add('workbench', 1);
+  game.selectHotbarResource('workbench');
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.getPlacementPreview().canPlace, true, 'workbench can be placed on an existing ground tile');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'selected workbench can be placed');
+  assert.equal(game.tileMap.getObject(1, 1), 'workbench', 'placed workbench becomes a world object');
+  assert.equal(game.inventory.get('workbench'), 0, 'placing workbench consumes one workbench');
+  assert.equal(game.activeHotbarResource, 'earth', 'hotbar returns to earth after placing the last workbench');
+  assert.equal(game.crystalSystem.lastMessage, 'Werkbank platziert.', 'successful workbench placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('workbench', 1);
+  game.selectHotbarResource('workbench');
+  game.player.facing = { x: 0, y: -1 };
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'workbench cannot be placed on the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Nicht auf dem Kristall.', 'crystal placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('workbench', 1);
+  game.selectHotbarResource('workbench');
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'workbench cannot be placed in the void');
+  assert.equal(game.crystalSystem.lastMessage, 'Werkbank braucht ein vorhandenes Tile.', 'void placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('workbench', 2);
+  game.selectHotbarResource('workbench');
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryPlaceSelectedItem();
+  game.selectHotbarResource('workbench');
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'workbench cannot be placed on an occupied object tile');
+  assert.equal(game.crystalSystem.lastMessage, 'Zielfeld ist bereits belegt.', 'occupied placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('workbench', 1);
+  game.selectHotbarResource('workbench');
+
+  assert.equal(game.getWorkbenchPlacementPreview(game.player.getTilePosition(), game.player.getTilePosition()).canPlace, false, 'workbench cannot be placed on the player tile');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   game.inventory.add('earth', 1);
   game.player.facing = { x: 0, y: -1 };
 
@@ -410,6 +635,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
   game.inventory.add('earth', 3);
+  game.inventory.add('workbench', 2);
   game.selectHotbarResource('earth');
   game.player.setPosition(
     1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
@@ -417,6 +643,8 @@ const map = new TileMap();
   );
   game.player.facing = { x: 1, y: 0 };
   game.tryPlaceEarth();
+  game.selectHotbarResource('workbench');
+  game.tryPlaceSelectedItem();
 
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
@@ -427,6 +655,8 @@ const map = new TileMap();
   assert.equal(loadedGame.saveStatus, 'loaded', 'valid save marks save status as loaded');
   assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
   assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
+  assert.equal(loadedGame.inventory.get('workbench'), 1, 'saved workbench item count loads from local storage');
+  assert.equal(loadedGame.tileMap.getObject(2, 0), 'workbench', 'saved placed workbench loads as world object');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
 
   loadedGame.selectHotbarResource('fiber');
@@ -454,6 +684,8 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
   game.inventory.add('earth', 1);
+  game.inventory.add('workbench', 1);
+  game.tileMap.setWorkbench(1, 1);
   game.saveGame();
   game.input.keys.add('r');
   game.update(1);
@@ -463,6 +695,8 @@ const map = new TileMap();
 
   assert.equal(storage.getItem(SAVE_KEY), null, 'reset clears the saved game');
   assert.equal(game.inventory.get('earth'), 0, 'reset restores empty resources');
+  assert.equal(game.inventory.get('workbench'), 0, 'reset clears crafted workbench items');
+  assert.equal(game.tileMap.getObject(1, 1), null, 'reset clears placed workbenches');
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
   assert.equal(game.crystalSystem.lastMessage, 'Speicherstand gelöscht. Neustart am Kristall.', 'reset writes a clear log message');
 }

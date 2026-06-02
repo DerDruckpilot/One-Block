@@ -6,7 +6,6 @@ export class Hud {
   update({ hint, debug, debugEnabled, resetHoldSeconds }) {
     this.element.innerHTML = `
       <div><strong>Log:</strong> ${hint}</div>
-      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>1-4: Hotbar<br>B: aktives Item platzieren<br>P: Debug umschalten<br>R halten: Reset</div>
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
       ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>

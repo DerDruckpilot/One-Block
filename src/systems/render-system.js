@@ -1,4 +1,4 @@
-import { GAME_VIEW, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import { GAME_VIEW, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 
 export class RenderSystem {
   constructor(context) {
@@ -42,6 +42,17 @@ export class RenderSystem {
     this.context.fillStyle = '#d9c7ff';
     this.context.fillRect(cx - 3, cy - 10, 4, 8);
     this.context.restore();
+  }
+
+  renderObjects(tileMap, camera) {
+    tileMap.forEachObject((object) => {
+      const screenX = Math.round(object.x * TILE_SIZE - camera.x);
+      const screenY = Math.round(object.y * TILE_SIZE - camera.y);
+
+      if (object.type === OBJECT_TYPES.workbench) {
+        this.drawWorkbench(screenX, screenY);
+      }
+    });
   }
 
   renderPlayer(player, camera) {
@@ -101,6 +112,23 @@ export class RenderSystem {
     this.context.fillRect(x + 20, y + 9, 5, 3);
     this.context.fillStyle = '#69a84f';
     this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 4);
+  }
+
+  drawWorkbench(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#3a2418';
+    this.context.fillRect(x + 6, y + 15, 20, 12);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 5, y + 11, 22, 8);
+    this.context.fillStyle = '#b57a45';
+    this.context.fillRect(x + 7, y + 9, 18, 5);
+    this.context.fillStyle = '#2e1d14';
+    this.context.fillRect(x + 8, y + 24, 4, 6);
+    this.context.fillRect(x + 20, y + 24, 4, 6);
+    this.context.fillStyle = '#d2a06a';
+    this.context.fillRect(x + 10, y + 11, 4, 3);
+    this.context.fillRect(x + 18, y + 11, 4, 3);
+    this.context.restore();
   }
 
   drawIslandShadow(tileMap, camera) {

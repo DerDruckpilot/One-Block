@@ -1,10 +1,11 @@
-import { TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import { OBJECT_TYPES, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 
 const keyOf = (x, y) => `${x},${y}`;
 
 export class TileMap {
   constructor() {
     this.tiles = new Map();
+    this.objects = new Map();
     this.crystal = { x: 0, y: 0 };
     this.createStartIsland();
   }
@@ -26,6 +27,26 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.earth);
   }
 
+  getObject(x, y) {
+    return this.objects.get(keyOf(x, y)) || null;
+  }
+
+  setObject(x, y, type) {
+    this.objects.set(keyOf(x, y), type);
+  }
+
+  setWorkbench(x, y) {
+    this.setObject(x, y, OBJECT_TYPES.workbench);
+  }
+
+  canPlaceWorkbench(x, y, playerTile = null) {
+    if (!this.isGround(x, y)) return false;
+    if (this.isCrystal(x, y)) return false;
+    if (this.getObject(x, y)) return false;
+    if (playerTile && playerTile.x === x && playerTile.y === y) return false;
+    return true;
+  }
+
   loadTiles(tiles) {
     this.tiles.clear();
     for (const tile of tiles) {
@@ -34,10 +55,25 @@ export class TileMap {
     this.tiles.set(keyOf(this.crystal.x, this.crystal.y), TILE_TYPES.crystal);
   }
 
+  loadObjects(objects = []) {
+    this.objects.clear();
+    for (const object of objects) {
+      if (object.type === OBJECT_TYPES.workbench) {
+        this.objects.set(keyOf(object.x, object.y), object.type);
+      }
+    }
+  }
+
   toJSON() {
     const tiles = [];
     this.forEachTile((tile) => tiles.push(tile));
     return tiles;
+  }
+
+  objectsToJSON() {
+    const objects = [];
+    this.forEachObject((object) => objects.push(object));
+    return objects;
   }
 
   canPlaceEarth(x, y, blockedTile = null) {
@@ -144,6 +180,13 @@ export class TileMap {
 
   forEachTile(callback) {
     for (const [key, type] of this.tiles.entries()) {
+      const [x, y] = key.split(',').map(Number);
+      callback({ x, y, type });
+    }
+  }
+
+  forEachObject(callback) {
+    for (const [key, type] of this.objects.entries()) {
       const [x, y] = key.split(',').map(Number);
       callback({ x, y, type });
     }

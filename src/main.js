@@ -3,6 +3,10 @@ import { Game } from './core/game.js';
 const canvas = document.querySelector('#game');
 const hudElement = document.querySelector('#hud-content');
 const hotbarElement = document.querySelector('#hotbar');
+const inventoryButton = document.querySelector('#inventory-button');
+const craftingButton = document.querySelector('#crafting-button');
+const inventoryPanel = document.querySelector('#inventory-panel');
+const craftingPanel = document.querySelector('#crafting-panel');
 
 const getLocalStorage = () => {
   try {
@@ -13,7 +17,11 @@ const getLocalStorage = () => {
 };
 
 const game = new Game(canvas, hudElement, {
+  craftingButton,
+  craftingPanel,
   hotbarElement,
+  inventoryButton,
+  inventoryPanel,
   storage: getLocalStorage()
 });
 game.start();

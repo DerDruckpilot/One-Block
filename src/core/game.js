@@ -2,6 +2,7 @@ import {
   CRYSTAL_INTERACTION_DISTANCE,
   GAME_VIEW,
   HOTBAR_RESOURCES,
+  OBJECT_TYPES,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
@@ -16,8 +17,10 @@ import { CrystalSystem } from '../systems/crystal-system.js';
 import { RenderSystem } from '../systems/render-system.js';
 import { BackgroundSystem } from '../systems/background-system.js';
 import { SaveSystem } from '../systems/save-system.js';
+import { CraftingSystem } from '../systems/crafting-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
+import { MenuPanels } from '../ui/menu-panels.js';
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -31,6 +34,7 @@ export class Game {
     this.player = new Player(0, 0);
     this.respawnPlayer();
     this.crystalSystem = new CrystalSystem(this.inventory);
+    this.craftingSystem = new CraftingSystem(this.inventory);
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
@@ -39,11 +43,22 @@ export class Game {
       this.selectHotbarResource(resource);
       this.saveGame();
     });
+    this.menuPanels = new MenuPanels({
+      craftingPanel: options.craftingPanel,
+      inventoryPanel: options.inventoryPanel,
+      onCraftWorkbench: () => this.tryCraftWorkbench()
+    });
+    this.inventoryButton = options.inventoryButton;
+    this.craftingButton = options.craftingButton;
+    this.inventoryButton?.addEventListener('click', () => this.toggleInventoryMenu());
+    this.craftingButton?.addEventListener('click', () => this.toggleCraftingMenu());
 
     this.lastTimestamp = 0;
     this.falling = false;
     this.debugEnabled = false;
     this.activeHotbarResource = 'earth';
+    this.inventoryOpen = false;
+    this.craftingOpen = false;
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
@@ -90,9 +105,10 @@ export class Game {
     }
 
     this.handleHotbarSelection();
+    this.handleMenuToggles();
 
     if (this.input.wasPressed('b')) {
-      this.tryPlaceEarth();
+      this.tryPlaceSelectedItem();
     }
 
     this.handleDebugToggle();
@@ -111,6 +127,13 @@ export class Game {
       inventory: this.inventory.resources,
       activeResource: this.activeHotbarResource
     });
+    this.menuPanels.update({
+      craftingOpen: this.craftingOpen,
+      inventory: this.inventory,
+      inventoryOpen: this.inventoryOpen,
+      workbenchRecipe: this.craftingSystem.getWorkbenchRecipeState()
+    });
+    this.updateMenuButtonStates();
   }
 
   tryUseCrystal() {
@@ -128,23 +151,47 @@ export class Game {
   }
 
   tryPlaceEarth() {
-    const placement = this.getEarthPlacementPreview();
+    return this.tryPlaceSelectedItem();
+  }
+
+  tryPlaceSelectedItem() {
+    const placement = this.getPlacementPreview();
 
     if (!placement.canPlace) {
       this.crystalSystem.lastMessage = placement.message;
       return false;
     }
 
-    this.tileMap.setEarth(placement.x, placement.y);
-    this.inventory.remove('earth', 1);
-    this.crystalSystem.lastMessage = 'Erde platziert.';
+    if (this.activeHotbarResource === 'earth') {
+      this.tileMap.setEarth(placement.x, placement.y);
+      this.inventory.remove('earth', 1);
+      this.crystalSystem.lastMessage = 'Erde platziert.';
+    }
+
+    if (this.activeHotbarResource === OBJECT_TYPES.workbench) {
+      this.tileMap.setWorkbench(placement.x, placement.y);
+      this.inventory.remove(OBJECT_TYPES.workbench, 1);
+      this.crystalSystem.lastMessage = 'Werkbank platziert.';
+      if (this.inventory.get(OBJECT_TYPES.workbench) <= 0) {
+        this.selectHotbarResource('earth');
+      }
+    }
+
     this.saveGame();
     return true;
   }
 
   getEarthPlacementPreview() {
+    return this.getPlacementPreview();
+  }
+
+  getPlacementPreview() {
     const target = this.player.getFacingTile();
     const playerTile = this.player.getTilePosition();
+
+    if (this.activeHotbarResource === OBJECT_TYPES.workbench) {
+      return this.getWorkbenchPlacementPreview(target, playerTile);
+    }
 
     if (this.activeHotbarResource !== 'earth') {
       return {
@@ -193,6 +240,54 @@ export class Game {
     };
   }
 
+  getWorkbenchPlacementPreview(target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
+    if (this.inventory.get(OBJECT_TYPES.workbench) <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht genug Werkbank.'
+      };
+    }
+
+    if (target.x === playerTile.x && target.y === playerTile.y) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist blockiert.'
+      };
+    }
+
+    if (!this.tileMap.isGround(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Werkbank braucht ein vorhandenes Tile.'
+      };
+    }
+
+    if (this.tileMap.isCrystal(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht auf dem Kristall.'
+      };
+    }
+
+    if (this.tileMap.getObject(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist bereits belegt.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: true,
+      message: 'Werkbank kann platziert werden.'
+    };
+  }
+
   handleVoidFall() {
     const foot = this.player.getFootPosition();
     const support = this.tileMap.getSupportStateAtWorld(foot.x, foot.y);
@@ -227,6 +322,39 @@ export class Game {
     }
   }
 
+  handleMenuToggles() {
+    if (this.input.wasPressed('i')) {
+      this.toggleInventoryMenu();
+    }
+
+    if (this.input.wasPressed('c')) {
+      this.toggleCraftingMenu();
+    }
+  }
+
+  toggleInventoryMenu() {
+    this.inventoryOpen = !this.inventoryOpen;
+    if (this.inventoryOpen) {
+      this.craftingOpen = false;
+    }
+  }
+
+  toggleCraftingMenu() {
+    this.craftingOpen = !this.craftingOpen;
+    if (this.craftingOpen) {
+      this.inventoryOpen = false;
+    }
+  }
+
+  tryCraftWorkbench() {
+    const result = this.craftingSystem.craftWorkbench();
+    this.crystalSystem.lastMessage = result.message;
+    if (result.crafted) {
+      this.saveGame();
+    }
+    return result.crafted;
+  }
+
   selectHotbarResource(resource) {
     if (!HOTBAR_RESOURCES.includes(resource)) return false;
 
@@ -255,7 +383,10 @@ export class Game {
     this.tileMap = new TileMap();
     this.inventory = new ResourceInventory();
     this.crystalSystem = new CrystalSystem(this.inventory);
+    this.craftingSystem = new CraftingSystem(this.inventory);
     this.activeHotbarResource = 'earth';
+    this.inventoryOpen = false;
+    this.craftingOpen = false;
     this.respawnPlayer();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
@@ -281,6 +412,7 @@ export class Game {
     }
 
     this.tileMap.loadTiles(save.tiles);
+    this.tileMap.loadObjects(save.objects);
 
     this.inventory.load(save.resources);
 
@@ -313,6 +445,7 @@ export class Game {
   saveGame() {
     const saved = this.saveSystem.save({
       tiles: this.tileMap.toJSON(),
+      objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
       activeHotbarResource: this.activeHotbarResource,
       player: {
@@ -329,8 +462,14 @@ export class Game {
     this.backgroundSystem.render(this.context, this.camera);
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
-    this.renderSystem.renderPlacementPreview(this.getEarthPlacementPreview(), this.camera);
+    this.renderSystem.renderObjects(this.tileMap, this.camera);
+    this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
+  }
+
+  updateMenuButtonStates() {
+    this.inventoryButton?.classList?.toggle('is-active', this.inventoryOpen);
+    this.craftingButton?.classList?.toggle('is-active', this.craftingOpen);
   }
 
   getDebugState() {
