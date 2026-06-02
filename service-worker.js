@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-2-1';
+const CACHE_NAME = 'one-block-v0-2-2';
 
 const CORE_ASSETS = [
   './',
@@ -21,6 +21,7 @@ const CORE_ASSETS = [
   './src/ui/hotbar.js',
   './src/ui/hud.js',
   './src/ui/menu-panels.js',
+  './src/ui/pointer-hitboxes.js',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'
 ];

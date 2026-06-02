@@ -18,6 +18,7 @@ import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
+import { PointerHitboxSystem } from '../src/ui/pointer-hitboxes.js';
 
 const inputWith = (...pressedKeys) => ({
   isDown: (...keys) => keys.some((key) => pressedKeys.includes(key))
@@ -50,6 +51,42 @@ const createMemoryStorage = () => {
     }
   };
 };
+
+const createRectElement = (rect, options = {}) => ({
+  hidden: options.hidden || false,
+  innerHTML: '',
+  dataset: options.dataset || {},
+  disabled: options.disabled || false,
+  classList: {
+    toggle() {}
+  },
+  getBoundingClientRect() {
+    return {
+      ...rect,
+      right: rect.left + rect.width,
+      bottom: rect.top + rect.height
+    };
+  },
+  querySelector(selector) {
+    return options.querySelector?.(selector) || null;
+  },
+  querySelectorAll(selector) {
+    return options.querySelectorAll?.(selector) || [];
+  }
+});
+
+const createPointerEvent = (clientX, clientY) => ({
+  clientX,
+  clientY,
+  defaultPrevented: false,
+  propagationStopped: false,
+  preventDefault() {
+    this.defaultPrevented = true;
+  },
+  stopPropagation() {
+    this.propagationStopped = true;
+  }
+});
 
 const map = new TileMap();
 
@@ -318,16 +355,9 @@ const map = new TileMap();
 
 {
   const element = {
-    innerHTML: '',
-    listener: null,
-    addEventListener(type, callback) {
-      if (type === 'click') this.listener = callback;
-    }
+    innerHTML: ''
   };
-  let selectedResource = null;
-  const hotbar = new Hotbar(element, (resource) => {
-    selectedResource = resource;
-  });
+  const hotbar = new Hotbar(element);
 
   hotbar.update({
     inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5 },
@@ -338,20 +368,55 @@ const map = new TileMap();
   assert.equal(element.innerHTML.includes('data-resource="rawWood"'), true, 'hotbar renders raw wood slot');
   assert.equal(element.innerHTML.includes('is-active'), true, 'hotbar marks the active slot');
 
-  element.listener({
-    target: {
-      closest() {
-        return { dataset: { resource: 'grassSeed' } };
-      }
-    }
-  });
-  assert.equal(selectedResource, 'grassSeed', 'hotbar click reports selected resource');
-
   hotbar.update({
     inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5, workbench: 1 },
     activeResource: 'workbench'
   });
   assert.equal(element.innerHTML.includes('data-resource="workbench"'), true, 'hotbar shows workbench once available');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  let selectedResource = null;
+  const canvas = {
+    width: 960,
+    height: 540,
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 480, height: 270 };
+    }
+  };
+  const hotbarSlot = createRectElement(
+    { left: 100, top: 400, width: 80, height: 56 },
+    { dataset: { resource: 'grassSeed' } }
+  );
+  const hitboxes = new PointerHitboxSystem({
+    canvas,
+    hotbarElement: createRectElement(
+      { left: 90, top: 390, width: 100, height: 76 },
+      { querySelectorAll: () => [hotbarSlot] }
+    ),
+    onHotbarSelect(resource) {
+      selectedResource = resource;
+    },
+    pointerTarget
+  });
+
+  const canvasPoint = hitboxes.clientToCanvasPoint(240, 135);
+  assert.equal(canvasPoint.x, 480, 'pointer maps browser x coordinate into canvas space');
+  assert.equal(canvasPoint.y, 270, 'pointer maps browser y coordinate into canvas space');
+
+  const event = createPointerEvent(120, 420);
+  pointerdown(event);
+
+  assert.equal(selectedResource, 'grassSeed', 'hotbar slot can be selected by pointer hitbox');
+  assert.equal(event.defaultPrevented, true, 'hotbar UI pointer event is consumed');
+  assert.equal(event.propagationStopped, true, 'hotbar UI pointer event does not leak into gameplay');
 }
 
 {
@@ -381,35 +446,38 @@ const map = new TileMap();
 }
 
 {
-  const elementClassList = () => {
-    const classes = new Set();
-    return {
-      contains: (name) => classes.has(name),
-      toggle(name, enabled) {
-        if (enabled) classes.add(name);
-        else classes.delete(name);
-      }
-    };
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
   };
+  const inventoryButton = createRectElement({ left: 420, top: 12, width: 54, height: 38 });
+  const craftingButton = createRectElement({ left: 482, top: 12, width: 54, height: 38 });
 
   const { Game } = await import('../src/core/game.js');
   const game = new Game(
-    { getContext: () => ({}) },
+    {
+      getContext: () => ({}),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 })
+    },
     { innerHTML: '' },
     {
-      craftingButton: { addEventListener(type, callback) { this.click = callback; }, classList: elementClassList() },
-      inventoryButton: { addEventListener(type, callback) { this.click = callback; }, classList: elementClassList() }
+      craftingButton,
+      inventoryButton,
+      pointerTarget
     }
   );
 
-  game.inventoryButton.click();
+  pointerdown(createPointerEvent(430, 20));
   assert.equal(game.inventoryOpen, true, 'inventory icon opens inventory');
-  game.inventoryButton.click();
+  pointerdown(createPointerEvent(430, 20));
   assert.equal(game.inventoryOpen, false, 'inventory icon closes inventory');
 
-  game.craftingButton.click();
+  pointerdown(createPointerEvent(490, 20));
   assert.equal(game.craftingOpen, true, 'crafting icon opens crafting');
-  game.craftingButton.click();
+  assert.equal(game.inventoryOpen, false, 'crafting icon keeps inventory closed');
+  pointerdown(createPointerEvent(490, 20));
   assert.equal(game.craftingOpen, false, 'crafting icon closes crafting');
 }
 
@@ -435,20 +503,13 @@ const map = new TileMap();
   const inventoryPanel = { hidden: true, innerHTML: '' };
   const craftingPanel = {
     hidden: true,
-    innerHTML: '',
-    addEventListener(type, callback) {
-      if (type === 'click') this.listener = callback;
-    }
+    innerHTML: ''
   };
-  let craftedId = null;
   const inventory = new ResourceInventory();
   inventory.add('rawWood', 4);
   const menus = new MenuPanels({
     craftingPanel,
-    inventoryPanel,
-    onCraftWorkbench(id) {
-      craftedId = id;
-    }
+    inventoryPanel
   });
   const crafting = new CraftingSystem(inventory);
 
@@ -464,15 +525,80 @@ const map = new TileMap();
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
+}
 
-  craftingPanel.listener({
-    target: {
-      closest() {
-        return { dataset: { craft: 'workbench' }, disabled: false };
-      }
+{
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
     }
-  });
-  assert.equal(craftedId, 'workbench', 'crafting panel click reports workbench craft action');
+  };
+  const inventory = new ResourceInventory();
+  inventory.add('rawWood', 5);
+  inventory.add('fiber', 2);
+  const craftButton = createRectElement({ left: 340, top: 230, width: 280, height: 36 }, { dataset: { craft: 'workbench' } });
+  const craftingPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelector: () => craftButton }
+  );
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game(
+    {
+      getContext: () => ({}),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 })
+    },
+    { innerHTML: '' },
+    {
+      craftingPanel,
+      pointerTarget
+    }
+  );
+  game.inventory.add('rawWood', 5);
+  game.inventory.add('fiber', 2);
+  game.craftingOpen = true;
+
+  pointerdown(createPointerEvent(360, 240));
+
+  assert.equal(game.inventory.get('rawWood'), 0, 'crafting button click consumes raw wood');
+  assert.equal(game.inventory.get('fiber'), 0, 'crafting button click consumes fibers');
+  assert.equal(game.inventory.get('workbench'), 1, 'crafting button click creates a workbench');
+  assert.equal(game.crystalSystem.lastMessage, 'Werkbank hergestellt.', 'crafting button click writes the craft log');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  const craftButton = createRectElement(
+    { left: 340, top: 230, width: 280, height: 36 },
+    { dataset: { craft: 'workbench' }, disabled: true }
+  );
+  const craftingPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelector: () => craftButton }
+  );
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game(
+    {
+      getContext: () => ({}),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 })
+    },
+    { innerHTML: '' },
+    {
+      craftingPanel,
+      pointerTarget
+    }
+  );
+  game.craftingOpen = true;
+
+  pointerdown(createPointerEvent(360, 240));
+
+  assert.equal(game.inventory.get('workbench'), 0, 'disabled crafting button does not craft');
+  assert.equal(game.crystalSystem.lastMessage, 'Nicht genug Material.', 'disabled crafting button writes a missing material log');
 }
 
 {

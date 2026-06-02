@@ -21,6 +21,7 @@ import { CraftingSystem } from '../systems/crafting-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
 import { MenuPanels } from '../ui/menu-panels.js';
+import { PointerHitboxSystem } from '../ui/pointer-hitboxes.js';
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -39,19 +40,31 @@ export class Game {
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
     this.hud = new Hud(hudElement);
-    this.hotbar = new Hotbar(options.hotbarElement, (resource) => {
-      this.selectHotbarResource(resource);
-      this.saveGame();
-    });
+    this.hotbar = new Hotbar(options.hotbarElement);
     this.menuPanels = new MenuPanels({
       craftingPanel: options.craftingPanel,
-      inventoryPanel: options.inventoryPanel,
-      onCraftWorkbench: () => this.tryCraftWorkbench()
+      inventoryPanel: options.inventoryPanel
     });
     this.inventoryButton = options.inventoryButton;
     this.craftingButton = options.craftingButton;
-    this.inventoryButton?.addEventListener('click', () => this.toggleInventoryMenu());
-    this.craftingButton?.addEventListener('click', () => this.toggleCraftingMenu());
+    this.pointerHitboxes = new PointerHitboxSystem({
+      canvas,
+      craftingButton: options.craftingButton,
+      craftingPanel: options.craftingPanel,
+      getCraftingOpen: () => this.craftingOpen,
+      getInventoryOpen: () => this.inventoryOpen,
+      hotbarElement: options.hotbarElement,
+      inventoryButton: options.inventoryButton,
+      inventoryPanel: options.inventoryPanel,
+      onBlockedCraft: () => {
+        this.crystalSystem.lastMessage = 'Nicht genug Material.';
+      },
+      onCraftWorkbench: () => this.tryCraftWorkbench(),
+      onCraftingToggle: () => this.toggleCraftingMenu(),
+      onHotbarSelect: (resource) => this.selectAndSaveHotbarResource(resource),
+      onInventoryToggle: () => this.toggleInventoryMenu(),
+      pointerTarget: options.pointerTarget
+    });
 
     this.lastTimestamp = 0;
     this.falling = false;
@@ -134,6 +147,7 @@ export class Game {
       workbenchRecipe: this.craftingSystem.getWorkbenchRecipeState()
     });
     this.updateMenuButtonStates();
+    this.pointerHitboxes.updateHitboxes();
   }
 
   tryUseCrystal() {
@@ -360,6 +374,14 @@ export class Game {
 
     this.activeHotbarResource = resource;
     return true;
+  }
+
+  selectAndSaveHotbarResource(resource) {
+    const selected = this.selectHotbarResource(resource);
+    if (selected) {
+      this.saveGame();
+    }
+    return selected;
   }
 
   handleReset(deltaSeconds) {

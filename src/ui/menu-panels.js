@@ -1,16 +1,9 @@
 import { INVENTORY_RESOURCES, RESOURCE_LABELS, WORKBENCH_RECIPE } from '../config/constants.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel, onCraftWorkbench = () => {} }) {
+  constructor({ inventoryPanel, craftingPanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
-    this.onCraftWorkbench = onCraftWorkbench;
-
-    this.craftingPanel?.addEventListener('click', (event) => {
-      const button = event.target.closest?.('[data-craft]');
-      if (!button || button.disabled) return;
-      this.onCraftWorkbench(button.dataset.craft);
-    });
   }
 
   update({ inventory, inventoryOpen, craftingOpen, workbenchRecipe }) {
