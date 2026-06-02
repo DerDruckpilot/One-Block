@@ -6,15 +6,8 @@ import {
 } from '../config/constants.js';
 
 export class Hotbar {
-  constructor(element, onSelect = () => {}) {
+  constructor(element) {
     this.element = element;
-    this.onSelect = onSelect;
-
-    this.element?.addEventListener('click', (event) => {
-      const button = event.target.closest?.('[data-resource]');
-      if (!button) return;
-      this.onSelect(button.dataset.resource);
-    });
   }
 
   update({ inventory, activeResource }) {
