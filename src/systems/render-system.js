@@ -71,6 +71,21 @@ export class RenderSystem {
     this.context.restore();
   }
 
+  renderPlacementPreview(preview, camera) {
+    const x = Math.round(preview.x * TILE_SIZE - camera.x);
+    const y = Math.round(preview.y * TILE_SIZE - camera.y);
+
+    this.context.save();
+    this.context.globalAlpha = preview.canPlace ? 0.42 : 0.5;
+    this.context.fillStyle = preview.canPlace ? '#8dff7a' : '#7f2630';
+    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    this.context.globalAlpha = 1;
+    this.context.strokeStyle = preview.canPlace ? '#d4ffc9' : '#ff8a8a';
+    this.context.lineWidth = 2;
+    this.context.strokeRect(x + 2.5, y + 2.5, TILE_SIZE - 5, TILE_SIZE - 5);
+    this.context.restore();
+  }
+
   drawEarthTile(x, y) {
     this.context.fillStyle = '#5e442a';
     this.context.fillRect(x, y + 23, TILE_SIZE, 9);
