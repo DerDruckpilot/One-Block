@@ -35,9 +35,36 @@ export class TileMap {
     return this.getTile(x, y) === TILE_TYPES.crystal;
   }
 
+  isVoid(x, y) {
+    return !this.getTile(x, y);
+  }
+
+  isVoidAtWorld(x, y) {
+    const tile = this.worldToTile(x, y);
+    return this.isVoid(tile.x, tile.y);
+  }
+
   isAdjacentToCrystal(tilePosition) {
     const distance = Math.abs(tilePosition.x - this.crystal.x) + Math.abs(tilePosition.y - this.crystal.y);
     return distance <= 1;
+  }
+
+  isNearCrystalWorld(x, y, maxDistance) {
+    const center = this.getCrystalCenter();
+    const distance = Math.hypot(x - center.x, y - center.y);
+    return distance <= maxDistance;
+  }
+
+  isCrystalAtWorld(x, y) {
+    const tile = this.worldToTile(x, y);
+    return this.isCrystal(tile.x, tile.y);
+  }
+
+  getCrystalCenter() {
+    return {
+      x: this.crystal.x * TILE_SIZE + TILE_SIZE / 2,
+      y: this.crystal.y * TILE_SIZE + TILE_SIZE / 2
+    };
   }
 
   worldToTile(x, y) {

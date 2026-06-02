@@ -1,4 +1,11 @@
-import { GAME_VIEW, PLAYER_SIZE, TILE_SIZE } from '../config/constants.js';
+import {
+  CRYSTAL_INTERACTION_DISTANCE,
+  GAME_VIEW,
+  PLAYER_FOOT_OFFSET,
+  PLAYER_SIZE,
+  PLAYER_SPAWN_TILE,
+  TILE_SIZE
+} from '../config/constants.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { TileMap } from '../world/tile-map.js';
@@ -17,10 +24,8 @@ export class Game {
     this.camera = new Camera();
     this.tileMap = new TileMap();
     this.inventory = new ResourceInventory();
-    this.player = new Player(
-      TILE_SIZE / 2 - PLAYER_SIZE / 2,
-      TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - 10)
-    );
+    this.player = new Player(0, 0);
+    this.respawnPlayer();
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
@@ -57,7 +62,8 @@ export class Game {
 
   update(deltaSeconds) {
     this.player.update(deltaSeconds, this.input, this.tileMap);
-    this.camera.follow(this.player);
+    this.handleVoidFall();
+    this.camera.centerOn(this.tileMap.getCrystalCenter());
     this.backgroundSystem.update(deltaSeconds);
 
     if (this.input.wasPressed(' ', 'e', 'Enter')) {
@@ -71,13 +77,32 @@ export class Game {
   }
 
   tryUseCrystal() {
-    const playerTile = this.player.getFacingTile();
-    const isFacingCrystal = this.tileMap.isCrystal(playerTile.x, playerTile.y);
-    const isCloseToCrystal = this.tileMap.isAdjacentToCrystal(this.player.getTilePosition());
+    const foot = this.player.getFootPosition();
+    const isCloseToCrystal = this.tileMap.isNearCrystalWorld(
+      foot.x,
+      foot.y,
+      CRYSTAL_INTERACTION_DISTANCE
+    );
 
-    if (isFacingCrystal || isCloseToCrystal) {
+    if (isCloseToCrystal) {
       this.crystalSystem.use();
     }
+  }
+
+  handleVoidFall() {
+    const foot = this.player.getFootPosition();
+
+    if (this.tileMap.isVoidAtWorld(foot.x, foot.y)) {
+      this.respawnPlayer();
+      this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
+    }
+  }
+
+  respawnPlayer() {
+    const spawnX = PLAYER_SPAWN_TILE.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2;
+    const spawnY = PLAYER_SPAWN_TILE.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET);
+    this.player.setPosition(spawnX, spawnY);
+    this.player.facing = { x: 0, y: -1 };
   }
 
   render() {

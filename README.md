@@ -59,7 +59,6 @@ Die Demo ist noch kein fertiges Spiel. Sie dient als technischer Startpunkt.
 | Eingabe | Funktion |
 |---|---|
 | WASD / Pfeiltasten | Bewegen |
-| Shift | Rennen |
 | Leertaste / E | Kristall benutzen |
 
 ## Wichtige Dokumente

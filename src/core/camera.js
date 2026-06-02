@@ -10,4 +10,9 @@ export class Camera {
     this.x = target.x - GAME_VIEW.width / 2;
     this.y = target.y - GAME_VIEW.height / 2;
   }
+
+  centerOn(point) {
+    this.x = point.x - GAME_VIEW.width / 2;
+    this.y = point.y - GAME_VIEW.height / 2;
+  }
 }
