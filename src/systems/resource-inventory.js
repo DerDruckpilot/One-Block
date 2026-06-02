@@ -4,10 +4,7 @@ export class ResourceInventory {
       earth: 0,
       rawWood: 0,
       fiber: 0,
-      seed: 0,
-      stone: 0,
-      clay: 0,
-      encounter: 0
+      grassSeed: 0
     };
   }
 

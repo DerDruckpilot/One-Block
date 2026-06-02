@@ -40,22 +40,6 @@ export class TileMap {
     return distance <= 1;
   }
 
-  canPlaceEarth(x, y) {
-    if (this.getTile(x, y)) return false;
-    return this.hasNeighborGround(x, y);
-  }
-
-  hasNeighborGround(x, y) {
-    const neighbors = [
-      { x: x + 1, y },
-      { x: x - 1, y },
-      { x, y: y + 1 },
-      { x, y: y - 1 }
-    ];
-
-    return neighbors.some((neighbor) => this.isGround(neighbor.x, neighbor.y));
-  }
-
   worldToTile(x, y) {
     return {
       x: Math.floor(x / TILE_SIZE),

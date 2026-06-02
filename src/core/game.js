@@ -1,4 +1,4 @@
-import { GAME_VIEW, TOOLS } from '../config/constants.js';
+import { GAME_VIEW, PLAYER_SIZE, TILE_SIZE } from '../config/constants.js';
 import { Input } from './input.js';
 import { Camera } from './camera.js';
 import { TileMap } from '../world/tile-map.js';
@@ -17,13 +17,15 @@ export class Game {
     this.camera = new Camera();
     this.tileMap = new TileMap();
     this.inventory = new ResourceInventory();
-    this.player = new Player(0, 48);
+    this.player = new Player(
+      TILE_SIZE / 2 - PLAYER_SIZE / 2,
+      TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - 10)
+    );
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
     this.hud = new Hud(hudElement);
 
-    this.selectedTool = 'fist';
     this.lastTimestamp = 0;
     this.running = false;
   }
@@ -54,7 +56,6 @@ export class Game {
   }
 
   update(deltaSeconds) {
-    this.handleToolSelection();
     this.player.update(deltaSeconds, this.input, this.tileMap);
     this.camera.follow(this.player);
     this.backgroundSystem.update(deltaSeconds);
@@ -63,21 +64,10 @@ export class Game {
       this.tryUseCrystal();
     }
 
-    if (this.input.wasPressed('b')) {
-      this.tryPlaceEarth();
-    }
-
     this.hud.update({
-      selectedTool: TOOLS[this.selectedTool],
       inventory: this.inventory.resources,
       hint: this.crystalSystem.lastMessage
     });
-  }
-
-  handleToolSelection() {
-    if (this.input.wasPressed('1')) this.selectedTool = 'fist';
-    if (this.input.wasPressed('2')) this.selectedTool = 'woodPickaxe';
-    if (this.input.wasPressed('3')) this.selectedTool = 'spear';
   }
 
   tryUseCrystal() {
@@ -86,24 +76,7 @@ export class Game {
     const isCloseToCrystal = this.tileMap.isAdjacentToCrystal(this.player.getTilePosition());
 
     if (isFacingCrystal || isCloseToCrystal) {
-      this.crystalSystem.use(this.selectedTool);
-    }
-  }
-
-  tryPlaceEarth() {
-    const target = this.player.getFacingTile();
-
-    if (this.inventory.get('earth') <= 0) {
-      this.crystalSystem.lastMessage = 'Keine Erde im Inventar.';
-      return;
-    }
-
-    if (this.tileMap.canPlaceEarth(target.x, target.y)) {
-      this.tileMap.setEarth(target.x, target.y);
-      this.inventory.remove('earth', 1);
-      this.crystalSystem.lastMessage = 'Erdblock platziert.';
-    } else {
-      this.crystalSystem.lastMessage = 'Hier kann kein Erdblock platziert werden.';
+      this.crystalSystem.use();
     }
   }
 
