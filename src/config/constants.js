@@ -18,6 +18,7 @@ export const PLAYER_SPAWN_TILE = {
 
 export const PLAYER_FOOT_OFFSET = 10;
 export const CRYSTAL_INTERACTION_DISTANCE = TILE_SIZE * 1.45;
+export const VOID_FALL_MARGIN = TILE_SIZE * 2;
 
 export const TILE_TYPES = {
   earth: 'earth',

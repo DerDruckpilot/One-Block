@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 
 import {
   CRYSTAL_INTERACTION_DISTANCE,
+  GAME_VIEW,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   TILE_SIZE
 } from '../src/config/constants.js';
+import { Camera } from '../src/core/camera.js';
 import { Player } from '../src/entities/player.js';
 import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
@@ -22,6 +24,38 @@ const createSpawnedPlayer = () => new Player(
 );
 
 const map = new TileMap();
+
+{
+  const listeners = {};
+  globalThis.window = {
+    addEventListener(type, callback) {
+      listeners[type] = callback;
+    }
+  };
+
+  const { Input } = await import(`../src/core/input.js?test=${Date.now()}`);
+  const input = new Input();
+  let prevented = false;
+
+  listeners.keydown({
+    key: 'ArrowRight',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+
+  assert.equal(input.isDown('ArrowRight'), true, 'keydown registers arrow movement');
+  assert.equal(input.getDebugState().lastKey, 'ArrowRight', 'input tracks last key');
+  assert.deepEqual(input.getMovementKeys(), ['ArrowRight'], 'input exposes active movement keys');
+  assert.equal(prevented, true, 'arrow key default behavior is prevented');
+
+  listeners.keyup({
+    key: 'ArrowRight',
+    preventDefault() {}
+  });
+
+  assert.equal(input.isDown('ArrowRight'), false, 'keyup clears arrow movement');
+}
 
 {
   const player = createSpawnedPlayer();
@@ -51,6 +85,11 @@ const map = new TileMap();
 
   const foot = player.getFootPosition();
   assert.equal(map.isVoidAtWorld(foot.x, foot.y), true, 'player can leave the island and reach the void');
+  assert.equal(
+    map.isPastVoidFallMarginWorld(foot.x, foot.y),
+    true,
+    'player can get far enough into the void to trigger death'
+  );
 }
 
 {
@@ -73,6 +112,25 @@ const map = new TileMap();
   game.handleVoidFall();
 
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'void fall respawns beside the crystal');
+}
+
+{
+  const player = createSpawnedPlayer();
+  const camera = new Camera();
+
+  player.update(0.25, inputWith('d'), map);
+  camera.centerOn(player.getCenterPosition());
+
+  assert.equal(
+    Math.round(player.getCenterPosition().x - camera.x),
+    Math.round(GAME_VIEW.width / 2),
+    'camera follows player center on x axis'
+  );
+  assert.equal(
+    Math.round(player.getCenterPosition().y - camera.y),
+    Math.round(GAME_VIEW.height / 2),
+    'camera follows player center on y axis'
+  );
 }
 
 {
