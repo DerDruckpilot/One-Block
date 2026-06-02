@@ -10,10 +10,11 @@ import {
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
 import { Player } from '../src/entities/player.js';
-import { SaveSystem } from '../src/systems/save-system.js';
+import { SAVE_KEY, SaveSystem } from '../src/systems/save-system.js';
 import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { CrystalSystem } from '../src/systems/crystal-system.js';
+import { Hud } from '../src/ui/hud.js';
 
 const inputWith = (...pressedKeys) => ({
   isDown: (...keys) => keys.some((key) => pressedKeys.includes(key))
@@ -27,13 +28,21 @@ const createSpawnedPlayer = () => new Player(
 const createMemoryStorage = () => {
   const data = new Map();
   return {
+    calls: {
+      getItem: 0,
+      removeItem: 0,
+      setItem: 0
+    },
     getItem(key) {
+      this.calls.getItem += 1;
       return data.get(key) || null;
     },
     removeItem(key) {
+      this.calls.removeItem += 1;
       data.delete(key);
     },
     setItem(key, value) {
+      this.calls.setItem += 1;
       data.set(key, value);
     }
   };
@@ -71,6 +80,36 @@ const map = new TileMap();
   });
 
   assert.equal(input.wasPressed('b'), true, 'keydown registers earth placement key');
+
+  prevented = false;
+  listeners.keydown({
+    key: 'F2',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('F2'), true, 'keydown registers F2 debug key');
+  assert.equal(prevented, true, 'F2 default behavior is prevented');
+
+  prevented = false;
+  listeners.keydown({
+    key: 'F3',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('F3'), true, 'keydown registers F3 debug key');
+  assert.equal(prevented, true, 'F3 default behavior is prevented');
+
+  prevented = false;
+  listeners.keydown({
+    key: 'r',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.isDown('r'), true, 'keydown keeps reset key held');
+  assert.equal(prevented, true, 'reset key default behavior is prevented');
 
   listeners.keyup({
     key: 'ArrowRight',
@@ -312,6 +351,11 @@ const map = new TileMap();
 
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
+  assert.equal(storage.getItem(SAVE_KEY) !== null, true, 'game writes save data through local storage');
+  assert.ok(storage.calls.setItem > 0, 'saving uses localStorage.setItem');
+  assert.ok(storage.calls.getItem > 0, 'loading uses localStorage.getItem');
+  assert.equal(game.saveStatus, 'saved', 'placing earth marks save status as saved');
+  assert.equal(loadedGame.saveStatus, 'loaded', 'valid save marks save status as loaded');
   assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
   assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
@@ -322,8 +366,11 @@ const map = new TileMap();
   const saveSystem = new SaveSystem(storage);
 
   assert.equal(saveSystem.save({ resources: { earth: 1 } }), true, 'save system writes to storage');
+  assert.equal(storage.calls.setItem, 1, 'save system uses storage.setItem');
   assert.equal(saveSystem.load().resources.earth, 1, 'save system reads from storage');
+  assert.ok(storage.calls.getItem > 0, 'save system uses storage.getItem');
   assert.equal(saveSystem.clear(), true, 'save system clears storage');
+  assert.equal(storage.calls.removeItem, 1, 'save system uses storage.removeItem');
   assert.equal(saveSystem.load(), null, 'cleared save returns null');
 }
 
@@ -334,25 +381,75 @@ const map = new TileMap();
 
   game.inventory.add('earth', 1);
   game.saveGame();
-  game.resetHoldSeconds = 2;
-  game.resetGame();
+  game.input.keys.add('r');
+  game.update(1);
+  assert.equal(game.crystalSystem.lastMessage, 'Reset wird vorbereitet...', 'holding reset key shows a preparation message');
+  game.autosaveSeconds = 1;
+  game.update(1.1);
 
-  assert.equal(storage.getItem('one-block-save-v1'), null, 'reset clears the saved game');
+  assert.equal(storage.getItem(SAVE_KEY), null, 'reset clears the saved game');
   assert.equal(game.inventory.get('earth'), 0, 'reset restores empty resources');
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Speicherstand gelöscht. Neustart am Kristall.', 'reset writes a clear log message');
 }
 
 {
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
-  game.input.pressedThisFrame.add('F3');
+  game.input.pressedThisFrame.add('F2');
   game.handleDebugToggle();
-  assert.equal(game.debugVisible, true, 'F3 enables debug HUD');
+  assert.equal(game.debugEnabled, true, 'F2 enables debug HUD');
+
+  game.input.pressedThisFrame.add('F2');
+  game.handleDebugToggle();
+  assert.equal(game.debugEnabled, false, 'F2 disables debug HUD');
 
   game.input.pressedThisFrame.add('F3');
   game.handleDebugToggle();
-  assert.equal(game.debugVisible, false, 'F3 disables debug HUD');
+  assert.equal(game.debugEnabled, true, 'F3 enables debug HUD');
+
+  game.input.pressedThisFrame.add('F3');
+  game.handleDebugToggle();
+  assert.equal(game.debugEnabled, false, 'F3 disables debug HUD');
+}
+
+{
+  const element = { innerHTML: '' };
+  const hud = new Hud(element);
+  const debug = {
+    playerX: 0,
+    playerY: 0,
+    cameraX: 0,
+    cameraY: 0,
+    supportTileX: 0,
+    supportTileY: 0,
+    supported: true,
+    inVoid: false,
+    falling: false,
+    movementKeys: [],
+    lastKey: 'none',
+    saveStatus: 'saved'
+  };
+
+  hud.update({
+    inventory: {},
+    hint: 'Neues Spiel gestartet.',
+    debug,
+    debugEnabled: false,
+    resetHoldSeconds: 0
+  });
+  assert.equal(element.innerHTML.includes('<strong>Debug:</strong>'), false, 'HUD hides debug information by default');
+
+  hud.update({
+    inventory: {},
+    hint: 'Neues Spiel gestartet.',
+    debug,
+    debugEnabled: true,
+    resetHoldSeconds: 0
+  });
+  assert.equal(element.innerHTML.includes('<strong>Debug:</strong>'), true, 'HUD shows debug information when enabled');
+  assert.equal(element.innerHTML.includes('save: saved'), true, 'debug HUD shows save status');
 }
 
 {

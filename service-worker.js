@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-1-7';
+const CACHE_NAME = 'one-block-v0-1-8';
 
 const CORE_ASSETS = [
   './',
@@ -43,7 +43,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((response) => {
         if (event.request.url.startsWith(self.location.origin)) {
           const responseCopy = response.clone();

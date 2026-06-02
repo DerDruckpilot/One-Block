@@ -36,9 +36,10 @@ export class Game {
 
     this.lastTimestamp = 0;
     this.falling = false;
-    this.debugVisible = false;
+    this.debugEnabled = false;
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
+    this.saveStatus = 'new';
     this.running = false;
     this.loadGame();
   }
@@ -86,14 +87,16 @@ export class Game {
     }
 
     this.handleDebugToggle();
-    this.handleReset(deltaSeconds);
-    this.handleAutosave(deltaSeconds);
+    const didReset = this.handleReset(deltaSeconds);
+    if (!didReset) {
+      this.handleAutosave(deltaSeconds);
+    }
 
     this.hud.update({
       inventory: this.inventory.resources,
       hint: this.crystalSystem.lastMessage,
       debug: this.getDebugState(),
-      debugVisible: this.debugVisible,
+      debugEnabled: this.debugEnabled,
       resetHoldSeconds: this.resetHoldSeconds
     });
   }
@@ -190,22 +193,25 @@ export class Game {
   }
 
   handleDebugToggle() {
-    if (this.input.wasPressed('F3')) {
-      this.debugVisible = !this.debugVisible;
+    if (this.input.wasPressed('F2', 'F3')) {
+      this.debugEnabled = !this.debugEnabled;
     }
   }
 
   handleReset(deltaSeconds) {
     if (this.input.isDown('r')) {
       this.resetHoldSeconds += deltaSeconds;
+      this.crystalSystem.lastMessage = 'Reset wird vorbereitet...';
 
       if (this.resetHoldSeconds >= 2) {
         this.resetGame();
+        return true;
       }
-      return;
+      return false;
     }
 
     this.resetHoldSeconds = 0;
+    return false;
   }
 
   resetGame() {
@@ -216,6 +222,7 @@ export class Game {
     this.respawnPlayer();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
+    this.saveStatus = 'new';
     this.crystalSystem.lastMessage = 'Speicherstand gelöscht. Neustart am Kristall.';
   }
 
@@ -230,11 +237,13 @@ export class Game {
 
   loadGame() {
     const save = this.saveSystem.load();
-    if (!save) return false;
-
-    if (Array.isArray(save.tiles)) {
-      this.tileMap.loadTiles(save.tiles);
+    if (!this.isValidSave(save)) {
+      this.saveStatus = 'new';
+      this.crystalSystem.lastMessage = 'Neues Spiel gestartet.';
+      return false;
     }
+
+    this.tileMap.loadTiles(save.tiles);
 
     this.inventory.load(save.resources);
 
@@ -248,11 +257,22 @@ export class Game {
     }
 
     this.crystalSystem.lastMessage = 'Speicherstand geladen.';
+    this.saveStatus = 'loaded';
     return true;
   }
 
+  isValidSave(save) {
+    return Boolean(
+      save &&
+      save.version === 1 &&
+      Array.isArray(save.tiles) &&
+      save.resources &&
+      typeof save.resources === 'object'
+    );
+  }
+
   saveGame() {
-    return this.saveSystem.save({
+    const saved = this.saveSystem.save({
       tiles: this.tileMap.toJSON(),
       resources: this.inventory.toJSON(),
       player: {
@@ -261,6 +281,8 @@ export class Game {
         facing: this.player.facing
       }
     });
+    this.saveStatus = saved ? 'saved' : 'error';
+    return saved;
   }
 
   render() {
@@ -287,7 +309,8 @@ export class Game {
       inVoid: support.inVoid,
       falling: this.falling,
       movementKeys: input.movementKeys,
-      lastKey: input.lastKey
+      lastKey: input.lastKey,
+      saveStatus: this.saveStatus
     };
   }
 }
