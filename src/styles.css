@@ -58,6 +58,14 @@ body {
   color: #d9c7ff;
 }
 
+.debug-hud {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
 #help {
   position: fixed;
   left: 50%;

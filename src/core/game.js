@@ -19,6 +19,7 @@ import { Hud } from '../ui/hud.js';
 export class Game {
   constructor(canvas, hudElement) {
     this.canvas = canvas;
+    this.canvas.tabIndex = 0;
     this.context = canvas.getContext('2d');
     this.input = new Input();
     this.camera = new Camera();
@@ -37,6 +38,8 @@ export class Game {
 
   start() {
     this.resizeCanvas();
+    this.canvas.focus?.({ preventScroll: true });
+    this.canvas.addEventListener?.('pointerdown', () => this.canvas.focus?.({ preventScroll: true }));
     window.addEventListener('resize', () => this.resizeCanvas());
     this.running = true;
     requestAnimationFrame((timestamp) => this.loop(timestamp));
@@ -63,7 +66,7 @@ export class Game {
   update(deltaSeconds) {
     this.player.update(deltaSeconds, this.input, this.tileMap);
     this.handleVoidFall();
-    this.camera.centerOn(this.tileMap.getCrystalCenter());
+    this.camera.centerOn(this.player.getCenterPosition());
     this.backgroundSystem.update(deltaSeconds);
 
     if (this.input.wasPressed(' ', 'e', 'Enter')) {
@@ -72,7 +75,8 @@ export class Game {
 
     this.hud.update({
       inventory: this.inventory.resources,
-      hint: this.crystalSystem.lastMessage
+      hint: this.crystalSystem.lastMessage,
+      debug: this.getDebugState()
     });
   }
 
@@ -92,7 +96,7 @@ export class Game {
   handleVoidFall() {
     const foot = this.player.getFootPosition();
 
-    if (this.tileMap.isVoidAtWorld(foot.x, foot.y)) {
+    if (this.tileMap.isVoidAtWorld(foot.x, foot.y) && this.tileMap.isPastVoidFallMarginWorld(foot.x, foot.y)) {
       this.respawnPlayer();
       this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
     }
@@ -110,5 +114,18 @@ export class Game {
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderPlayer(this.player, this.camera);
+  }
+
+  getDebugState() {
+    const input = this.input.getDebugState();
+
+    return {
+      playerX: this.player.x,
+      playerY: this.player.y,
+      cameraX: this.camera.x,
+      cameraY: this.camera.y,
+      movementKeys: input.movementKeys,
+      lastKey: input.lastKey
+    };
   }
 }
