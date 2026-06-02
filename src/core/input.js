@@ -39,7 +39,7 @@ export class Input {
   }
 
   shouldPreventDefault(key) {
-    return [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F2', 'F3', 'r'].includes(key);
+    return [' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'p', 'r'].includes(key);
   }
 
   isDown(...keys) {

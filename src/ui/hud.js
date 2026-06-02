@@ -14,7 +14,7 @@ export class Hud {
     this.element.innerHTML = `
       <div><strong>Rohstoffe:</strong><br>${resources || 'noch keine'}</div>
       <div><strong>Log:</strong> ${hint}</div>
-      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>F2/F3: Debug umschalten<br>R halten: Reset</div>
+      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren<br>P: Debug umschalten<br>R halten: Reset</div>
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
       ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>

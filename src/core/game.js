@@ -193,7 +193,7 @@ export class Game {
   }
 
   handleDebugToggle() {
-    if (this.input.wasPressed('F2', 'F3')) {
+    if (this.input.wasPressed('p')) {
       this.debugEnabled = !this.debugEnabled;
     }
   }

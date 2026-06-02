@@ -83,23 +83,14 @@ const map = new TileMap();
 
   prevented = false;
   listeners.keydown({
-    key: 'F2',
+    key: 'P',
     preventDefault() {
       prevented = true;
     }
   });
-  assert.equal(input.wasPressed('F2'), true, 'keydown registers F2 debug key');
-  assert.equal(prevented, true, 'F2 default behavior is prevented');
-
-  prevented = false;
-  listeners.keydown({
-    key: 'F3',
-    preventDefault() {
-      prevented = true;
-    }
-  });
-  assert.equal(input.wasPressed('F3'), true, 'keydown registers F3 debug key');
-  assert.equal(prevented, true, 'F3 default behavior is prevented');
+  assert.equal(input.wasPressed('p'), true, 'keydown registers P debug key');
+  assert.equal(input.getDebugState().lastKey, 'p', 'input normalizes P debug key');
+  assert.equal(prevented, true, 'P default behavior is prevented');
 
   prevented = false;
   listeners.keydown({
@@ -397,21 +388,13 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
-  game.input.pressedThisFrame.add('F2');
+  game.input.pressedThisFrame.add('p');
   game.handleDebugToggle();
-  assert.equal(game.debugEnabled, true, 'F2 enables debug HUD');
+  assert.equal(game.debugEnabled, true, 'P enables debug HUD');
 
-  game.input.pressedThisFrame.add('F2');
+  game.input.pressedThisFrame.add('p');
   game.handleDebugToggle();
-  assert.equal(game.debugEnabled, false, 'F2 disables debug HUD');
-
-  game.input.pressedThisFrame.add('F3');
-  game.handleDebugToggle();
-  assert.equal(game.debugEnabled, true, 'F3 enables debug HUD');
-
-  game.input.pressedThisFrame.add('F3');
-  game.handleDebugToggle();
-  assert.equal(game.debugEnabled, false, 'F3 disables debug HUD');
+  assert.equal(game.debugEnabled, false, 'P disables debug HUD');
 }
 
 {
