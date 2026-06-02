@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILE_TYPES, VOID_FALL_MARGIN } from '../config/constants.js';
+import { TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 
 const keyOf = (x, y) => `${x},${y}`;
 
@@ -61,15 +61,9 @@ export class TileMap {
     return this.isVoid(tile.x, tile.y);
   }
 
-  isPastVoidFallMarginWorld(x, y) {
-    const bounds = this.getIslandBoundsWorld();
-
-    return (
-      x < bounds.left - VOID_FALL_MARGIN ||
-      x > bounds.right + VOID_FALL_MARGIN ||
-      y < bounds.top - VOID_FALL_MARGIN ||
-      y > bounds.bottom + VOID_FALL_MARGIN
-    );
+  isGroundAtWorld(x, y) {
+    const tile = this.worldToTile(x, y);
+    return this.isGround(tile.x, tile.y);
   }
 
   isAdjacentToCrystal(tilePosition) {
@@ -92,21 +86,6 @@ export class TileMap {
     return {
       x: this.crystal.x * TILE_SIZE + TILE_SIZE / 2,
       y: this.crystal.y * TILE_SIZE + TILE_SIZE / 2
-    };
-  }
-
-  getIslandBoundsWorld() {
-    const tiles = [];
-    this.forEachTile((tile) => tiles.push(tile));
-
-    const xs = tiles.map((tile) => tile.x);
-    const ys = tiles.map((tile) => tile.y);
-
-    return {
-      left: Math.min(...xs) * TILE_SIZE,
-      right: (Math.max(...xs) + 1) * TILE_SIZE,
-      top: Math.min(...ys) * TILE_SIZE,
-      bottom: (Math.max(...ys) + 1) * TILE_SIZE
     };
   }
 

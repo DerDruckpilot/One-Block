@@ -86,16 +86,33 @@ const map = new TileMap();
 {
   const player = createSpawnedPlayer();
 
-  for (let i = 0; i < 40; i += 1) {
+  for (let i = 0; i < 20; i += 1) {
     player.update(0.05, inputWith('d'), map);
   }
 
   const foot = player.getFootPosition();
   assert.equal(map.isVoidAtWorld(foot.x, foot.y), true, 'player can leave the island and reach the void');
+  assert.equal(map.isGroundAtWorld(foot.x, foot.y), false, 'void starts as soon as the foot point has no tile under it');
+}
+
+{
+  const lShapeMap = new TileMap();
+  lShapeMap.setEarth(2, 0);
+  lShapeMap.setEarth(3, 0);
+  lShapeMap.setEarth(4, 0);
+
+  const safeOnArm = lShapeMap.tileToWorld(4, 0);
+  const gapInOldBounds = lShapeMap.tileToWorld(4, 1);
+
   assert.equal(
-    map.isPastVoidFallMarginWorld(foot.x, foot.y),
+    lShapeMap.isGroundAtWorld(safeOnArm.x + TILE_SIZE / 2, safeOnArm.y + TILE_SIZE / 2),
     true,
-    'player can get far enough into the void to trigger death'
+    'placed earth tiles are safe individually'
+  );
+  assert.equal(
+    lShapeMap.isGroundAtWorld(gapInOldBounds.x + TILE_SIZE / 2, gapInOldBounds.y + TILE_SIZE / 2),
+    false,
+    'missing tiles inside a wider island shape are still void'
   );
 }
 
@@ -119,6 +136,23 @@ const map = new TileMap();
   game.handleVoidFall();
 
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'void fall respawns beside the crystal');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.tileMap.setEarth(2, 0);
+  game.tileMap.setEarth(3, 0);
+  game.tileMap.setEarth(4, 0);
+  game.player.setPosition(
+    4 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+
+  game.handleVoidFall();
+
+  assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'gap inside extended island bounds triggers respawn');
 }
 
 {
