@@ -1,6 +1,7 @@
 import {
   CRYSTAL_INTERACTION_DISTANCE,
   GAME_VIEW,
+  HOTBAR_RESOURCES,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
@@ -16,6 +17,7 @@ import { RenderSystem } from '../systems/render-system.js';
 import { BackgroundSystem } from '../systems/background-system.js';
 import { SaveSystem } from '../systems/save-system.js';
 import { Hud } from '../ui/hud.js';
+import { Hotbar } from '../ui/hotbar.js';
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -33,10 +35,15 @@ export class Game {
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
     this.hud = new Hud(hudElement);
+    this.hotbar = new Hotbar(options.hotbarElement, (resource) => {
+      this.selectHotbarResource(resource);
+      this.saveGame();
+    });
 
     this.lastTimestamp = 0;
     this.falling = false;
     this.debugEnabled = false;
+    this.activeHotbarResource = 'earth';
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
@@ -82,6 +89,8 @@ export class Game {
       this.tryUseCrystal();
     }
 
+    this.handleHotbarSelection();
+
     if (this.input.wasPressed('b')) {
       this.tryPlaceEarth();
     }
@@ -93,11 +102,14 @@ export class Game {
     }
 
     this.hud.update({
-      inventory: this.inventory.resources,
       hint: this.crystalSystem.lastMessage,
       debug: this.getDebugState(),
       debugEnabled: this.debugEnabled,
       resetHoldSeconds: this.resetHoldSeconds
+    });
+    this.hotbar.update({
+      inventory: this.inventory.resources,
+      activeResource: this.activeHotbarResource
     });
   }
 
@@ -133,6 +145,14 @@ export class Game {
   getEarthPlacementPreview() {
     const target = this.player.getFacingTile();
     const playerTile = this.player.getTilePosition();
+
+    if (this.activeHotbarResource !== 'earth') {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Dieses Item kann noch nicht platziert werden.'
+      };
+    }
 
     if (this.inventory.get('earth') <= 0) {
       return {
@@ -198,6 +218,22 @@ export class Game {
     }
   }
 
+  handleHotbarSelection() {
+    for (let index = 0; index < HOTBAR_RESOURCES.length; index += 1) {
+      if (this.input.wasPressed(String(index + 1))) {
+        this.selectHotbarResource(HOTBAR_RESOURCES[index]);
+        this.saveGame();
+      }
+    }
+  }
+
+  selectHotbarResource(resource) {
+    if (!HOTBAR_RESOURCES.includes(resource)) return false;
+
+    this.activeHotbarResource = resource;
+    return true;
+  }
+
   handleReset(deltaSeconds) {
     if (this.input.isDown('r')) {
       this.resetHoldSeconds += deltaSeconds;
@@ -219,6 +255,7 @@ export class Game {
     this.tileMap = new TileMap();
     this.inventory = new ResourceInventory();
     this.crystalSystem = new CrystalSystem(this.inventory);
+    this.activeHotbarResource = 'earth';
     this.respawnPlayer();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
@@ -256,6 +293,8 @@ export class Game {
       }
     }
 
+    this.selectHotbarResource(save.activeHotbarResource || 'earth');
+
     this.crystalSystem.lastMessage = 'Speicherstand geladen.';
     this.saveStatus = 'loaded';
     return true;
@@ -275,6 +314,7 @@ export class Game {
     const saved = this.saveSystem.save({
       tiles: this.tileMap.toJSON(),
       resources: this.inventory.toJSON(),
+      activeHotbarResource: this.activeHotbarResource,
       player: {
         x: this.player.x,
         y: this.player.y,

@@ -30,3 +30,26 @@ export const RESOURCE_LABELS = {
   fiber: 'Fasern',
   grassSeed: 'Grassamen'
 };
+
+export const HOTBAR_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
+
+export const RESOURCE_SHORT_LABELS = {
+  earth: 'ER',
+  rawWood: 'RH',
+  fiber: 'FA',
+  grassSeed: 'GS'
+};
+
+export const RESOURCE_ICONS = {
+  earth: '▣',
+  rawWood: '▥',
+  fiber: '≋',
+  grassSeed: '✣'
+};
+
+export const BASIC_RESOURCE_DROPS = [
+  { resource: 'earth', amount: 1, weight: 50 },
+  { resource: 'rawWood', amount: 1, weight: 20 },
+  { resource: 'fiber', amount: 1, weight: 20 },
+  { resource: 'grassSeed', amount: 1, weight: 10 }
+];

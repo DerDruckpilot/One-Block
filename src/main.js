@@ -2,6 +2,7 @@ import { Game } from './core/game.js';
 
 const canvas = document.querySelector('#game');
 const hudElement = document.querySelector('#hud-content');
+const hotbarElement = document.querySelector('#hotbar');
 
 const getLocalStorage = () => {
   try {
@@ -11,7 +12,10 @@ const getLocalStorage = () => {
   }
 };
 
-const game = new Game(canvas, hudElement, { storage: getLocalStorage() });
+const game = new Game(canvas, hudElement, {
+  hotbarElement,
+  storage: getLocalStorage()
+});
 game.start();
 
 if (window.navigator && 'serviceWorker' in window.navigator) {
