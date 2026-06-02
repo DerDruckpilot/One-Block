@@ -1,4 +1,4 @@
-import { MOVEMENT, PLAYER_SIZE, TILE_SIZE } from '../config/constants.js';
+import { MOVEMENT, PLAYER_FOOT_OFFSET, PLAYER_SIZE, TILE_SIZE } from '../config/constants.js';
 
 export class Player {
   constructor(x, y) {
@@ -19,11 +19,11 @@ export class Player {
     const nextX = this.x + movement.x * speed * deltaSeconds;
     const nextY = this.y + movement.y * speed * deltaSeconds;
 
-    if (this.canStandAt(nextX, this.y, tileMap)) {
+    if (this.canMoveTo(nextX, this.y, tileMap)) {
       this.x = nextX;
     }
 
-    if (this.canStandAt(this.x, nextY, tileMap)) {
+    if (this.canMoveTo(this.x, nextY, tileMap)) {
       this.y = nextY;
     }
   }
@@ -53,17 +53,32 @@ export class Player {
     return { x: 0, y: Math.sign(movement.y) };
   }
 
-  canStandAt(x, y, tileMap) {
-    const footX = x + this.width / 2;
-    const footY = y + this.height - 10;
-    const tile = tileMap.worldToTile(footX, footY);
-    return tileMap.isGround(tile.x, tile.y);
+  canMoveTo(x, y, tileMap) {
+    const foot = this.getFootPositionAt(x, y);
+    return !tileMap.isCrystalAtWorld(foot.x, foot.y);
+  }
+
+  setPosition(x, y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  getFootPosition() {
+    return this.getFootPositionAt(this.x, this.y);
+  }
+
+  getFootPositionAt(x, y) {
+    return {
+      x: x + this.width / 2,
+      y: y + this.height - PLAYER_FOOT_OFFSET
+    };
   }
 
   getTilePosition() {
+    const foot = this.getFootPosition();
     return {
-      x: Math.floor((this.x + this.width / 2) / TILE_SIZE),
-      y: Math.floor((this.y + this.height - 10) / TILE_SIZE)
+      x: Math.floor(foot.x / TILE_SIZE),
+      y: Math.floor(foot.y / TILE_SIZE)
     };
   }
 

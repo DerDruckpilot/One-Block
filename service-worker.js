@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-1-0';
+const CACHE_NAME = 'one-block-v0-1-1';
 
 const CORE_ASSETS = [
   './',
@@ -25,6 +25,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS))
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -33,7 +34,7 @@ self.addEventListener('activate', (event) => {
       keys
         .filter((key) => key !== CACHE_NAME)
         .map((key) => caches.delete(key))
-    ))
+    )).then(() => clients.claim())
   );
 });
 

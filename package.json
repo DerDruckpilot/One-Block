@@ -7,7 +7,7 @@
   "scripts": {
     "start": "npx serve .",
     "check": "node scripts/check-project.js",
-    "test": "node scripts/check-project.js"
+    "test": "node scripts/check-project.js && node scripts/test-gameplay.js"
   },
   "keywords": [
     "game",
