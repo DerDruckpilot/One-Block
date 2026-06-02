@@ -6,9 +6,9 @@ const hudElement = document.querySelector('#hud-content');
 const game = new Game(canvas, hudElement);
 game.start();
 
-if ('serviceWorker' in navigator) {
+if (window.navigator && 'serviceWorker' in window.navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch((error) => {
+    window.navigator.serviceWorker.register('./service-worker.js').catch((error) => {
       console.warn('Service Worker konnte nicht registriert werden:', error);
     });
   });

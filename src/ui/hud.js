@@ -14,6 +14,7 @@ export class Hud {
     this.element.innerHTML = `
       <div><strong>Rohstoffe:</strong><br>${resources || 'noch keine'}</div>
       <div><strong>Log:</strong> ${hint}</div>
+      <div><strong>Steuerung:</strong><br>WASD/Pfeile: bewegen<br>E/Leertaste: Kristall aktivieren<br>B: Erde platzieren</div>
       <div class="debug-hud">
         <strong>Debug:</strong><br>
         Spieler: ${this.formatNumber(debug.playerX)}, ${this.formatNumber(debug.playerY)}<br>
