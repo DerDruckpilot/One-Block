@@ -27,6 +27,10 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.earth);
   }
 
+  setGrass(x, y) {
+    this.tiles.set(keyOf(x, y), TILE_TYPES.grass);
+  }
+
   getObject(x, y) {
     return this.objects.get(keyOf(x, y)) || null;
   }
@@ -50,7 +54,9 @@ export class TileMap {
   loadTiles(tiles) {
     this.tiles.clear();
     for (const tile of tiles) {
-      this.tiles.set(keyOf(tile.x, tile.y), tile.type);
+      if ([TILE_TYPES.earth, TILE_TYPES.grass, TILE_TYPES.crystal].includes(tile.type)) {
+        this.tiles.set(keyOf(tile.x, tile.y), tile.type);
+      }
     }
     this.tiles.set(keyOf(this.crystal.x, this.crystal.y), TILE_TYPES.crystal);
   }
@@ -95,7 +101,15 @@ export class TileMap {
 
   isGround(x, y) {
     const tile = this.getTile(x, y);
-    return tile === TILE_TYPES.earth || tile === TILE_TYPES.crystal;
+    return tile === TILE_TYPES.earth || tile === TILE_TYPES.grass || tile === TILE_TYPES.crystal;
+  }
+
+  isPlantableEarth(x, y) {
+    return this.getTile(x, y) === TILE_TYPES.earth;
+  }
+
+  isGrass(x, y) {
+    return this.getTile(x, y) === TILE_TYPES.grass;
   }
 
   isCrystal(x, y) {
@@ -150,6 +164,24 @@ export class TileMap {
     const center = this.getCrystalCenter();
     const distance = Math.hypot(x - center.x, y - center.y);
     return distance <= maxDistance;
+  }
+
+  isNearObjectWorld(x, y, type, maxDistance) {
+    let isNear = false;
+
+    this.forEachObject((object) => {
+      if (object.type !== type) return;
+
+      const center = {
+        x: object.x * TILE_SIZE + TILE_SIZE / 2,
+        y: object.y * TILE_SIZE + TILE_SIZE / 2
+      };
+      if (Math.hypot(x - center.x, y - center.y) <= maxDistance) {
+        isNear = true;
+      }
+    });
+
+    return isNear;
   }
 
   isCrystalAtWorld(x, y) {

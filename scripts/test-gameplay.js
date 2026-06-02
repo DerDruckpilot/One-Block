@@ -133,6 +133,16 @@ const map = new TileMap();
 
   prevented = false;
   listeners.keydown({
+    key: '6',
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('6'), true, 'keydown registers extended hotbar slot key');
+  assert.equal(prevented, true, 'extended hotbar slot key default behavior is prevented');
+
+  prevented = false;
+  listeners.keydown({
     key: 'I',
     preventDefault() {
       prevented = true;
@@ -487,6 +497,11 @@ const map = new TileMap();
 
   assert.equal(crafting.getWorkbenchRecipeState().canCraft, false, 'workbench recipe needs resources');
   assert.equal(crafting.craftWorkbench().crafted, false, 'crafting fails without resources');
+  assert.equal(
+    crafting.getRecipeStates({ hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenPickaxe').isAvailable,
+    false,
+    'wooden pickaxe recipe is unavailable without workbench access'
+  );
 
   inventory.add('rawWood', 5);
   inventory.add('fiber', 2);
@@ -497,6 +512,15 @@ const map = new TileMap();
   assert.equal(inventory.get('fiber'), 0, 'workbench crafting consumes fibers');
   assert.equal(inventory.get('workbench'), 1, 'workbench crafting adds a workbench item');
   assert.equal(result.message, 'Werkbank hergestellt.', 'workbench crafting returns a clear log message');
+
+  inventory.add('rawWood', 8);
+  inventory.add('fiber', 4);
+  const pickaxeResult = crafting.craft('woodenPickaxe', { hasWorkbenchAccess: true });
+  assert.equal(pickaxeResult.crafted, true, 'wooden pickaxe can be crafted near a workbench');
+  assert.equal(inventory.get('rawWood'), 0, 'wooden pickaxe crafting consumes raw wood');
+  assert.equal(inventory.get('fiber'), 0, 'wooden pickaxe crafting consumes fibers');
+  assert.equal(inventory.get('woodenPickaxe'), 1, 'wooden pickaxe crafting adds the tool item');
+  assert.equal(pickaxeResult.message, 'Holzspitzhacke hergestellt.', 'wooden pickaxe crafting returns a clear log message');
 }
 
 {
@@ -515,15 +539,18 @@ const map = new TileMap();
 
   menus.update({
     craftingOpen: true,
+    hasWorkbenchAccess: false,
     inventory,
     inventoryOpen: true,
-    workbenchRecipe: crafting.getWorkbenchRecipeState()
+    recipeStates: crafting.getRecipeStates({ hasWorkbenchAccess: false })
   });
 
   assert.equal(inventoryPanel.hidden, false, 'inventory panel opens');
   assert.equal(inventoryPanel.innerHTML.includes('Erde'), true, 'inventory panel lists base resources');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'crafting panel shows workbench-gated recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Für weitere Rezepte nahe an eine Werkbank stellen'), true, 'crafting panel explains missing workbench access');
   assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
 }
 
@@ -540,7 +567,7 @@ const map = new TileMap();
   const craftButton = createRectElement({ left: 340, top: 230, width: 280, height: 36 }, { dataset: { craft: 'workbench' } });
   const craftingPanel = createRectElement(
     { left: 300, top: 90, width: 360, height: 220 },
-    { querySelector: () => craftButton }
+    { querySelectorAll: () => [craftButton] }
   );
   const { Game } = await import('../src/core/game.js');
   const game = new Game(
@@ -579,7 +606,7 @@ const map = new TileMap();
   );
   const craftingPanel = createRectElement(
     { left: 300, top: 90, width: 360, height: 220 },
-    { querySelector: () => craftButton }
+    { querySelectorAll: () => [craftButton] }
   );
   const { Game } = await import('../src/core/game.js');
   const game = new Game(
@@ -660,6 +687,17 @@ const map = new TileMap();
   assert.equal(game.inventory.get('workbench'), 0, 'placing workbench consumes one workbench');
   assert.equal(game.activeHotbarResource, 'earth', 'hotbar returns to earth after placing the last workbench');
   assert.equal(game.crystalSystem.lastMessage, 'Werkbank platziert.', 'successful workbench placement writes a clear log message');
+  assert.equal(game.hasWorkbenchAccess(), true, 'placed workbench is functional when player stands nearby');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.tileMap.setWorkbench(1, 1);
+  game.player.setPosition(TILE_SIZE * 8, TILE_SIZE * 8);
+
+  assert.equal(game.hasWorkbenchAccess(), false, 'placed workbench is not available from far away');
 }
 
 {
@@ -722,6 +760,69 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  game.inventory.add('woodenPickaxe', 1);
+  game.selectHotbarResource('woodenPickaxe');
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'wooden pickaxe cannot be placed in this slice');
+  assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'wooden pickaxe writes a non-placeable log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('grassSeed', 2);
+  game.selectHotbarResource('grassSeed');
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.getPlacementPreview().canPlace, true, 'grass seeds can be planted on an earth tile');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'grass seeds can be planted with B placement logic');
+  assert.equal(game.tileMap.getTile(1, 1), 'grass', 'grass seed turns earth into grass tile');
+  assert.equal(game.inventory.get('grassSeed'), 1, 'planting grass consumes one grass seed');
+  assert.equal(game.crystalSystem.lastMessage, 'Grassamen gepflanzt.', 'planting grass writes a clear log message');
+  assert.equal(game.tileMap.isPlayerSupported(game.player), true, 'grass tile remains normal supported ground nearby');
+  assert.equal(game.tileMap.canPlaceWorkbench(1, 1, { x: 0, y: 1 }), true, 'grass tile still accepts placed objects');
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'grass seeds cannot be planted twice on the same tile');
+  assert.equal(game.crystalSystem.lastMessage, 'Tile ist bereits begrünt.', 'already grass tile writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('grassSeed', 1);
+  game.selectHotbarResource('grassSeed');
+  game.player.facing = { x: 0, y: -1 };
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'grass seeds cannot be planted on crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Nicht auf dem Kristall.', 'grass crystal placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('grassSeed', 1);
+  game.selectHotbarResource('grassSeed');
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'grass seeds cannot be planted in void');
+  assert.equal(game.crystalSystem.lastMessage, 'Grassamen brauchen Erde.', 'grass void placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   game.inventory.add('earth', 1);
   game.player.facing = { x: 0, y: -1 };
 
@@ -762,6 +863,8 @@ const map = new TileMap();
 
   game.inventory.add('earth', 3);
   game.inventory.add('workbench', 2);
+  game.inventory.add('woodenPickaxe', 1);
+  game.inventory.add('grassSeed', 1);
   game.selectHotbarResource('earth');
   game.player.setPosition(
     1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
@@ -770,6 +873,9 @@ const map = new TileMap();
   game.player.facing = { x: 1, y: 0 };
   game.tryPlaceEarth();
   game.selectHotbarResource('workbench');
+  game.tryPlaceSelectedItem();
+  game.selectHotbarResource('grassSeed');
+  game.player.facing = { x: 0, y: 1 };
   game.tryPlaceSelectedItem();
 
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
@@ -782,6 +888,8 @@ const map = new TileMap();
   assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
   assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
   assert.equal(loadedGame.inventory.get('workbench'), 1, 'saved workbench item count loads from local storage');
+  assert.equal(loadedGame.inventory.get('woodenPickaxe'), 1, 'saved wooden pickaxe item count loads from local storage');
+  assert.equal(loadedGame.tileMap.getTile(1, 1), 'grass', 'saved grass tile loads from local storage');
   assert.equal(loadedGame.tileMap.getObject(2, 0), 'workbench', 'saved placed workbench loads as world object');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
 
@@ -811,7 +919,9 @@ const map = new TileMap();
 
   game.inventory.add('earth', 1);
   game.inventory.add('workbench', 1);
+  game.inventory.add('woodenPickaxe', 1);
   game.tileMap.setWorkbench(1, 1);
+  game.tileMap.setGrass(1, 0);
   game.saveGame();
   game.input.keys.add('r');
   game.update(1);
@@ -822,7 +932,9 @@ const map = new TileMap();
   assert.equal(storage.getItem(SAVE_KEY), null, 'reset clears the saved game');
   assert.equal(game.inventory.get('earth'), 0, 'reset restores empty resources');
   assert.equal(game.inventory.get('workbench'), 0, 'reset clears crafted workbench items');
+  assert.equal(game.inventory.get('woodenPickaxe'), 0, 'reset clears crafted wooden pickaxes');
   assert.equal(game.tileMap.getObject(1, 1), null, 'reset clears placed workbenches');
+  assert.equal(game.tileMap.getTile(1, 0), 'earth', 'reset restores grass tiles back to the start island earth');
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
   assert.equal(game.crystalSystem.lastMessage, 'Speicherstand gelöscht. Neustart am Kristall.', 'reset writes a clear log message');
 }

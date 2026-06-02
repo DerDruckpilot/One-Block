@@ -5,7 +5,8 @@ export class ResourceInventory {
       rawWood: 0,
       fiber: 0,
       grassSeed: 0,
-      workbench: 0
+      workbench: 0,
+      woodenPickaxe: 0
     };
   }
 

@@ -1,12 +1,16 @@
-import { RESOURCE_LABELS, WORKBENCH_RECIPE } from '../config/constants.js';
+import { CRAFTING_RECIPES, RESOURCE_LABELS } from '../config/constants.js';
 
 export class CraftingSystem {
   constructor(inventory) {
     this.inventory = inventory;
   }
 
-  getWorkbenchRecipeState() {
-    const missing = Object.entries(WORKBENCH_RECIPE.costs)
+  getRecipeStates({ hasWorkbenchAccess = false } = {}) {
+    return CRAFTING_RECIPES.map((recipe) => this.getRecipeState(recipe, hasWorkbenchAccess));
+  }
+
+  getRecipeState(recipe, hasWorkbenchAccess = false) {
+    const missing = Object.entries(recipe.costs)
       .map(([resource, amount]) => ({
         resource,
         label: RESOURCE_LABELS[resource],
@@ -15,16 +19,38 @@ export class CraftingSystem {
         missing: Math.max(0, amount - this.inventory.get(resource))
       }))
       .filter((cost) => cost.missing > 0);
+    const isAvailable = !recipe.requiresWorkbench || hasWorkbenchAccess;
 
     return {
-      recipe: WORKBENCH_RECIPE,
-      canCraft: missing.length === 0,
+      recipe,
+      canCraft: isAvailable && missing.length === 0,
+      isAvailable,
       missing
     };
   }
 
-  craftWorkbench() {
-    const state = this.getWorkbenchRecipeState();
+  getWorkbenchRecipeState() {
+    return this.getRecipeStates().find((state) => state.recipe.id === 'workbench');
+  }
+
+  craft(recipeId, { hasWorkbenchAccess = false } = {}) {
+    const state = this.getRecipeStates({ hasWorkbenchAccess })
+      .find((recipeState) => recipeState.recipe.id === recipeId);
+
+    if (!state) {
+      return {
+        crafted: false,
+        message: 'Unbekanntes Rezept.'
+      };
+    }
+
+    if (!state.isAvailable) {
+      return {
+        crafted: false,
+        message: 'Werkbank benötigt.'
+      };
+    }
+
     if (!state.canCraft) {
       return {
         crafted: false,
@@ -32,14 +58,18 @@ export class CraftingSystem {
       };
     }
 
-    for (const [resource, amount] of Object.entries(WORKBENCH_RECIPE.costs)) {
+    for (const [resource, amount] of Object.entries(state.recipe.costs)) {
       this.inventory.remove(resource, amount);
     }
-    this.inventory.add(WORKBENCH_RECIPE.result, WORKBENCH_RECIPE.resultAmount);
+    this.inventory.add(state.recipe.result, state.recipe.resultAmount);
 
     return {
       crafted: true,
-      message: 'Werkbank hergestellt.'
+      message: `${RESOURCE_LABELS[state.recipe.result]} hergestellt.`
     };
+  }
+
+  craftWorkbench() {
+    return this.craft('workbench');
   }
 }
