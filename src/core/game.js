@@ -73,6 +73,10 @@ export class Game {
       this.tryUseCrystal();
     }
 
+    if (this.input.wasPressed('b')) {
+      this.tryPlaceEarth();
+    }
+
     this.hud.update({
       inventory: this.inventory.resources,
       hint: this.crystalSystem.lastMessage,
@@ -91,6 +95,26 @@ export class Game {
     if (isCloseToCrystal) {
       this.crystalSystem.use();
     }
+  }
+
+  tryPlaceEarth() {
+    if (this.inventory.get('earth') <= 0) {
+      this.crystalSystem.lastMessage = 'Keine Erde zum Platzieren vorhanden.';
+      return false;
+    }
+
+    const target = this.player.getFacingTile();
+    const playerTile = this.player.getTilePosition();
+
+    if (!this.tileMap.canPlaceEarth(target.x, target.y, playerTile)) {
+      this.crystalSystem.lastMessage = 'Hier kann keine Erde platziert werden.';
+      return false;
+    }
+
+    this.tileMap.setEarth(target.x, target.y);
+    this.inventory.remove('earth', 1);
+    this.crystalSystem.lastMessage = 'Erde platziert.';
+    return true;
   }
 
   handleVoidFall() {

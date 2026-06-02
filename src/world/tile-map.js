@@ -26,6 +26,23 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.earth);
   }
 
+  canPlaceEarth(x, y, blockedTile = null) {
+    if (this.getTile(x, y)) return false;
+    if (blockedTile && blockedTile.x === x && blockedTile.y === y) return false;
+    return this.hasNeighborGround(x, y);
+  }
+
+  hasNeighborGround(x, y) {
+    const neighbors = [
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 }
+    ];
+
+    return neighbors.some((neighbor) => this.isGround(neighbor.x, neighbor.y));
+  }
+
   isGround(x, y) {
     const tile = this.getTile(x, y);
     return tile === TILE_TYPES.earth || tile === TILE_TYPES.crystal;

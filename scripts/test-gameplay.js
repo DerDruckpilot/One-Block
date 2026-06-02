@@ -49,6 +49,13 @@ const map = new TileMap();
   assert.deepEqual(input.getMovementKeys(), ['ArrowRight'], 'input exposes active movement keys');
   assert.equal(prevented, true, 'arrow key default behavior is prevented');
 
+  listeners.keydown({
+    key: 'b',
+    preventDefault() {}
+  });
+
+  assert.equal(input.wasPressed('b'), true, 'keydown registers earth placement key');
+
   listeners.keyup({
     key: 'ArrowRight',
     preventDefault() {}
@@ -112,6 +119,48 @@ const map = new TileMap();
   game.handleVoidFall();
 
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'void fall respawns beside the crystal');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('earth', 2);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.tryPlaceEarth(), true, 'earth can be placed in front of the player');
+  assert.equal(game.tileMap.getTile(2, 0), 'earth', 'placed earth becomes a world tile');
+  assert.equal(game.inventory.get('earth'), 1, 'placing earth consumes one earth resource');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('earth', 1);
+  game.player.facing = { x: 0, y: -1 };
+
+  assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed on the crystal');
+  assert.equal(game.inventory.get('earth'), 1, 'failed placement does not consume earth');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('earth', 1);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: -1, y: 0 };
+
+  assert.equal(game.tryPlaceEarth(), false, 'earth cannot be placed on an existing tile');
+  assert.equal(game.inventory.get('earth'), 1, 'blocked placement does not consume earth');
 }
 
 {
