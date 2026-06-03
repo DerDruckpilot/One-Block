@@ -672,13 +672,19 @@ const map = new TileMap();
     { left: 320, top: 150, width: 260, height: 32 },
     { dataset: { inventoryResource: 'stone' } }
   );
-  const inventoryPanel = createRectElement(
-    { left: 300, top: 90, width: 360, height: 220 },
-    { querySelectorAll: () => [inventoryItem] }
+  const inventoryHotbarSlot = createRectElement(
+    { left: 420, top: 260, width: 80, height: 56 },
+    { dataset: { inventoryHotbarSlot: '1' } }
   );
-  const hotbarSlot = createRectElement(
-    { left: 420, top: 460, width: 80, height: 56 },
-    { dataset: { hotbarSlot: '1' } }
+  const inventoryPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 260 },
+    {
+      querySelectorAll: (selector) => {
+        if (selector === '[data-inventory-resource]') return [inventoryItem];
+        if (selector === '[data-inventory-hotbar-slot]') return [inventoryHotbarSlot];
+        return [];
+      }
+    }
   );
 
   const { Game } = await import('../src/core/game.js');
@@ -689,10 +695,6 @@ const map = new TileMap();
     },
     { innerHTML: '' },
     {
-      hotbarElement: createRectElement(
-        { left: 410, top: 450, width: 100, height: 76 },
-        { querySelectorAll: () => [hotbarSlot] }
-      ),
       inventoryPanel,
       pointerTarget
     }
@@ -702,8 +704,8 @@ const map = new TileMap();
   pointerdown(createPointerEvent(330, 160));
   assert.equal(game.selectedInventoryResource, 'stone', 'inventory item click selects an item for hotbar assignment');
 
-  pointerdown(createPointerEvent(430, 470));
-  assert.equal(game.hotbarSlots[1], 'stone', 'clicking a hotbar slot assigns the selected inventory item');
+  pointerdown(createPointerEvent(430, 270));
+  assert.equal(game.hotbarSlots[1], 'stone', 'clicking the inventory hotbar assigns the selected inventory item');
   assert.equal(game.activeHotbarSlot, 1, 'assigned hotbar slot becomes active');
 }
 
@@ -765,6 +767,47 @@ const map = new TileMap();
 }
 
 {
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  const canvas = {
+    width: 960,
+    height: 540,
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 960, height: 540 };
+    }
+  };
+  const hotbarSlot = createRectElement(
+    { left: 420, top: 460, width: 80, height: 56 },
+    { dataset: { hotbarSlot: '2', resource: 'fiber' } }
+  );
+  let selectedSlot = null;
+  const hitboxes = new PointerHitboxSystem({
+    canvas,
+    getInventoryOpen: () => true,
+    hotbarElement: createRectElement(
+      { left: 410, top: 450, width: 100, height: 76 },
+      { querySelectorAll: () => [hotbarSlot] }
+    ),
+    onHotbarSelect(slotIndex) {
+      selectedSlot = slotIndex;
+    },
+    pointerTarget
+  });
+
+  pointerdown(createPointerEvent(430, 470));
+  assert.equal(selectedSlot, null, 'normal hotbar hitbox is inactive while a menu is open');
+
+  hitboxes.getInventoryOpen = () => false;
+  pointerdown(createPointerEvent(430, 470));
+  assert.equal(selectedSlot, 2, 'normal hotbar hitbox works again after menus close');
+}
+
+{
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
@@ -789,6 +832,91 @@ const map = new TileMap();
   game.input.pressedThisFrame.add('c');
   game.handleMenuToggles();
   assert.equal(game.craftingOpen, false, 'C closes crafting');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  assert.equal(game.isGamePaused(), false, 'new game starts unpaused');
+  game.inventoryOpen = true;
+  assert.equal(game.isGamePaused(), true, 'open inventory pauses the game');
+  game.inventoryOpen = false;
+  game.craftingOpen = true;
+  game.craftingContext = 'normal';
+  assert.equal(game.isGamePaused(), true, 'open normal crafting pauses the game');
+  game.craftingContext = 'workbench';
+  assert.equal(game.isGamePaused(), true, 'open workbench crafting pauses the game');
+  game.craftingOpen = false;
+  assert.equal(game.isGamePaused(), false, 'closing menus unpauses the game');
+}
+
+{
+  const actionButton = createInteractiveRectElement({ left: 800, top: 400, width: 80, height: 80 });
+  const attackButton = createInteractiveRectElement({ left: 720, top: 400, width: 80, height: 80 });
+  const joystick = createInteractiveRectElement({ left: 0, top: 0, width: 100, height: 100 });
+  const knob = createInteractiveRectElement({ left: 35, top: 35, width: 30, height: 30 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, {
+    actionButton,
+    attackButton,
+    joystickElement: joystick,
+    joystickKnobElement: knob
+  });
+
+  game.inventory.add('earth', 1);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.inventoryOpen = true;
+  const startX = game.player.x;
+  const startY = game.player.y;
+  game.input.keys.add('d');
+  joystick.listeners.pointerdown({ ...createPointerEvent(50, 50), pointerId: 41 });
+  joystick.listeners.pointermove({ ...createPointerEvent(100, 50), pointerId: 41 });
+  actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 42 });
+  attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 43 });
+
+  game.update(0.2);
+
+  assert.equal(game.player.x, startX, 'paused game ignores keyboard and joystick movement');
+  assert.equal(game.player.y, startY, 'paused game keeps the player position stable');
+  assert.equal(game.tileMap.getTile(2, 0), null, 'paused game ignores action placement');
+  assert.equal(game.inventory.get('earth'), 1, 'paused placement does not consume inventory');
+  assert.equal(game.tryPlaceSelectedItem(), false, 'direct placement is blocked while paused');
+  assert.equal(game.tryUseCrystal(), false, 'direct crystal interaction is blocked while paused');
+  assert.equal(game.tryAttackAction(), false, 'direct attack is blocked while paused');
+  assert.equal(game.touchInput.getDebugState().enabled, false, 'touch input is disabled while paused');
+
+  game.input.pressedThisFrame.add('i');
+  game.input.pressedThisFrame.add('b');
+  game.update(0.016);
+  assert.equal(game.inventoryOpen, false, 'menu close key closes inventory');
+  assert.equal(game.tileMap.getTile(2, 0), null, 'gameplay stays paused for the frame that closes a menu');
+}
+
+{
+  const hotbarElement = { hidden: false, innerHTML: '' };
+  const touchControlsElement = { hidden: false };
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, {
+    hotbarElement,
+    touchControlsElement
+  });
+
+  game.inventoryOpen = true;
+  game.update(0.016);
+  assert.equal(hotbarElement.hidden, true, 'normal hotbar is hidden while a menu is open');
+  assert.equal(touchControlsElement.hidden, true, 'touch controls are hidden while a menu is open');
+  assert.equal(game.getDebugState().paused, true, 'debug state exposes the pause state');
+
+  game.inventoryOpen = false;
+  game.update(0.016);
+  assert.equal(hotbarElement.hidden, false, 'normal hotbar returns when menus close');
+  assert.equal(touchControlsElement.hidden, false, 'touch controls return when menus close');
+  assert.equal(game.getDebugState().paused, false, 'debug state updates after unpausing');
 }
 
 {
@@ -914,6 +1042,8 @@ const map = new TileMap();
 
   menus.update({
     craftingOpen: true,
+    activeHotbarSlot: 1,
+    hotbarSlots: ['earth', 'stone', null, 'woodenSpear'],
     hasWorkbenchAccess: false,
     inventory,
     inventoryOpen: true,
@@ -929,6 +1059,8 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-tab="tools"'), true, 'inventory panel exposes category tabs');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-filter="true"'), true, 'inventory panel exposes a filter field');
   assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hotbar-Slot anklicken'), true, 'inventory panel explains hotbar assignment');
+  assert.equal(inventoryPanel.innerHTML.includes('data-inventory-hotbar-slot="1"'), true, 'inventory panel exposes its own hotbar assignment slots');
+  assert.equal(inventoryPanel.innerHTML.includes('Hotbar 2: Stein'), true, 'inventory hotbar shows assigned slot labels');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), false, 'normal crafting hides workbench-gated recipe');
@@ -940,6 +1072,7 @@ const map = new TileMap();
   menus.update({
     craftingContext: 'normal',
     craftingOpen: false,
+    hotbarSlots: ['earth', 'stone', null, 'woodenSpear'],
     inventory,
     inventoryOpen: true,
     recipeStates: [],
@@ -952,6 +1085,7 @@ const map = new TileMap();
   menus.update({
     craftingContext: 'normal',
     craftingOpen: false,
+    hotbarSlots: ['earth', 'stone', null, 'woodenSpear'],
     inventory,
     inventoryOpen: true,
     recipeStates: [],
@@ -963,6 +1097,7 @@ const map = new TileMap();
   menus.update({
     craftingContext: 'workbench',
     craftingOpen: true,
+    hotbarSlots: ['earth', 'stone', null, 'woodenSpear'],
     inventory,
     inventoryOpen: false,
     recipeStates: crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }),
@@ -1004,6 +1139,7 @@ const map = new TileMap();
   game.inventory.add('rawWood', 5);
   game.inventory.add('fiber', 2);
   game.craftingOpen = true;
+  assert.equal(game.isGamePaused(), true, 'open crafting pauses gameplay before crafting button clicks');
 
   pointerdown(createPointerEvent(360, 240));
 
@@ -1041,6 +1177,7 @@ const map = new TileMap();
     }
   );
   game.craftingOpen = true;
+  assert.equal(game.isGamePaused(), true, 'disabled crafting button is still handled through paused menu UI');
 
   pointerdown(createPointerEvent(360, 240));
 

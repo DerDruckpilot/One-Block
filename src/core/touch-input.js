@@ -16,6 +16,7 @@ export class TouchInput {
     this.vector = { x: 0, y: 0 };
     this.actionPressedThisFrame = false;
     this.attackPressedThisFrame = false;
+    this.enabled = true;
 
     this.bindJoystick();
     this.bindButton(actionButton, 'action');
@@ -24,6 +25,7 @@ export class TouchInput {
 
   bindJoystick() {
     this.joystickElement?.addEventListener?.('pointerdown', (event) => {
+      if (!this.enabled) return;
       if (this.joystickPointerId !== null) return;
       this.consumeEvent(event);
       this.joystickPointerId = event.pointerId;
@@ -33,6 +35,7 @@ export class TouchInput {
     });
 
     this.joystickElement?.addEventListener?.('pointermove', (event) => {
+      if (!this.enabled) return;
       if (event.pointerId !== this.joystickPointerId) return;
       this.consumeEvent(event);
       this.updateJoystickVector(event);
@@ -49,6 +52,7 @@ export class TouchInput {
 
   bindButton(button, action) {
     button?.addEventListener?.('pointerdown', (event) => {
+      if (!this.enabled) return;
       this.consumeEvent(event);
       button.setPointerCapture?.(event.pointerId);
       this.buttonPointers.set(event.pointerId, action);
@@ -69,6 +73,21 @@ export class TouchInput {
     button?.addEventListener?.('pointerup', release);
     button?.addEventListener?.('pointercancel', release);
     button?.addEventListener?.('lostpointercapture', release);
+  }
+
+  setEnabled(enabled) {
+    const nextEnabled = enabled === true;
+    if (this.enabled === nextEnabled) return;
+
+    this.enabled = nextEnabled;
+    if (!this.enabled) {
+      this.clearJoystick();
+      this.buttonPointers.clear();
+      this.actionPressedThisFrame = false;
+      this.attackPressedThisFrame = false;
+      this.actionButton?.classList?.remove('is-pressed');
+      this.attackButton?.classList?.remove('is-pressed');
+    }
   }
 
   updateJoystickVector(event) {
@@ -143,6 +162,7 @@ export class TouchInput {
 
   getDebugState() {
     return {
+      enabled: this.enabled,
       joystickActive: this.joystickPointerId !== null,
       actionPressed: this.isButtonHeld('action'),
       attackPressed: this.isButtonHeld('attack'),

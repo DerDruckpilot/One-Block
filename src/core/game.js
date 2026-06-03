@@ -53,6 +53,7 @@ export class Game {
     this.saveSystem = new SaveSystem(options.storage);
     this.hud = new Hud(hudElement);
     this.hotbar = new Hotbar(options.hotbarElement);
+    this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({
       craftingPanel: options.craftingPanel,
       inventoryPanel: options.inventoryPanel
@@ -130,28 +131,39 @@ export class Game {
 
   update(deltaSeconds) {
     this.falling = false;
-    this.input.setVirtualMovement(this.touchInput.getMovementVector());
-    this.player.update(deltaSeconds, this.input, this.tileMap);
-    this.handleVoidFall();
-    this.camera.centerOn(this.player.getCenterPosition());
-    this.backgroundSystem.update(deltaSeconds);
-
-    if (this.input.wasPressed(' ', 'e', 'Enter')) {
-      this.tryUseCrystal();
-    }
-
-    this.handleHotbarSelection();
+    const wasPaused = this.isGamePaused();
     this.handleMenuToggles();
-
-    if (this.input.wasPressed('b')) {
-      this.tryPlaceSelectedItem();
-    }
-
-    this.handleTouchActions();
     this.handleDebugToggle();
-    const didReset = this.handleReset(deltaSeconds);
-    if (!didReset) {
-      this.handleAutosave(deltaSeconds);
+
+    const paused = this.isGamePaused();
+    const gameplayPaused = wasPaused || paused;
+    this.touchInput.setEnabled(!paused);
+    this.input.setVirtualMovement(gameplayPaused ? { x: 0, y: 0 } : this.touchInput.getMovementVector());
+
+    if (!gameplayPaused) {
+      this.player.update(deltaSeconds, this.input, this.tileMap);
+      this.handleVoidFall();
+      this.camera.centerOn(this.player.getCenterPosition());
+      this.backgroundSystem.update(deltaSeconds);
+
+      if (this.input.wasPressed(' ', 'e', 'Enter')) {
+        this.tryUseCrystal();
+      }
+
+      this.handleHotbarSelection();
+
+      if (this.input.wasPressed('b')) {
+        this.tryPlaceSelectedItem();
+      }
+
+      this.handleTouchActions();
+      const didReset = this.handleReset(deltaSeconds);
+      if (!didReset) {
+        this.handleAutosave(deltaSeconds);
+      }
+    } else {
+      this.resetHoldSeconds = 0;
+      this.touchInput.consumeFramePresses();
     }
 
     this.hud.update({
@@ -168,7 +180,9 @@ export class Game {
     this.menuPanels.update({
       craftingOpen: this.craftingOpen,
       craftingContext: this.craftingContext,
+      activeHotbarSlot: this.activeHotbarSlot,
       hasWorkbenchAccess: this.hasWorkbenchAccess(),
+      hotbarSlots: this.hotbarSlots,
       inventory: this.inventory,
       inventoryOpen: this.inventoryOpen,
       recipeStates: this.craftingSystem.getRecipeStates({
@@ -178,10 +192,13 @@ export class Game {
       selectedInventoryResource: this.selectedInventoryResource
     });
     this.updateMenuButtonStates();
+    this.updateInteractiveUiState();
     this.pointerHitboxes.updateHitboxes();
   }
 
   tryUseCrystal() {
+    if (this.isGamePaused()) return false;
+
     const foot = this.player.getFootPosition();
     const isCloseToCrystal = this.tileMap.isNearCrystalWorld(
       foot.x,
@@ -198,7 +215,10 @@ export class Game {
         this.crystalSystem.use();
       }
       this.saveGame();
+      return true;
     }
+
+    return false;
   }
 
   isNearCrystal() {
@@ -211,6 +231,8 @@ export class Game {
   }
 
   tryContextAction() {
+    if (this.isGamePaused()) return false;
+
     const placement = this.getPlacementPreview();
     if (placement.canPlace) {
       return this.tryPlaceSelectedItem();
@@ -230,6 +252,8 @@ export class Game {
   }
 
   tryAttackAction() {
+    if (this.isGamePaused()) return false;
+
     const activeItem = this.getActiveHotbarItem();
 
     if (activeItem === 'woodenPickaxe' && this.inventory.get('woodenPickaxe') > 0) {
@@ -265,6 +289,8 @@ export class Game {
   }
 
   tryPlaceSelectedItem() {
+    if (this.isGamePaused()) return false;
+
     const placement = this.getPlacementPreview();
 
     if (!placement.canPlace) {
@@ -513,6 +539,14 @@ export class Game {
     }
   }
 
+  isMenuOpen() {
+    return this.inventoryOpen || this.craftingOpen;
+  }
+
+  isGamePaused() {
+    return this.isMenuOpen();
+  }
+
   toggleInventoryMenu() {
     this.inventoryOpen = !this.inventoryOpen;
     if (this.inventoryOpen) {
@@ -734,13 +768,25 @@ export class Game {
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderObjects(this.tileMap, this.camera);
-    this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
+    if (!this.isGamePaused()) {
+      this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
+    }
     this.renderSystem.renderPlayer(this.player, this.camera);
   }
 
   updateMenuButtonStates() {
     this.inventoryButton?.classList?.toggle('is-active', this.inventoryOpen);
     this.craftingButton?.classList?.toggle('is-active', this.craftingOpen);
+  }
+
+  updateInteractiveUiState() {
+    const menuOpen = this.isMenuOpen();
+    if (this.hotbar.element) {
+      this.hotbar.element.hidden = menuOpen;
+    }
+    if (this.touchControlsElement) {
+      this.touchControlsElement.hidden = menuOpen;
+    }
   }
 
   getDebugState() {
@@ -759,6 +805,7 @@ export class Game {
       supported: support.supported,
       inVoid: support.inVoid,
       falling: this.falling,
+      paused: this.isGamePaused(),
       movementKeys: input.movementKeys,
       virtualMovement: input.virtualMovement,
       touch,
