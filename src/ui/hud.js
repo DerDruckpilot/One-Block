@@ -15,6 +15,7 @@ export class Hud {
         supported: ${debug.supported ? 'true' : 'false'}<br>
         void/falling: ${debug.inVoid ? 'void' : 'safe'} / ${debug.falling ? 'falling' : 'stable'}<br>
         save: ${debug.saveStatus}<br>
+        Hotbar: ${debug.activeHotbarSlot + 1} / ${debug.activeHotbarItem || 'leer'}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>
         Letzter Key: ${debug.lastKey}
       </div>` : ''}

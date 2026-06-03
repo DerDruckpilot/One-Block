@@ -1,11 +1,15 @@
 import {
   CRYSTAL_INTERACTION_DISTANCE,
+  DEFAULT_HOTBAR_SLOTS,
   GAME_VIEW,
-  HOTBAR_RESOURCES,
+  HOTBAR_SLOT_COUNT,
+  INVENTORY_RESOURCES,
   OBJECT_TYPES,
+  PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
+  RESOURCE_LABELS,
   TILE_SIZE,
   WORKBENCH_INTERACTION_DISTANCE
 } from '../config/constants.js';
@@ -62,7 +66,8 @@ export class Game {
       },
       onCraft: (recipeId) => this.tryCraft(recipeId),
       onCraftingToggle: () => this.toggleCraftingMenu(),
-      onHotbarSelect: (resource) => this.selectAndSaveHotbarResource(resource),
+      onHotbarSelect: (slotIndex) => this.handleHotbarSlotClick(slotIndex),
+      onInventoryItemSelect: (resource) => this.selectInventoryResource(resource),
       onInventoryToggle: () => this.toggleInventoryMenu(),
       pointerTarget: options.pointerTarget
     });
@@ -70,7 +75,9 @@ export class Game {
     this.lastTimestamp = 0;
     this.falling = false;
     this.debugEnabled = false;
-    this.activeHotbarResource = 'earth';
+    this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
+    this.activeHotbarSlot = 0;
+    this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
     this.resetHoldSeconds = 0;
@@ -139,7 +146,8 @@ export class Game {
     });
     this.hotbar.update({
       inventory: this.inventory.resources,
-      activeResource: this.activeHotbarResource
+      activeSlot: this.activeHotbarSlot,
+      slots: this.hotbarSlots
     });
     this.menuPanels.update({
       craftingOpen: this.craftingOpen,
@@ -148,7 +156,8 @@ export class Game {
       inventoryOpen: this.inventoryOpen,
       recipeStates: this.craftingSystem.getRecipeStates({
         hasWorkbenchAccess: this.hasWorkbenchAccess()
-      })
+      }),
+      selectedInventoryResource: this.selectedInventoryResource
     });
     this.updateMenuButtonStates();
     this.pointerHitboxes.updateHitboxes();
@@ -163,7 +172,13 @@ export class Game {
     );
 
     if (isCloseToCrystal) {
-      this.crystalSystem.use();
+      const usesPickaxe = this.getActiveHotbarItem() === 'woodenPickaxe' &&
+        this.inventory.get('woodenPickaxe') > 0;
+      if (usesPickaxe) {
+        this.crystalSystem.use(PICKAXE_RESOURCE_DROPS, (drop) => `${RESOURCE_LABELS[drop.resource]} erhalten.`);
+      } else {
+        this.crystalSystem.use();
+      }
       this.saveGame();
     }
   }
@@ -180,22 +195,27 @@ export class Game {
       return false;
     }
 
-    if (this.activeHotbarResource === 'earth') {
+    const activeItem = this.getActiveHotbarItem();
+
+    if (activeItem === 'earth') {
       this.tileMap.setEarth(placement.x, placement.y);
       this.inventory.remove('earth', 1);
       this.crystalSystem.lastMessage = 'Erde platziert.';
     }
 
-    if (this.activeHotbarResource === OBJECT_TYPES.workbench) {
+    if (activeItem === 'stone') {
+      this.tileMap.setStone(placement.x, placement.y);
+      this.inventory.remove('stone', 1);
+      this.crystalSystem.lastMessage = 'Stein platziert.';
+    }
+
+    if (activeItem === OBJECT_TYPES.workbench) {
       this.tileMap.setWorkbench(placement.x, placement.y);
       this.inventory.remove(OBJECT_TYPES.workbench, 1);
       this.crystalSystem.lastMessage = 'Werkbank platziert.';
-      if (this.inventory.get(OBJECT_TYPES.workbench) <= 0) {
-        this.selectHotbarResource('earth');
-      }
     }
 
-    if (this.activeHotbarResource === 'grassSeed') {
+    if (activeItem === 'grassSeed') {
       this.tileMap.setGrass(placement.x, placement.y);
       this.inventory.remove('grassSeed', 1);
       this.crystalSystem.lastMessage = 'Grassamen gepflanzt.';
@@ -212,28 +232,44 @@ export class Game {
   getPlacementPreview() {
     const target = this.player.getFacingTile();
     const playerTile = this.player.getTilePosition();
+    const activeItem = this.getActiveHotbarItem();
 
-    if (this.activeHotbarResource === OBJECT_TYPES.workbench) {
-      return this.getWorkbenchPlacementPreview(target, playerTile);
-    }
-
-    if (this.activeHotbarResource === 'grassSeed') {
-      return this.getGrassSeedPlacementPreview(target);
-    }
-
-    if (this.activeHotbarResource !== 'earth') {
+    if (!activeItem) {
       return {
         ...target,
         canPlace: false,
-        message: 'Dieses Item kann noch nicht platziert werden.'
+        message: 'Kein Item ausgewählt.'
       };
     }
 
-    if (this.inventory.get('earth') <= 0) {
+    if (activeItem === OBJECT_TYPES.workbench) {
+      return this.getWorkbenchPlacementPreview(target, playerTile);
+    }
+
+    if (activeItem === 'grassSeed') {
+      return this.getGrassSeedPlacementPreview(target);
+    }
+
+    if (activeItem === 'earth' || activeItem === 'stone') {
+      return this.getFloorTilePlacementPreview(activeItem, target, playerTile);
+    }
+
+    return {
+      ...target,
+      canPlace: false,
+      message: 'Dieses Item kann noch nicht platziert werden.'
+    };
+  }
+
+  getFloorTilePlacementPreview(resource, target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
+    const label = RESOURCE_LABELS[resource];
+    const noPlacementLabel = resource === 'earth' ? 'keine Erde' : `kein ${label}`;
+
+    if (this.inventory.get(resource) <= 0) {
       return {
         ...target,
         canPlace: false,
-        message: 'Nicht genug Erde.'
+        message: `Nicht genug ${label}.`
       };
     }
 
@@ -257,14 +293,14 @@ export class Game {
       return {
         ...target,
         canPlace: false,
-        message: 'Hier kann keine Erde platziert werden.'
+        message: `Hier kann ${noPlacementLabel} platziert werden.`
       };
     }
 
     return {
       ...target,
       canPlace: true,
-      message: 'Erde kann platziert werden.'
+      message: `${label} kann platziert werden.`
     };
   }
 
@@ -382,9 +418,9 @@ export class Game {
   }
 
   handleHotbarSelection() {
-    for (let index = 0; index < HOTBAR_RESOURCES.length; index += 1) {
+    for (let index = 0; index < HOTBAR_SLOT_COUNT; index += 1) {
       if (this.input.wasPressed(String(index + 1))) {
-        this.selectHotbarResource(HOTBAR_RESOURCES[index]);
+        this.selectHotbarSlot(index);
         this.saveGame();
       }
     }
@@ -404,6 +440,8 @@ export class Game {
     this.inventoryOpen = !this.inventoryOpen;
     if (this.inventoryOpen) {
       this.craftingOpen = false;
+    } else {
+      this.selectedInventoryResource = null;
     }
   }
 
@@ -411,6 +449,7 @@ export class Game {
     this.craftingOpen = !this.craftingOpen;
     if (this.craftingOpen) {
       this.inventoryOpen = false;
+      this.selectedInventoryResource = null;
     }
   }
 
@@ -439,19 +478,52 @@ export class Game {
     );
   }
 
-  selectHotbarResource(resource) {
-    if (!HOTBAR_RESOURCES.includes(resource)) return false;
+  getActiveHotbarItem() {
+    return this.hotbarSlots[this.activeHotbarSlot] || null;
+  }
 
-    this.activeHotbarResource = resource;
+  selectHotbarSlot(slotIndex) {
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= HOTBAR_SLOT_COUNT) return false;
+
+    this.activeHotbarSlot = slotIndex;
     return true;
   }
 
-  selectAndSaveHotbarResource(resource) {
-    const selected = this.selectHotbarResource(resource);
-    if (selected) {
-      this.saveGame();
+  selectHotbarResource(resource) {
+    if (!this.isKnownInventoryResource(resource)) return false;
+
+    const existingIndex = this.hotbarSlots.indexOf(resource);
+    if (existingIndex >= 0) {
+      this.activeHotbarSlot = existingIndex;
+      return true;
     }
-    return selected;
+
+    this.hotbarSlots[this.activeHotbarSlot] = resource;
+    return true;
+  }
+
+  handleHotbarSlotClick(slotIndex) {
+    if (!this.selectHotbarSlot(slotIndex)) return false;
+
+    if (this.selectedInventoryResource) {
+      this.hotbarSlots[slotIndex] = this.selectedInventoryResource;
+      this.crystalSystem.lastMessage = `${RESOURCE_LABELS[this.selectedInventoryResource]} in Hotbar-Slot ${slotIndex + 1}.`;
+    }
+
+    this.saveGame();
+    return true;
+  }
+
+  selectInventoryResource(resource) {
+    if (!this.isKnownInventoryResource(resource)) return false;
+
+    this.selectedInventoryResource = resource;
+    this.crystalSystem.lastMessage = `${RESOURCE_LABELS[resource]} für Hotbar ausgewählt.`;
+    return true;
+  }
+
+  isKnownInventoryResource(resource) {
+    return INVENTORY_RESOURCES.includes(resource);
   }
 
   handleReset(deltaSeconds) {
@@ -476,7 +548,9 @@ export class Game {
     this.inventory = new ResourceInventory();
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.craftingSystem = new CraftingSystem(this.inventory);
-    this.activeHotbarResource = 'earth';
+    this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
+    this.activeHotbarSlot = 0;
+    this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
     this.respawnPlayer();
@@ -517,7 +591,7 @@ export class Game {
       }
     }
 
-    this.selectHotbarResource(save.activeHotbarResource || 'earth');
+    this.loadHotbarState(save);
 
     this.crystalSystem.lastMessage = 'Speicherstand geladen.';
     this.saveStatus = 'loaded';
@@ -539,7 +613,8 @@ export class Game {
       tiles: this.tileMap.toJSON(),
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
-      activeHotbarResource: this.activeHotbarResource,
+      hotbarSlots: [...this.hotbarSlots],
+      activeHotbarSlot: this.activeHotbarSlot,
       player: {
         x: this.player.x,
         y: this.player.y,
@@ -581,7 +656,34 @@ export class Game {
       falling: this.falling,
       movementKeys: input.movementKeys,
       lastKey: input.lastKey,
-      saveStatus: this.saveStatus
+      saveStatus: this.saveStatus,
+      activeHotbarSlot: this.activeHotbarSlot,
+      activeHotbarItem: this.getActiveHotbarItem()
     };
+  }
+
+  loadHotbarState(save) {
+    if (Array.isArray(save.hotbarSlots)) {
+      this.hotbarSlots = this.normalizeHotbarSlots(save.hotbarSlots);
+    } else {
+      this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
+      if (this.isKnownInventoryResource(save.activeHotbarResource)) {
+        const index = this.hotbarSlots.indexOf(save.activeHotbarResource);
+        this.activeHotbarSlot = index >= 0 ? index : 0;
+      }
+    }
+
+    if (Number.isInteger(save.activeHotbarSlot)) {
+      this.activeHotbarSlot = Math.min(Math.max(save.activeHotbarSlot, 0), HOTBAR_SLOT_COUNT - 1);
+    }
+  }
+
+  normalizeHotbarSlots(slots) {
+    const normalized = [];
+    for (let index = 0; index < HOTBAR_SLOT_COUNT; index += 1) {
+      const resource = slots[index] || null;
+      normalized.push(this.isKnownInventoryResource(resource) ? resource : null);
+    }
+    return normalized;
   }
 }

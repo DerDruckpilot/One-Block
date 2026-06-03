@@ -1,6 +1,4 @@
 import {
-  BASE_RESOURCES,
-  HOTBAR_RESOURCES,
   RESOURCE_ICONS,
   RESOURCE_LABELS,
   RESOURCE_SHORT_LABELS
@@ -9,29 +7,26 @@ import {
 export class Hotbar {
   constructor(element) {
     this.element = element;
+    this.lastHtml = '';
   }
 
-  update({ inventory, activeResource }) {
+  update({ inventory, activeSlot, slots }) {
     if (!this.element) return;
 
-    const visibleResources = HOTBAR_RESOURCES.filter((resource) => (
-      BASE_RESOURCES.includes(resource) ||
-      inventory[resource] > 0 ||
-      activeResource === resource
-    ));
-
-    this.element.innerHTML = visibleResources.map((resource, index) => {
-      const isActive = resource === activeResource;
-      const label = RESOURCE_LABELS[resource];
-      const shortLabel = RESOURCE_SHORT_LABELS[resource];
-      const icon = RESOURCE_ICONS[resource];
-      const amount = inventory[resource] || 0;
+    const html = slots.map((resource, index) => {
+      const isActive = index === activeSlot;
+      const isEmpty = !resource;
+      const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
+      const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
+      const icon = isEmpty ? '--' : RESOURCE_ICONS[resource];
+      const amount = isEmpty ? 0 : inventory[resource] || 0;
 
       return `
         <button
-          class="hotbar-slot${isActive ? ' is-active' : ''}"
+          class="hotbar-slot${isActive ? ' is-active' : ''}${isEmpty ? ' is-empty' : ''}"
           type="button"
-          data-resource="${resource}"
+          data-hotbar-slot="${index}"
+          ${resource ? `data-resource="${resource}"` : ''}
           aria-pressed="${isActive ? 'true' : 'false'}"
           aria-label="${index + 1}: ${label}"
         >
@@ -42,5 +37,10 @@ export class Hotbar {
         </button>
       `;
     }).join('');
+
+    if (html !== this.lastHtml) {
+      this.element.innerHTML = html;
+      this.lastHtml = html;
+    }
   }
 }

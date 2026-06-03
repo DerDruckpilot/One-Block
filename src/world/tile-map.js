@@ -31,6 +31,10 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.grass);
   }
 
+  setStone(x, y) {
+    this.tiles.set(keyOf(x, y), TILE_TYPES.stone);
+  }
+
   getObject(x, y) {
     return this.objects.get(keyOf(x, y)) || null;
   }
@@ -54,7 +58,7 @@ export class TileMap {
   loadTiles(tiles) {
     this.tiles.clear();
     for (const tile of tiles) {
-      if ([TILE_TYPES.earth, TILE_TYPES.grass, TILE_TYPES.crystal].includes(tile.type)) {
+      if ([TILE_TYPES.earth, TILE_TYPES.grass, TILE_TYPES.stone, TILE_TYPES.crystal].includes(tile.type)) {
         this.tiles.set(keyOf(tile.x, tile.y), tile.type);
       }
     }
@@ -101,7 +105,10 @@ export class TileMap {
 
   isGround(x, y) {
     const tile = this.getTile(x, y);
-    return tile === TILE_TYPES.earth || tile === TILE_TYPES.grass || tile === TILE_TYPES.crystal;
+    return tile === TILE_TYPES.earth ||
+      tile === TILE_TYPES.grass ||
+      tile === TILE_TYPES.stone ||
+      tile === TILE_TYPES.crystal;
   }
 
   isPlantableEarth(x, y) {
