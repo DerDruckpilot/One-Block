@@ -1,9 +1,11 @@
 import {
+  HOTBAR_SLOT_COUNT,
   INVENTORY_RESOURCES,
   INVENTORY_TABS,
   RESOURCE_CATEGORIES,
   RESOURCE_ICONS,
-  RESOURCE_LABELS
+  RESOURCE_LABELS,
+  RESOURCE_SHORT_LABELS
 } from '../config/constants.js';
 
 export class MenuPanels {
@@ -27,12 +29,14 @@ export class MenuPanels {
   update({
     craftingContext = 'normal',
     craftingOpen,
+    hotbarSlots = [],
+    activeHotbarSlot = 0,
     inventory,
     inventoryOpen,
     recipeStates,
     selectedInventoryResource
   }) {
-    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource);
+    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
   }
 
@@ -53,7 +57,7 @@ export class MenuPanels {
     this.lastCraftingHtml = '';
   }
 
-  renderInventory(inventory, isOpen, selectedInventoryResource = null) {
+  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
 
@@ -99,7 +103,41 @@ export class MenuPanels {
       <div class="menu-note">${selectedText}</div>
       <div class="inventory-grid">${rows}</div>
       <div class="menu-note">Item anklicken, dann Hotbar-Slot anklicken.</div>
+      ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
     `);
+  }
+
+  renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot) {
+    const slots = [];
+    for (let index = 0; index < HOTBAR_SLOT_COUNT; index += 1) {
+      const resource = hotbarSlots[index] || null;
+      const isActive = index === activeHotbarSlot;
+      const isEmpty = !resource;
+      const icon = isEmpty ? '--' : RESOURCE_ICONS[resource];
+      const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
+      const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
+      const amount = isEmpty ? 0 : inventory.get(resource);
+      slots.push(`
+        <button
+          class="inventory-hotbar-slot${isActive ? ' is-active' : ''}${isEmpty ? ' is-empty' : ''}"
+          type="button"
+          data-inventory-hotbar-slot="${index}"
+          aria-pressed="${isActive ? 'true' : 'false'}"
+          aria-label="Hotbar ${index + 1}: ${label}"
+        >
+          <span class="hotbar-key">${index + 1}</span>
+          <span class="hotbar-icon">${icon}</span>
+          <span class="hotbar-label">${shortLabel}</span>
+          <span class="hotbar-count">${amount}</span>
+        </button>
+      `);
+    }
+
+    return `
+      <div class="inventory-hotbar-assignment" aria-label="Hotbar-Zuweisung">
+        ${slots.join('')}
+      </div>
+    `;
   }
 
   getFilteredInventoryResources() {

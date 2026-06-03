@@ -149,6 +149,14 @@ export class PointerHitboxSystem {
         if (itemHitbox) hitboxes.push(itemHitbox);
       }
 
+      for (const hotbarSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-hotbar-slot]') || [])) {
+        if (hotbarSlot.dataset.inventoryHotbarSlot === undefined) continue;
+        const hotbarHitbox = this.createElementHitbox(hotbarSlot, `inventory-hotbar-${hotbarSlot.dataset.inventoryHotbarSlot}`, () => {
+          this.onHotbarSelect(Number(hotbarSlot.dataset.inventoryHotbarSlot));
+        });
+        if (hotbarHitbox) hitboxes.push(hotbarHitbox);
+      }
+
       const panelHitbox = this.createElementHitbox(this.inventoryPanel, 'inventory-panel', () => {});
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
@@ -157,6 +165,8 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
+    if (this.getInventoryOpen() || this.getCraftingOpen()) return [];
+
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(
         element,

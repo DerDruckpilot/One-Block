@@ -8,6 +8,7 @@ const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
 const inventoryPanel = document.querySelector('#inventory-panel');
 const craftingPanel = document.querySelector('#crafting-panel');
+const touchControlsElement = document.querySelector('#touch-controls');
 const joystickElement = document.querySelector('#touch-joystick');
 const joystickKnobElement = document.querySelector('#touch-joystick-knob');
 const actionButton = document.querySelector('#touch-action');
@@ -31,7 +32,8 @@ const game = new Game(canvas, hudElement, {
   inventoryPanel,
   joystickElement,
   joystickKnobElement,
-  storage: getLocalStorage()
+  storage: getLocalStorage(),
+  touchControlsElement
 });
 game.start();
 

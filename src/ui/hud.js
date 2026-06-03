@@ -22,6 +22,7 @@ export class Hud {
         Support-Tile: ${debug.supportTileX}, ${debug.supportTileY}<br>
         supported: ${debug.supported ? 'true' : 'false'}<br>
         void/falling: ${debug.inVoid ? 'void' : 'safe'} / ${debug.falling ? 'falling' : 'stable'}<br>
+        paused: ${debug.paused ? 'true' : 'false'}<br>
         save: ${debug.saveStatus}<br>
         Hotbar: ${debug.activeHotbarSlot + 1} / ${debug.activeHotbarItem || 'leer'}<br>
         Touch: stick ${touch.joystickActive ? 'true' : 'false'}, action ${touch.actionPressed ? 'true' : 'false'}, attack ${touch.attackPressed ? 'true' : 'false'}, pointer ${touch.pointerCount}<br>

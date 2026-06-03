@@ -401,6 +401,11 @@ button.menu-row:hover {
   pointer-events: auto;
 }
 
+#hotbar[hidden],
+#touch-controls[hidden] {
+  display: none !important;
+}
+
 .hotbar-slot {
   position: relative;
   display: grid;
@@ -417,6 +422,46 @@ button.menu-row:hover {
   font: inherit;
   image-rendering: pixelated;
   cursor: pointer;
+}
+
+.inventory-hotbar-assignment {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(64px, 82px));
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 2px solid #4d2f1d;
+  border-radius: 8px;
+  background: rgba(43, 26, 17, 0.44);
+}
+
+.inventory-hotbar-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  grid-template-rows: 26px 18px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 58px;
+  padding: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 25, 0.72);
+  color: var(--ui-text);
+  font: inherit;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+
+.inventory-hotbar-slot.is-active {
+  border-color: #ffe082;
+  box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.25), inset 0 0 18px rgba(255, 224, 130, 0.16);
+}
+
+.inventory-hotbar-slot.is-empty {
+  opacity: 0.72;
 }
 
 .hotbar-slot.is-active {
@@ -624,9 +669,9 @@ button.menu-row:hover {
   }
 
   .menu-panel {
-    top: max(54px, calc(env(safe-area-inset-top) + 54px));
-    width: min(650px, calc(100vw - 164px));
-    max-height: calc(100vh - 94px);
+    top: max(50px, calc(env(safe-area-inset-top) + 50px));
+    width: min(720px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height: calc(100vh - 62px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: 10px;
     font-size: 13px;
   }
@@ -648,6 +693,16 @@ button.menu-row:hover {
 
   .inventory-slot {
     min-height: 66px;
+  }
+
+  .inventory-hotbar-assignment {
+    grid-template-columns: repeat(4, minmax(50px, 68px));
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .inventory-hotbar-slot {
+    height: 50px;
   }
 
   .recipe-list,
