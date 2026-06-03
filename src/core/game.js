@@ -1,4 +1,5 @@
 import {
+  ATTACK_FEEDBACK_SECONDS,
   CRYSTAL_INTERACTION_DISTANCE,
   DEFAULT_HOTBAR_SLOTS,
   GAME_VIEW,
@@ -24,6 +25,8 @@ import { RenderSystem } from '../systems/render-system.js';
 import { BackgroundSystem } from '../systems/background-system.js';
 import { SaveSystem } from '../systems/save-system.js';
 import { CraftingSystem } from '../systems/crafting-system.js';
+import { EnemySystem } from '../systems/enemy-system.js';
+import { LogSystem } from '../systems/log-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
 import { MenuPanels } from '../ui/menu-panels.js';
@@ -39,7 +42,8 @@ export class Game {
       actionButton: options.actionButton,
       attackButton: options.attackButton,
       joystickElement: options.joystickElement,
-      joystickKnobElement: options.joystickKnobElement
+      joystickKnobElement: options.joystickKnobElement,
+      pointerTarget: options.pointerTarget
     });
     this.camera = new Camera();
     this.tileMap = new TileMap();
@@ -48,6 +52,8 @@ export class Game {
     this.respawnPlayer();
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.craftingSystem = new CraftingSystem(this.inventory);
+    this.enemySystem = new EnemySystem();
+    this.logSystem = new LogSystem();
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
@@ -70,7 +76,7 @@ export class Game {
       inventoryButton: options.inventoryButton,
       inventoryPanel: options.inventoryPanel,
       onBlockedCraft: () => {
-        this.crystalSystem.lastMessage = 'Nicht genug Material.';
+        this.setLog('Nicht genug Material.');
       },
       onCraft: (recipeId) => this.tryCraft(recipeId),
       onCraftSelect: (recipeId) => this.menuPanels.selectCraftingRecipe(recipeId),
@@ -94,6 +100,7 @@ export class Game {
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
+    this.attackFeedback = null;
     this.running = false;
     this.loadGame();
   }
@@ -145,6 +152,8 @@ export class Game {
       this.handleVoidFall();
       this.camera.centerOn(this.player.getCenterPosition());
       this.backgroundSystem.update(deltaSeconds);
+      this.handleEnemyEvents(this.enemySystem.update(deltaSeconds, this.tileMap, this.player));
+      this.updateAttackFeedback(deltaSeconds);
 
       if (this.input.wasPressed(' ', 'e', 'Enter')) {
         this.tryUseCrystal();
@@ -154,6 +163,10 @@ export class Game {
 
       if (this.input.wasPressed('b')) {
         this.tryPlaceSelectedItem();
+      }
+
+      if (this.input.wasPressed('f')) {
+        this.tryAttackAction();
       }
 
       this.handleTouchActions();
@@ -168,6 +181,7 @@ export class Game {
 
     this.hud.update({
       hint: this.crystalSystem.lastMessage,
+      logs: this.logSystem.toJSON(),
       debug: this.getDebugState(),
       debugEnabled: this.debugEnabled,
       resetHoldSeconds: this.resetHoldSeconds
@@ -207,13 +221,8 @@ export class Game {
     );
 
     if (isCloseToCrystal) {
-      const usesPickaxe = this.getActiveHotbarItem() === 'woodenPickaxe' &&
-        this.inventory.get('woodenPickaxe') > 0;
-      if (usesPickaxe) {
-        this.crystalSystem.use(PICKAXE_RESOURCE_DROPS, (drop) => `${RESOURCE_LABELS[drop.resource]} erhalten.`);
-      } else {
-        this.crystalSystem.use();
-      }
+      this.crystalSystem.use();
+      this.setLog(this.crystalSystem.lastMessage);
       this.saveGame();
       return true;
     }
@@ -247,7 +256,7 @@ export class Game {
       return true;
     }
 
-    this.crystalSystem.lastMessage = 'Keine Aktion möglich.';
+    this.setLog('Keine Aktion möglich.');
     return false;
   }
 
@@ -257,20 +266,50 @@ export class Game {
     const activeItem = this.getActiveHotbarItem();
 
     if (activeItem === 'woodenPickaxe' && this.inventory.get('woodenPickaxe') > 0) {
-      if (this.isNearCrystal()) {
-        this.tryUseCrystal();
-        return true;
-      }
-      this.crystalSystem.lastMessage = 'Kein Ziel.';
-      return false;
+      return this.usePickaxeAttack();
     }
 
     if (activeItem === 'woodenSpear' && this.inventory.get('woodenSpear') > 0) {
-      this.crystalSystem.lastMessage = 'Kein Ziel.';
+      return this.useSpearAttack();
+    }
+
+    this.setLog('Keine Waffe ausgewählt.');
+    return false;
+  }
+
+  usePickaxeAttack() {
+    if (!this.isNearCrystal()) {
+      this.setLog('Kein Ziel für Spitzhacke.');
       return false;
     }
 
-    this.crystalSystem.lastMessage = 'Keine Waffe ausgewählt.';
+    this.setCrystalHitFeedback();
+    this.setLog('Du schlägst Splitter aus dem Kristall.');
+    this.crystalSystem.use(PICKAXE_RESOURCE_DROPS, (drop) => `${RESOURCE_LABELS[drop.resource]} erhalten.`);
+    this.setLog(this.crystalSystem.lastMessage);
+    this.saveGame();
+    return true;
+  }
+
+  useSpearAttack() {
+    this.setSpearAttackFeedback();
+    const hit = this.enemySystem.attackWithSpear(this.player);
+    if (hit.hit) {
+      this.setLog(hit.message);
+      this.saveGame();
+      return true;
+    }
+
+    if (this.isNearCrystal()) {
+      const spawn = this.enemySystem.spawnNearCrystal(this.tileMap);
+      this.setLog(spawn.message);
+      if (spawn.spawned) {
+        this.saveGame();
+      }
+      return spawn.spawned;
+    }
+
+    this.setLog('Kein Ziel.');
     return false;
   }
 
@@ -284,6 +323,51 @@ export class Game {
     }
   }
 
+  setLog(message) {
+    this.logSystem.add(message);
+    this.crystalSystem.lastMessage = this.logSystem.latest(message);
+  }
+
+  handleEnemyEvents(events) {
+    for (const event of events) {
+      if (event.type === 'void') {
+        this.setLog('Kreatur verschwindet im Void.');
+        this.saveGame();
+      }
+    }
+  }
+
+  setSpearAttackFeedback() {
+    const foot = this.player.getFootPosition();
+    this.attackFeedback = {
+      type: 'spear',
+      x: foot.x,
+      y: foot.y,
+      facing: { ...this.player.facing },
+      seconds: ATTACK_FEEDBACK_SECONDS,
+      duration: ATTACK_FEEDBACK_SECONDS
+    };
+  }
+
+  setCrystalHitFeedback() {
+    const center = this.tileMap.getCrystalCenter();
+    this.attackFeedback = {
+      type: 'crystalHit',
+      x: center.x,
+      y: center.y,
+      seconds: ATTACK_FEEDBACK_SECONDS,
+      duration: ATTACK_FEEDBACK_SECONDS
+    };
+  }
+
+  updateAttackFeedback(deltaSeconds) {
+    if (!this.attackFeedback) return;
+    this.attackFeedback.seconds = Math.max(0, this.attackFeedback.seconds - deltaSeconds);
+    if (this.attackFeedback.seconds <= 0) {
+      this.attackFeedback = null;
+    }
+  }
+
   tryPlaceEarth() {
     return this.tryPlaceSelectedItem();
   }
@@ -294,7 +378,7 @@ export class Game {
     const placement = this.getPlacementPreview();
 
     if (!placement.canPlace) {
-      this.crystalSystem.lastMessage = placement.message;
+      this.setLog(placement.message);
       return false;
     }
 
@@ -303,25 +387,25 @@ export class Game {
     if (activeItem === 'earth') {
       this.tileMap.setEarth(placement.x, placement.y);
       this.inventory.remove('earth', 1);
-      this.crystalSystem.lastMessage = 'Erde platziert.';
+      this.setLog('Erde platziert.');
     }
 
     if (activeItem === 'stone') {
       this.tileMap.setStone(placement.x, placement.y);
       this.inventory.remove('stone', 1);
-      this.crystalSystem.lastMessage = 'Stein platziert.';
+      this.setLog('Stein platziert.');
     }
 
     if (activeItem === OBJECT_TYPES.workbench) {
       this.tileMap.setWorkbench(placement.x, placement.y);
       this.inventory.remove(OBJECT_TYPES.workbench, 1);
-      this.crystalSystem.lastMessage = 'Werkbank platziert.';
+      this.setLog('Werkbank platziert.');
     }
 
     if (activeItem === 'grassSeed') {
       this.tileMap.setGrass(placement.x, placement.y);
       this.inventory.remove('grassSeed', 1);
-      this.crystalSystem.lastMessage = 'Grassamen gepflanzt.';
+      this.setLog('Grassamen gepflanzt.');
     }
 
     this.saveGame();
@@ -502,7 +586,7 @@ export class Game {
 
     if (this.falling) {
       this.respawnPlayer();
-      this.crystalSystem.lastMessage = 'Du bist in den Void gefallen und beim Kristall respawnt.';
+      this.setLog('Du bist in den Void gefallen und beim Kristall respawnt.');
       this.saveGame();
     }
   }
@@ -576,7 +660,7 @@ export class Game {
 
   openWorkbenchCrafting() {
     if (!this.hasWorkbenchAccess()) {
-      this.crystalSystem.lastMessage = 'Keine Werkbank in Reichweite.';
+      this.setLog('Keine Werkbank in Reichweite.');
       return false;
     }
 
@@ -585,7 +669,7 @@ export class Game {
     this.inventoryOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('woodenPickaxe');
-    this.crystalSystem.lastMessage = 'Werkbank geöffnet.';
+    this.setLog('Werkbank geöffnet.');
     return true;
   }
 
@@ -594,7 +678,7 @@ export class Game {
       craftingContext: this.craftingContext,
       hasWorkbenchAccess: this.hasWorkbenchAccess()
     });
-    this.crystalSystem.lastMessage = result.message;
+    this.setLog(result.message);
     if (result.crafted) {
       this.saveGame();
     }
@@ -644,7 +728,7 @@ export class Game {
 
     if (this.selectedInventoryResource) {
       this.hotbarSlots[slotIndex] = this.selectedInventoryResource;
-      this.crystalSystem.lastMessage = `${RESOURCE_LABELS[this.selectedInventoryResource]} in Hotbar-Slot ${slotIndex + 1}.`;
+      this.setLog(`${RESOURCE_LABELS[this.selectedInventoryResource]} in Hotbar-Slot ${slotIndex + 1}.`);
     }
 
     this.saveGame();
@@ -655,7 +739,7 @@ export class Game {
     if (!this.isKnownInventoryResource(resource)) return false;
 
     this.selectedInventoryResource = resource;
-    this.crystalSystem.lastMessage = `${RESOURCE_LABELS[resource]} für Hotbar ausgewählt.`;
+    this.setLog(`${RESOURCE_LABELS[resource]} für Hotbar ausgewählt.`);
     return true;
   }
 
@@ -666,7 +750,7 @@ export class Game {
   handleReset(deltaSeconds) {
     if (this.input.isDown('r')) {
       this.resetHoldSeconds += deltaSeconds;
-      this.crystalSystem.lastMessage = 'Reset wird vorbereitet...';
+      this.setLog('Reset wird vorbereitet...');
 
       if (this.resetHoldSeconds >= 2) {
         this.resetGame();
@@ -695,7 +779,10 @@ export class Game {
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
-    this.crystalSystem.lastMessage = 'Speicherstand gelöscht. Neustart am Kristall.';
+    this.enemySystem.clear();
+    this.attackFeedback = null;
+    this.logSystem.reset('Speicherstand gelöscht. Neustart am Kristall.');
+    this.crystalSystem.lastMessage = this.logSystem.latest();
   }
 
   handleAutosave(deltaSeconds) {
@@ -711,7 +798,8 @@ export class Game {
     const save = this.saveSystem.load();
     if (!this.isValidSave(save)) {
       this.saveStatus = 'new';
-      this.crystalSystem.lastMessage = 'Neues Spiel gestartet.';
+      this.logSystem.reset('Neues Spiel gestartet.');
+      this.crystalSystem.lastMessage = this.logSystem.latest();
       return false;
     }
 
@@ -730,8 +818,10 @@ export class Game {
     }
 
     this.loadHotbarState(save);
+    this.logSystem.load(save.logs);
+    this.enemySystem.load(save.enemies, this.tileMap);
 
-    this.crystalSystem.lastMessage = 'Speicherstand geladen.';
+    this.setLog('Speicherstand geladen.');
     this.saveStatus = 'loaded';
     return true;
   }
@@ -751,6 +841,8 @@ export class Game {
       tiles: this.tileMap.toJSON(),
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
+      enemies: this.enemySystem.toJSON(),
+      logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
       activeHotbarSlot: this.activeHotbarSlot,
       player: {
@@ -768,9 +860,11 @@ export class Game {
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderObjects(this.tileMap, this.camera);
+    this.renderSystem.renderEnemies(this.enemySystem.enemies, this.camera);
     if (!this.isGamePaused()) {
       this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
     }
+    this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
   }
 
@@ -812,7 +906,9 @@ export class Game {
       lastKey: input.lastKey,
       saveStatus: this.saveStatus,
       activeHotbarSlot: this.activeHotbarSlot,
-      activeHotbarItem: this.getActiveHotbarItem()
+      activeHotbarItem: this.getActiveHotbarItem(),
+      attackState: this.attackFeedback?.type || 'none',
+      activeEnemies: this.enemySystem.activeCount()
     };
   }
 

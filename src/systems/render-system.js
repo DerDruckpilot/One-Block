@@ -84,6 +84,76 @@ export class RenderSystem {
     });
   }
 
+  renderEnemies(enemies, camera) {
+    for (const enemy of enemies) {
+      const x = Math.round(enemy.x - camera.x);
+      const y = Math.round(enemy.y - camera.y);
+      const flash = enemy.hitFlashSeconds > 0;
+
+      this.context.save();
+      this.context.fillStyle = 'rgba(0, 0, 0, 0.24)';
+      this.context.fillRect(x + 5, y + 25, 20, 5);
+      this.context.fillStyle = flash ? '#ffd6d6' : '#7b2633';
+      this.context.fillRect(x + 6, y + 8, 18, 18);
+      this.context.fillStyle = flash ? '#ff7070' : '#b83a4b';
+      this.context.fillRect(x + 9, y + 5, 12, 18);
+      this.context.fillStyle = '#2a1419';
+      this.context.fillRect(x + 10, y + 12, 3, 3);
+      this.context.fillRect(x + 18, y + 12, 3, 3);
+      this.context.fillStyle = '#e8b860';
+      this.context.fillRect(x + 5, y + 3, 5, 5);
+      this.context.fillRect(x + 20, y + 3, 5, 5);
+
+      if (enemy.healthVisible) {
+        const width = 28;
+        const fill = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+        this.context.fillStyle = '#2a1419';
+        this.context.fillRect(x + 1, y - 7, width, 5);
+        this.context.fillStyle = '#64d65f';
+        this.context.fillRect(x + 2, y - 6, Math.round((width - 2) * fill), 3);
+      }
+      this.context.restore();
+    }
+  }
+
+  renderAttackFeedback(feedback, camera) {
+    if (!feedback || feedback.seconds <= 0) return;
+
+    this.context.save();
+    if (feedback.type === 'spear') {
+      const progress = 1 - feedback.seconds / feedback.duration;
+      const originX = Math.round(feedback.x - camera.x);
+      const originY = Math.round(feedback.y - camera.y);
+      const facing = feedback.facing || { x: 0, y: -1 };
+      const endX = originX + facing.x * 50;
+      const endY = originY + facing.y * 50;
+      this.context.globalAlpha = 0.76 - progress * 0.36;
+      this.context.strokeStyle = '#ffe082';
+      this.context.lineWidth = 5;
+      this.context.beginPath?.();
+      if (this.context.moveTo && this.context.lineTo && this.context.stroke) {
+        this.context.moveTo(originX, originY);
+        this.context.lineTo(endX, endY);
+        this.context.stroke();
+      } else {
+        this.context.fillStyle = '#ffe082';
+        this.context.fillRect(Math.min(originX, endX), Math.min(originY, endY), Math.max(4, Math.abs(endX - originX) || 4), Math.max(4, Math.abs(endY - originY) || 4));
+      }
+    }
+
+    if (feedback.type === 'crystalHit') {
+      const x = Math.round(feedback.x - camera.x);
+      const y = Math.round(feedback.y - camera.y);
+      this.context.globalAlpha = 0.72;
+      this.context.fillStyle = '#ffffff';
+      this.context.fillRect(x - 12, y - 12, 24, 4);
+      this.context.fillRect(x - 2, y - 22, 4, 24);
+      this.context.fillStyle = '#d87cff';
+      this.context.fillRect(x - 18, y - 2, 36, 4);
+    }
+    this.context.restore();
+  }
+
   renderPlayer(player, camera) {
     const x = Math.round(player.x - camera.x);
     const y = Math.round(player.y - camera.y);

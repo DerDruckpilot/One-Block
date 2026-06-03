@@ -67,6 +67,18 @@ body {
   color: #d9c7ff;
 }
 
+.hud-log {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.hud-log li {
+  padding-left: 2px;
+}
+
 .debug-hud {
   margin-top: 8px;
   padding-top: 8px;
@@ -534,6 +546,10 @@ button.menu-row:hover {
   backdrop-filter: blur(6px);
   pointer-events: auto;
   touch-action: none;
+}
+
+.touch-joystick[hidden] {
+  display: none !important;
 }
 
 .touch-joystick.is-active {

@@ -19,6 +19,13 @@ export const PLAYER_SPAWN_TILE = {
 export const PLAYER_FOOT_OFFSET = 10;
 export const CRYSTAL_INTERACTION_DISTANCE = TILE_SIZE * 1.45;
 export const WORKBENCH_INTERACTION_DISTANCE = TILE_SIZE * 1.8;
+export const ENEMY_SIZE = 30;
+export const ENEMY_MAX_HP = 4;
+export const ENEMY_SPEED = 34;
+export const SPEAR_ATTACK_RANGE = TILE_SIZE * 1.75;
+export const SPEAR_ATTACK_DOT = 0.25;
+export const SPEAR_DAMAGE = 1;
+export const ATTACK_FEEDBACK_SECONDS = 0.18;
 
 export const TILE_TYPES = {
   earth: 'earth',
