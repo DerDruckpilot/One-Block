@@ -1,12 +1,18 @@
 import { CRAFTING_RECIPES, RESOURCE_LABELS } from '../config/constants.js';
 
+const getRecipeContext = (recipeId) => (
+  CRAFTING_RECIPES.find((recipe) => recipe.id === recipeId)?.craftingContext || 'normal'
+);
+
 export class CraftingSystem {
   constructor(inventory) {
     this.inventory = inventory;
   }
 
-  getRecipeStates({ hasWorkbenchAccess = false } = {}) {
-    return CRAFTING_RECIPES.map((recipe) => this.getRecipeState(recipe, hasWorkbenchAccess));
+  getRecipeStates({ hasWorkbenchAccess = false, craftingContext = 'normal' } = {}) {
+    return CRAFTING_RECIPES
+      .filter((recipe) => recipe.craftingContext === craftingContext)
+      .map((recipe) => this.getRecipeState(recipe, hasWorkbenchAccess));
   }
 
   getRecipeState(recipe, hasWorkbenchAccess = false) {
@@ -33,8 +39,8 @@ export class CraftingSystem {
     return this.getRecipeStates().find((state) => state.recipe.id === 'workbench');
   }
 
-  craft(recipeId, { hasWorkbenchAccess = false } = {}) {
-    const state = this.getRecipeStates({ hasWorkbenchAccess })
+  craft(recipeId, { hasWorkbenchAccess = false, craftingContext = getRecipeContext(recipeId) } = {}) {
+    const state = this.getRecipeStates({ hasWorkbenchAccess, craftingContext })
       .find((recipeState) => recipeState.recipe.id === recipeId);
 
     if (!state) {

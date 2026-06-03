@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-3-1';
+const CACHE_NAME = 'one-block-v0-3-2';
 
 const CORE_ASSETS = [
   './',
@@ -18,6 +18,7 @@ const CORE_ASSETS = [
   './src/systems/resource-inventory.js',
   './src/systems/save-system.js',
   './src/systems/render-system.js',
+  './src/systems/terrain-renderer.js',
   './src/systems/background-system.js',
   './src/ui/hotbar.js',
   './src/ui/hud.js',

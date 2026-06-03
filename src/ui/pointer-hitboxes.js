@@ -10,9 +10,11 @@ export class PointerHitboxSystem {
     inventoryPanel,
     onBlockedCraft = () => {},
     onCraft = () => {},
+    onCraftSelect = () => {},
     onCraftingToggle = () => {},
     onHotbarSelect = () => {},
     onInventoryItemSelect = () => {},
+    onInventoryTabSelect = () => {},
     onInventoryToggle = () => {},
     pointerTarget = globalThis.window
   }) {
@@ -26,9 +28,11 @@ export class PointerHitboxSystem {
     this.inventoryPanel = inventoryPanel;
     this.onBlockedCraft = onBlockedCraft;
     this.onCraft = onCraft;
+    this.onCraftSelect = onCraftSelect;
     this.onCraftingToggle = onCraftingToggle;
     this.onHotbarSelect = onHotbarSelect;
     this.onInventoryItemSelect = onInventoryItemSelect;
+    this.onInventoryTabSelect = onInventoryTabSelect;
     this.onInventoryToggle = onInventoryToggle;
     this.hitboxes = [];
 
@@ -45,6 +49,10 @@ export class PointerHitboxSystem {
   }
 
   handlePointerDown(event) {
+    if (event.target?.matches?.('input, textarea')) {
+      return false;
+    }
+
     const point = this.getPointerPoint(event);
     this.updateHitboxes();
 
@@ -101,6 +109,7 @@ export class PointerHitboxSystem {
 
     if (this.getCraftingOpen()) {
       for (const craftButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-craft]') || [])) {
+        if (!craftButton.dataset.craft) continue;
         const craftButtonHitbox = this.createElementHitbox(craftButton, `craft-${craftButton.dataset.craft}`, () => {
           if (craftButton.disabled) {
             this.onBlockedCraft(craftButton.dataset.craft);
@@ -111,12 +120,29 @@ export class PointerHitboxSystem {
         if (craftButtonHitbox) hitboxes.push(craftButtonHitbox);
       }
 
+      for (const recipeButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-craft-select]') || [])) {
+        if (!recipeButton.dataset.craftSelect) continue;
+        const recipeHitbox = this.createElementHitbox(recipeButton, `recipe-${recipeButton.dataset.craftSelect}`, () => {
+          this.onCraftSelect(recipeButton.dataset.craftSelect);
+        });
+        if (recipeHitbox) hitboxes.push(recipeHitbox);
+      }
+
       const panelHitbox = this.createElementHitbox(this.craftingPanel, 'crafting-panel', () => {});
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
     if (this.getInventoryOpen()) {
+      for (const tabButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-tab]') || [])) {
+        if (!tabButton.dataset.inventoryTab) continue;
+        const tabHitbox = this.createElementHitbox(tabButton, `inventory-tab-${tabButton.dataset.inventoryTab}`, () => {
+          this.onInventoryTabSelect(tabButton.dataset.inventoryTab);
+        });
+        if (tabHitbox) hitboxes.push(tabHitbox);
+      }
+
       for (const itemButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-resource]') || [])) {
+        if (!itemButton.dataset.inventoryResource) continue;
         const itemHitbox = this.createElementHitbox(itemButton, `inventory-${itemButton.dataset.inventoryResource}`, () => {
           this.onInventoryItemSelect(itemButton.dataset.inventoryResource);
         });

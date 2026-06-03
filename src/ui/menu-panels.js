@@ -1,4 +1,10 @@
-import { INVENTORY_RESOURCES, RESOURCE_ICONS, RESOURCE_LABELS } from '../config/constants.js';
+import {
+  INVENTORY_RESOURCES,
+  INVENTORY_TABS,
+  RESOURCE_CATEGORIES,
+  RESOURCE_ICONS,
+  RESOURCE_LABELS
+} from '../config/constants.js';
 
 export class MenuPanels {
   constructor({ inventoryPanel, craftingPanel }) {
@@ -6,11 +12,45 @@ export class MenuPanels {
     this.craftingPanel = craftingPanel;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
+    this.inventoryTab = 'all';
+    this.inventoryFilter = '';
+    this.selectedCraftingRecipeId = null;
+
+    this.inventoryPanel?.addEventListener?.('input', (event) => {
+      if (event.target?.dataset?.inventoryFilter === 'true') {
+        this.inventoryFilter = event.target.value || '';
+        this.lastInventoryHtml = '';
+      }
+    });
   }
 
-  update({ craftingOpen, inventory, inventoryOpen, recipeStates, hasWorkbenchAccess, selectedInventoryResource }) {
+  update({
+    craftingContext = 'normal',
+    craftingOpen,
+    inventory,
+    inventoryOpen,
+    recipeStates,
+    selectedInventoryResource
+  }) {
     this.renderInventory(inventory, inventoryOpen, selectedInventoryResource);
-    this.renderCrafting(inventory, craftingOpen, recipeStates, hasWorkbenchAccess);
+    this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
+  }
+
+  selectInventoryTab(tabId) {
+    if (!INVENTORY_TABS.some((tab) => tab.id === tabId)) return false;
+    this.inventoryTab = tabId;
+    this.lastInventoryHtml = '';
+    return true;
+  }
+
+  setInventoryFilter(value) {
+    this.inventoryFilter = value || '';
+    this.lastInventoryHtml = '';
+  }
+
+  selectCraftingRecipe(recipeId) {
+    this.selectedCraftingRecipeId = recipeId;
+    this.lastCraftingHtml = '';
   }
 
   renderInventory(inventory, isOpen, selectedInventoryResource = null) {
@@ -22,16 +62,25 @@ export class MenuPanels {
       return;
     }
 
-    const rows = INVENTORY_RESOURCES
+    const tabs = INVENTORY_TABS.map((tab) => `
+      <button
+        class="menu-tab${this.inventoryTab === tab.id ? ' is-active' : ''}"
+        type="button"
+        data-inventory-tab="${tab.id}"
+        aria-pressed="${this.inventoryTab === tab.id ? 'true' : 'false'}"
+      >${tab.label}</button>
+    `).join('');
+    const rows = this.getFilteredInventoryResources()
       .map((resource) => `
         <button
-          class="menu-row inventory-item${selectedInventoryResource === resource ? ' is-selected' : ''}"
+          class="inventory-slot${selectedInventoryResource === resource ? ' is-selected' : ''}"
           type="button"
           data-inventory-resource="${resource}"
           aria-pressed="${selectedInventoryResource === resource ? 'true' : 'false'}"
         >
-          <span><span class="menu-icon">${RESOURCE_ICONS[resource]}</span> ${RESOURCE_LABELS[resource]}</span>
-          <strong>${inventory.get(resource)}</strong>
+          <span class="inventory-slot-icon">${RESOURCE_ICONS[resource]}</span>
+          <span class="inventory-slot-name">${RESOURCE_LABELS[resource]}</span>
+          <strong class="inventory-slot-count">${inventory.get(resource)}</strong>
         </button>
       `)
       .join('');
@@ -41,14 +90,29 @@ export class MenuPanels {
       : 'Kein Item für Hotbar-Zuweisung ausgewählt';
 
     this.setInventoryHtml(`
-      <h2>Inventar</h2>
-      <div class="menu-note">Item anklicken, dann Hotbar-Slot anklicken.</div>
+      <div class="menu-frame-title">Inventar</div>
+      <div class="menu-tabs">${tabs}</div>
+      <label class="menu-search">
+        <span>Suche</span>
+        <input data-inventory-filter="true" type="search" value="${this.escapeAttribute(this.inventoryFilter)}" placeholder="Filter..." />
+      </label>
       <div class="menu-note">${selectedText}</div>
-      <div class="menu-list">${rows}</div>
+      <div class="inventory-grid">${rows}</div>
+      <div class="menu-note">Item anklicken, dann Hotbar-Slot anklicken.</div>
     `);
   }
 
-  renderCrafting(inventory, isOpen, recipeStates, hasWorkbenchAccess) {
+  getFilteredInventoryResources() {
+    const needle = this.inventoryFilter.trim().toLowerCase();
+    return INVENTORY_RESOURCES.filter((resource) => {
+      const categories = RESOURCE_CATEGORIES[resource] || [];
+      const matchesTab = this.inventoryTab === 'all' || categories.includes(this.inventoryTab);
+      const matchesFilter = needle.length === 0 || RESOURCE_LABELS[resource].toLowerCase().includes(needle);
+      return matchesTab && matchesFilter;
+    });
+  }
+
+  renderCrafting(inventory, isOpen, recipeStates, craftingContext) {
     if (!this.craftingPanel) return;
     this.craftingPanel.hidden = !isOpen;
 
@@ -57,26 +121,53 @@ export class MenuPanels {
       return;
     }
 
-    const accessText = hasWorkbenchAccess
-      ? 'Werkbank in Reichweite'
-      : 'Für weitere Rezepte nahe an eine Werkbank stellen';
-    const recipes = recipeStates.map((recipeState) => this.renderRecipe(inventory, recipeState)).join('');
+    const selectedState = this.getSelectedRecipeState(recipeStates);
+    const title = craftingContext === 'workbench' ? 'Werkbank' : 'Crafting';
+    const recipes = recipeStates.map((recipeState) => this.renderRecipeListItem(recipeState, selectedState)).join('');
+    const detail = selectedState
+      ? this.renderRecipeDetail(inventory, selectedState)
+      : '<div class="recipe-detail-empty">Keine Rezepte verfügbar.</div>';
 
     this.setCraftingHtml(`
-      <h2>Crafting</h2>
-      <div class="menu-note">${accessText}</div>
-      <div class="recipe-list">${recipes}</div>
+      <div class="menu-frame-title">${title}</div>
+      <div class="crafting-layout">
+        <div class="recipe-list">${recipes}</div>
+        <div class="recipe-detail">${detail}</div>
+      </div>
     `);
   }
 
-  renderRecipe(inventory, recipeState) {
+  getSelectedRecipeState(recipeStates) {
+    if (!recipeStates.length) return null;
+    const selected = recipeStates.find((recipeState) => recipeState.recipe.id === this.selectedCraftingRecipeId);
+    return selected || recipeStates[0];
+  }
+
+  renderRecipeListItem(recipeState, selectedState) {
+    const { recipe } = recipeState;
+    const isSelected = selectedState?.recipe.id === recipe.id;
+    return `
+      <button
+        class="recipe-list-item${isSelected ? ' is-selected' : ''}${recipeState.canCraft ? '' : ' is-disabled'}"
+        type="button"
+        data-craft-select="${recipe.id}"
+        aria-pressed="${isSelected ? 'true' : 'false'}"
+      >
+        <span class="menu-icon">${RESOURCE_ICONS[recipe.result]}</span>
+        <span>${recipe.name}</span>
+      </button>
+    `;
+  }
+
+  renderRecipeDetail(inventory, recipeState) {
     const { recipe } = recipeState;
     const costs = Object.entries(recipe.costs)
       .map(([resource, amount]) => {
         const available = inventory.get(resource);
         const isMissing = available < amount;
         return `
-          <div class="menu-row${isMissing ? ' is-missing' : ''}">
+          <div class="material-card${isMissing ? ' is-missing' : ''}">
+            <span class="menu-icon">${RESOURCE_ICONS[resource]}</span>
             <span>${RESOURCE_LABELS[resource]}</span>
             <strong>${available}/${amount}</strong>
           </div>
@@ -85,20 +176,23 @@ export class MenuPanels {
       .join('');
     const missingText = recipeState.missing.length > 0
       ? `<div class="menu-note">Fehlt: ${recipeState.missing.map((cost) => `${cost.missing}x ${cost.label}`).join(', ')}</div>`
-      : '';
+      : '<div class="menu-note">Alle Materialien verfügbar.</div>';
     const lockedText = recipeState.isAvailable ? '' : '<div class="menu-note">Werkbank benötigt.</div>';
 
     return `
-      <div class="recipe-card">
-        <h3>${recipe.name}</h3>
-        <div class="menu-list">${costs}</div>
-        ${lockedText}
-        ${missingText}
-        <button class="craft-button" type="button" data-craft="${recipe.id}" ${recipeState.canCraft ? '' : 'disabled'}>
-          Herstellen
-        </button>
-      </div>
+      <h3>${recipe.name}</h3>
+      <div class="recipe-result"><span class="menu-icon">${RESOURCE_ICONS[recipe.result]}</span> ${RESOURCE_LABELS[recipe.result]}</div>
+      <div class="material-grid">${costs}</div>
+      ${lockedText}
+      ${missingText}
+      <button class="craft-button" type="button" data-craft="${recipe.id}" ${recipeState.canCraft ? '' : 'disabled'}>
+        Herstellen
+      </button>
     `;
+  }
+
+  escapeAttribute(value) {
+    return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
   }
 
   setInventoryHtml(html) {

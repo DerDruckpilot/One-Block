@@ -72,9 +72,11 @@ export class Game {
         this.crystalSystem.lastMessage = 'Nicht genug Material.';
       },
       onCraft: (recipeId) => this.tryCraft(recipeId),
+      onCraftSelect: (recipeId) => this.menuPanels.selectCraftingRecipe(recipeId),
       onCraftingToggle: () => this.toggleCraftingMenu(),
       onHotbarSelect: (slotIndex) => this.handleHotbarSlotClick(slotIndex),
       onInventoryItemSelect: (resource) => this.selectInventoryResource(resource),
+      onInventoryTabSelect: (tabId) => this.menuPanels.selectInventoryTab(tabId),
       onInventoryToggle: () => this.toggleInventoryMenu(),
       pointerTarget: options.pointerTarget
     });
@@ -87,6 +89,7 @@ export class Game {
     this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
+    this.craftingContext = 'normal';
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
@@ -164,11 +167,13 @@ export class Game {
     });
     this.menuPanels.update({
       craftingOpen: this.craftingOpen,
+      craftingContext: this.craftingContext,
       hasWorkbenchAccess: this.hasWorkbenchAccess(),
       inventory: this.inventory,
       inventoryOpen: this.inventoryOpen,
       recipeStates: this.craftingSystem.getRecipeStates({
-        hasWorkbenchAccess: this.hasWorkbenchAccess()
+        craftingContext: this.craftingContext,
+        hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false
       }),
       selectedInventoryResource: this.selectedInventoryResource
     });
@@ -209,6 +214,10 @@ export class Game {
     const placement = this.getPlacementPreview();
     if (placement.canPlace) {
       return this.tryPlaceSelectedItem();
+    }
+
+    if (this.hasWorkbenchAccess()) {
+      return this.openWorkbenchCrafting();
     }
 
     if (this.isNearCrystal()) {
@@ -514,15 +523,41 @@ export class Game {
   }
 
   toggleCraftingMenu() {
-    this.craftingOpen = !this.craftingOpen;
-    if (this.craftingOpen) {
-      this.inventoryOpen = false;
-      this.selectedInventoryResource = null;
+    if (this.craftingOpen && this.craftingContext === 'normal') {
+      this.craftingOpen = false;
+      return;
     }
+
+    this.openNormalCrafting();
+  }
+
+  openNormalCrafting() {
+    this.craftingContext = 'normal';
+    this.craftingOpen = true;
+    this.inventoryOpen = false;
+    this.selectedInventoryResource = null;
+    this.menuPanels.selectCraftingRecipe('workbench');
+    return true;
+  }
+
+  openWorkbenchCrafting() {
+    if (!this.hasWorkbenchAccess()) {
+      this.crystalSystem.lastMessage = 'Keine Werkbank in Reichweite.';
+      return false;
+    }
+
+    this.craftingContext = 'workbench';
+    this.craftingOpen = true;
+    this.inventoryOpen = false;
+    this.selectedInventoryResource = null;
+    this.menuPanels.selectCraftingRecipe('woodenPickaxe');
+    this.crystalSystem.lastMessage = 'Werkbank geöffnet.';
+    return true;
   }
 
   tryCraft(recipeId) {
     const result = this.craftingSystem.craft(recipeId, {
+      craftingContext: this.craftingContext,
       hasWorkbenchAccess: this.hasWorkbenchAccess()
     });
     this.crystalSystem.lastMessage = result.message;
@@ -621,6 +656,7 @@ export class Game {
     this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
+    this.craftingContext = 'normal';
     this.respawnPlayer();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;

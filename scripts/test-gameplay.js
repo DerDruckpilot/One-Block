@@ -19,6 +19,7 @@ import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { chooseWeightedDrop, CrystalSystem } from '../src/systems/crystal-system.js';
 import { CraftingSystem } from '../src/systems/crafting-system.js';
+import { TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
@@ -122,6 +123,29 @@ const createInteractiveRectElement = (rect, options = {}) => {
   };
 };
 
+const createDrawContext = () => {
+  const calls = [];
+  return {
+    calls,
+    fillStyle: '',
+    globalAlpha: 1,
+    lineWidth: 1,
+    strokeStyle: '',
+    fillRect(...args) {
+      calls.push({ fn: 'fillRect', args, fillStyle: this.fillStyle });
+    },
+    restore() {
+      calls.push({ fn: 'restore' });
+    },
+    save() {
+      calls.push({ fn: 'save' });
+    },
+    strokeRect(...args) {
+      calls.push({ fn: 'strokeRect', args, strokeStyle: this.strokeStyle });
+    }
+  };
+};
+
 const map = new TileMap();
 
 {
@@ -204,6 +228,18 @@ const map = new TileMap();
   });
   assert.equal(input.wasPressed('c'), true, 'keydown registers crafting key');
   assert.equal(prevented, true, 'crafting key default behavior is prevented');
+
+  input.consumeFramePresses();
+  prevented = false;
+  listeners.keydown({
+    key: 'C',
+    target: { tagName: 'INPUT' },
+    preventDefault() {
+      prevented = true;
+    }
+  });
+  assert.equal(input.wasPressed('c'), false, 'typing in an input does not trigger game shortcuts');
+  assert.equal(prevented, false, 'typing in an input is not prevented by game input');
 
   prevented = false;
   listeners.keydown({
@@ -295,6 +331,21 @@ const map = new TileMap();
     false,
     'player stand point directly beside an existing tile is void'
   );
+}
+
+{
+  const terrainMap = new TileMap();
+  terrainMap.setGrass(1, 0);
+  terrainMap.setStone(2, 0);
+  const context = createDrawContext();
+  const terrainRenderer = new TerrainRenderer();
+
+  terrainRenderer.drawTile(context, { x: 1, y: 0, type: 'grass' }, terrainMap, 32, 0);
+  terrainRenderer.drawTile(context, { x: 2, y: 0, type: 'stone' }, terrainMap, 64, 0);
+
+  assert.ok(context.calls.filter((call) => call.fn === 'fillRect').length > 12, 'terrain renderer draws structured pixel-art tile layers');
+  assert.equal(terrainMap.isGround(1, 0), true, 'grass remains a support tile after renderer changes');
+  assert.equal(terrainMap.isGround(2, 0), true, 'stone remains a support tile after renderer changes');
 }
 
 {
@@ -657,6 +708,63 @@ const map = new TileMap();
 }
 
 {
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  const canvas = {
+    width: 960,
+    height: 540,
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 960, height: 540 };
+    }
+  };
+  const tabButton = createRectElement(
+    { left: 310, top: 120, width: 96, height: 40 },
+    { dataset: { inventoryTab: 'tools' } }
+  );
+  const inventoryPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelectorAll: () => [tabButton] }
+  );
+  const recipeButton = createRectElement(
+    { left: 330, top: 140, width: 150, height: 42 },
+    { dataset: { craftSelect: 'woodenSpear' } }
+  );
+  const craftingPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelectorAll: () => [recipeButton] }
+  );
+  let selectedTab = null;
+  let selectedRecipe = null;
+  const hitboxes = new PointerHitboxSystem({
+    canvas,
+    craftingPanel,
+    getCraftingOpen: () => false,
+    getInventoryOpen: () => true,
+    inventoryPanel,
+    onCraftSelect(recipeId) {
+      selectedRecipe = recipeId;
+    },
+    onInventoryTabSelect(tabId) {
+      selectedTab = tabId;
+    },
+    pointerTarget
+  });
+
+  pointerdown(createPointerEvent(320, 130));
+  assert.equal(selectedTab, 'tools', 'inventory tab can be selected by pointer hitbox');
+
+  hitboxes.getCraftingOpen = () => true;
+  hitboxes.getInventoryOpen = () => false;
+  pointerdown(createPointerEvent(340, 150));
+  assert.equal(selectedRecipe, 'woodenSpear', 'crafting recipe can be selected by pointer hitbox');
+}
+
+{
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
@@ -674,12 +782,27 @@ const map = new TileMap();
   game.input.pressedThisFrame.add('c');
   game.handleMenuToggles();
   assert.equal(game.craftingOpen, true, 'C opens crafting');
+  assert.equal(game.craftingContext, 'normal', 'C opens normal crafting context');
   assert.equal(game.inventoryOpen, false, 'opening crafting keeps inventory closed');
   game.input.consumeFramePresses();
 
   game.input.pressedThisFrame.add('c');
   game.handleMenuToggles();
   assert.equal(game.craftingOpen, false, 'C closes crafting');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  assert.equal(game.openWorkbenchCrafting(), false, 'workbench crafting does not open away from a placed workbench');
+  assert.equal(game.craftingOpen, false, 'failed workbench crafting open keeps menus closed');
+  assert.equal(game.crystalSystem.lastMessage, 'Keine Werkbank in Reichweite.', 'failed workbench crafting open writes a clear log');
+
+  game.tileMap.setWorkbench(1, 1);
+  assert.equal(game.openWorkbenchCrafting(), true, 'workbench crafting opens near a placed workbench');
+  assert.equal(game.craftingOpen, true, 'workbench crafting opens the crafting panel');
+  assert.equal(game.craftingContext, 'workbench', 'workbench crafting uses the workbench recipe context');
 }
 
 {
@@ -725,14 +848,19 @@ const map = new TileMap();
   assert.equal(crafting.getWorkbenchRecipeState().canCraft, false, 'workbench recipe needs resources');
   assert.equal(crafting.craftWorkbench().crafted, false, 'crafting fails without resources');
   assert.equal(
-    crafting.getRecipeStates({ hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenPickaxe').isAvailable,
+    crafting.getRecipeStates({ craftingContext: 'normal' }).some((state) => state.recipe.id === 'woodenPickaxe'),
     false,
-    'wooden pickaxe recipe is unavailable without workbench access'
+    'normal crafting does not show wooden pickaxe recipe'
   );
   assert.equal(
-    crafting.getRecipeStates({ hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenSpear').isAvailable,
+    crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenSpear').isAvailable,
     false,
     'wooden spear recipe is unavailable without workbench access'
+  );
+  assert.equal(
+    crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }).some((state) => state.recipe.id === 'workbench'),
+    false,
+    'workbench crafting does not show basic workbench recipe'
   );
 
   inventory.add('rawWood', 5);
@@ -789,7 +917,7 @@ const map = new TileMap();
     hasWorkbenchAccess: false,
     inventory,
     inventoryOpen: true,
-    recipeStates: crafting.getRecipeStates({ hasWorkbenchAccess: false }),
+    recipeStates: crafting.getRecipeStates({ craftingContext: 'normal', hasWorkbenchAccess: false }),
     selectedInventoryResource: 'rawWood'
   });
 
@@ -798,13 +926,52 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('Stein'), true, 'inventory panel lists stone resources');
   assert.equal(inventoryPanel.innerHTML.includes('Holzspeer'), true, 'inventory panel lists tool items even at zero count');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-resource="rawWood"'), true, 'inventory panel exposes clickable item rows');
+  assert.equal(inventoryPanel.innerHTML.includes('data-inventory-tab="tools"'), true, 'inventory panel exposes category tabs');
+  assert.equal(inventoryPanel.innerHTML.includes('data-inventory-filter="true"'), true, 'inventory panel exposes a filter field');
   assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hotbar-Slot anklicken'), true, 'inventory panel explains hotbar assignment');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
-  assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'crafting panel shows workbench-gated recipe');
-  assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), true, 'crafting panel shows wooden spear recipe');
-  assert.equal(craftingPanel.innerHTML.includes('Für weitere Rezepte nahe an eine Werkbank stellen'), true, 'crafting panel explains missing workbench access');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), false, 'normal crafting hides workbench-gated recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), false, 'normal crafting hides wooden spear recipe');
+  assert.equal(craftingPanel.innerHTML.includes('data-craft-select="workbench"'), true, 'normal crafting exposes selectable workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
+
+  menus.selectInventoryTab('tools');
+  menus.update({
+    craftingContext: 'normal',
+    craftingOpen: false,
+    inventory,
+    inventoryOpen: true,
+    recipeStates: [],
+    selectedInventoryResource: null
+  });
+  assert.equal(inventoryPanel.innerHTML.includes('Holzspitzhacke'), true, 'tools tab shows tool items');
+  assert.equal(inventoryPanel.innerHTML.includes('Grassamen'), false, 'tools tab hides seed items');
+
+  menus.setInventoryFilter('speer');
+  menus.update({
+    craftingContext: 'normal',
+    craftingOpen: false,
+    inventory,
+    inventoryOpen: true,
+    recipeStates: [],
+    selectedInventoryResource: null
+  });
+  assert.equal(inventoryPanel.innerHTML.includes('Holzspeer'), true, 'inventory filter keeps matching items');
+  assert.equal(inventoryPanel.innerHTML.includes('Holzspitzhacke'), false, 'inventory filter hides non-matching items');
+
+  menus.update({
+    craftingContext: 'workbench',
+    craftingOpen: true,
+    inventory,
+    inventoryOpen: false,
+    recipeStates: crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }),
+    selectedInventoryResource: null
+  });
+  assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'workbench crafting title is shown');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'workbench crafting shows pickaxe recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), true, 'workbench crafting shows spear recipe');
+  assert.equal(craftingPanel.innerHTML.includes('data-craft-select="woodenPickaxe"'), true, 'crafting list exposes selectable recipes');
 }
 
 {
@@ -933,6 +1100,20 @@ const map = new TileMap();
   const totalResources = Object.values(game.inventory.resources).reduce((sum, amount) => sum + amount, 0);
   assert.equal(totalResources, 1, 'mobile action button activates the crystal when placement is not valid');
   assert.equal(game.crystalSystem.lastMessage.startsWith('Kristall:'), true, 'mobile crystal action keeps the existing crystal log');
+}
+
+{
+  const actionButton = createInteractiveRectElement({ left: 800, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
+
+  game.tileMap.setWorkbench(1, 1);
+  actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 36 });
+  game.update(0.016);
+
+  assert.equal(game.craftingOpen, true, 'mobile action opens crafting when near a workbench');
+  assert.equal(game.craftingContext, 'workbench', 'mobile action opens the workbench crafting context');
+  assert.equal(game.crystalSystem.lastMessage, 'Werkbank geöffnet.', 'mobile workbench action writes a clear log');
 }
 
 {
