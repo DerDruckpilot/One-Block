@@ -26,8 +26,20 @@
       <section id="inventory-panel" class="menu-panel" aria-label="Inventar" hidden></section>
       <section id="crafting-panel" class="menu-panel" aria-label="Crafting" hidden></section>
       <section id="hotbar" aria-label="Hotbar"></section>
+      <section id="touch-controls" aria-label="Touch-Steuerung">
+        <div id="touch-joystick" class="touch-joystick" aria-label="Bewegungsstick">
+          <div id="touch-joystick-knob" class="touch-joystick-knob"></div>
+        </div>
+        <div class="touch-buttons" aria-label="Aktionen">
+          <button id="touch-attack" class="touch-button touch-button-attack" type="button" aria-label="Angriff">ATK</button>
+          <button id="touch-action" class="touch-button touch-button-action" type="button" aria-label="Action">ACT</button>
+        </div>
+      </section>
       <section id="help">
         <strong>Steuerung:</strong> WASD/Pfeile: bewegen &middot; E/Leertaste: Kristall aktivieren &middot; I: Inventar &middot; C: Crafting &middot; B: ausgewähltes Item platzieren &middot; P: Debug
+      </section>
+      <section id="orientation-overlay" aria-live="polite">
+        <div>Bitte Gerät ins Querformat drehen</div>
       </section>
     </main>
     <script type="module" src="./src/main.js"></script>

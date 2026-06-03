@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-3-0';
+const CACHE_NAME = 'one-block-v0-3-1';
 
 const CORE_ASSETS = [
   './',
@@ -9,6 +9,7 @@ const CORE_ASSETS = [
   './src/config/constants.js',
   './src/core/game.js',
   './src/core/input.js',
+  './src/core/touch-input.js',
   './src/core/camera.js',
   './src/world/tile-map.js',
   './src/entities/player.js',
@@ -21,6 +22,7 @@ const CORE_ASSETS = [
   './src/ui/hotbar.js',
   './src/ui/hud.js',
   './src/ui/menu-panels.js',
+  './src/ui/orientation.js',
   './src/ui/pointer-hitboxes.js',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'

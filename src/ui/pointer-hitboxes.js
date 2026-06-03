@@ -79,9 +79,12 @@ export class PointerHitboxSystem {
       return { x: clientX, y: clientY, devicePixelRatio: globalThis.devicePixelRatio || 1 };
     }
 
+    const logicalWidth = Number(this.canvas?.dataset?.logicalWidth || this.canvas.width);
+    const logicalHeight = Number(this.canvas?.dataset?.logicalHeight || this.canvas.height);
+
     return {
-      x: (clientX - rect.left) * (this.canvas.width / rect.width),
-      y: (clientY - rect.top) * (this.canvas.height / rect.height),
+      x: (clientX - rect.left) * (logicalWidth / rect.width),
+      y: (clientY - rect.top) * (logicalHeight / rect.height),
       devicePixelRatio: globalThis.devicePixelRatio || 1
     };
   }

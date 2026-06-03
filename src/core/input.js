@@ -3,6 +3,7 @@ export class Input {
     this.keys = new Set();
     this.pressedThisFrame = new Set();
     this.lastKey = 'none';
+    this.virtualMovement = { x: 0, y: 0 };
 
     window.addEventListener('keydown', (event) => {
       const key = this.normalizeKey(event.key);
@@ -59,9 +60,21 @@ export class Input {
       .filter((key) => this.keys.has(key));
   }
 
+  setVirtualMovement(vector) {
+    this.virtualMovement = {
+      x: Number(vector?.x || 0),
+      y: Number(vector?.y || 0)
+    };
+  }
+
+  getVirtualMovement() {
+    return { ...this.virtualMovement };
+  }
+
   getDebugState() {
     return {
       movementKeys: this.getMovementKeys(),
+      virtualMovement: this.getVirtualMovement(),
       lastKey: this.lastKey
     };
   }

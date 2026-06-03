@@ -31,16 +31,20 @@ export class Player {
   readMovement(input) {
     let x = 0;
     let y = 0;
+    const touchMovement = input.getVirtualMovement?.() || { x: 0, y: 0 };
 
     if (input.isDown('a', 'ArrowLeft')) x -= 1;
     if (input.isDown('d', 'ArrowRight')) x += 1;
     if (input.isDown('w', 'ArrowUp')) y -= 1;
     if (input.isDown('s', 'ArrowDown')) y += 1;
 
-    if (x !== 0 && y !== 0) {
-      const normalizer = Math.SQRT1_2;
-      x *= normalizer;
-      y *= normalizer;
+    x += touchMovement.x;
+    y += touchMovement.y;
+
+    const length = Math.hypot(x, y);
+    if (length > 1) {
+      x /= length;
+      y /= length;
     }
 
     return { x, y };
