@@ -1,28 +1,22 @@
-import { GAME_VIEW, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import { OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import { TerrainRenderer } from './terrain-renderer.js';
 
 export class RenderSystem {
-  constructor(context) {
+  constructor(context, terrainRenderer = new TerrainRenderer()) {
     this.context = context;
+    this.terrainRenderer = terrainRenderer;
   }
 
   renderWorld(tileMap, camera) {
     this.drawIslandShadow(tileMap, camera);
 
     tileMap.forEachTile((tile) => {
+      if (tile.type === TILE_TYPES.crystal) return;
+
       const screenX = Math.round(tile.x * TILE_SIZE - camera.x);
       const screenY = Math.round(tile.y * TILE_SIZE - camera.y);
 
-      if (tile.type === TILE_TYPES.earth) {
-        this.drawEarthTile(screenX, screenY);
-      }
-
-      if (tile.type === TILE_TYPES.grass) {
-        this.drawGrassTile(screenX, screenY);
-      }
-
-      if (tile.type === TILE_TYPES.stone) {
-        this.drawStoneTile(screenX, screenY);
-      }
+      this.terrainRenderer.drawTile(this.context, tile, tileMap, screenX, screenY);
     });
   }
 
@@ -32,23 +26,50 @@ export class RenderSystem {
     const screenY = Math.round(y * TILE_SIZE - camera.y);
     const pulse = Math.sin(timeMs / 260) * 2;
 
-    this.drawEarthTile(screenX, screenY);
+    this.terrainRenderer.drawTile(
+      this.context,
+      { x, y, type: TILE_TYPES.crystal },
+      tileMap,
+      screenX,
+      screenY
+    );
 
     const cx = screenX + TILE_SIZE / 2;
     const cy = screenY + TILE_SIZE / 2 - 2;
 
     this.context.save();
-    this.context.globalAlpha = 0.35;
-    this.context.fillStyle = '#b48cff';
-    this.context.fillRect(cx - 14 - pulse, cy - 14 - pulse, 28 + pulse * 2, 28 + pulse * 2);
+    this.context.fillStyle = '#31251f';
+    this.context.fillRect(cx - 14, screenY + 19, 28, 7);
+    this.context.fillStyle = '#6d6358';
+    this.context.fillRect(cx - 12, screenY + 16, 24, 7);
+    this.context.fillStyle = '#8a8173';
+    this.context.fillRect(cx - 9, screenY + 15, 18, 3);
+    this.context.fillStyle = '#d78cff';
+    this.context.fillRect(cx - 4, screenY + 17, 8, 2);
+
+    this.context.globalAlpha = 0.32;
+    this.context.fillStyle = '#d974ff';
+    this.context.fillRect(cx - 17 - pulse, cy - 19 - pulse, 34 + pulse * 2, 34 + pulse * 2);
     this.context.globalAlpha = 1;
 
-    this.context.fillStyle = '#4f2a94';
-    this.context.fillRect(cx - 5, cy - 12, 10, 24);
-    this.context.fillStyle = '#8f63ff';
-    this.context.fillRect(cx - 9, cy - 6, 18, 14);
-    this.context.fillStyle = '#d9c7ff';
-    this.context.fillRect(cx - 3, cy - 10, 4, 8);
+    this.context.fillStyle = '#341b78';
+    this.context.fillRect(cx - 7, cy - 17, 14, 29);
+    this.context.fillRect(cx - 10, cy - 10, 20, 15);
+    this.context.fillStyle = '#6b2cd4';
+    this.context.fillRect(cx - 5, cy - 15, 10, 27);
+    this.context.fillStyle = '#a044ff';
+    this.context.fillRect(cx - 9, cy - 8, 8, 15);
+    this.context.fillRect(cx + 2, cy - 9, 7, 14);
+    this.context.fillStyle = '#e9b7ff';
+    this.context.fillRect(cx - 3, cy - 16, 5, 10);
+    this.context.fillRect(cx - 5, cy - 5, 3, 5);
+    this.context.fillStyle = '#ffffff';
+    this.context.fillRect(cx - 1, cy - 15, 2, 6);
+    this.context.fillStyle = '#c657ff';
+    this.context.fillRect(cx - 15, cy - 4, 4, 7);
+    this.context.fillRect(cx + 12, cy - 1, 4, 6);
+    this.context.fillRect(cx - 20, cy + 7, 3, 3);
+    this.context.fillRect(cx + 18, cy + 8, 3, 3);
     this.context.restore();
   }
 
@@ -103,58 +124,6 @@ export class RenderSystem {
     this.context.lineWidth = 3;
     this.context.strokeRect(x + 3.5, y + 3.5, TILE_SIZE - 7, TILE_SIZE - 7);
     this.context.restore();
-  }
-
-  drawEarthTile(x, y) {
-    this.context.fillStyle = '#5e442a';
-    this.context.fillRect(x, y + 23, TILE_SIZE, 9);
-    this.context.fillStyle = '#43301f';
-    this.context.fillRect(x + 3, y + 29, TILE_SIZE - 6, 5);
-
-    this.context.fillStyle = '#7a5834';
-    this.context.fillRect(x, y, TILE_SIZE, 26);
-    this.context.fillStyle = '#8f6b3f';
-    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, 22);
-    this.context.fillStyle = '#6e4c2e';
-    this.context.fillRect(x + 4, y + 18, 6, 3);
-    this.context.fillRect(x + 20, y + 9, 5, 3);
-    this.context.fillStyle = '#69a84f';
-    this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 4);
-  }
-
-  drawGrassTile(x, y) {
-    this.context.fillStyle = '#36552c';
-    this.context.fillRect(x, y + 23, TILE_SIZE, 9);
-    this.context.fillStyle = '#263d20';
-    this.context.fillRect(x + 3, y + 29, TILE_SIZE - 6, 5);
-
-    this.context.fillStyle = '#3f7f3d';
-    this.context.fillRect(x, y, TILE_SIZE, 26);
-    this.context.fillStyle = '#54a34c';
-    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, 22);
-    this.context.fillStyle = '#76c766';
-    this.context.fillRect(x + 3, y + 3, TILE_SIZE - 6, 5);
-    this.context.fillStyle = '#2f6f35';
-    this.context.fillRect(x + 4, y + 18, 6, 3);
-    this.context.fillRect(x + 20, y + 9, 5, 3);
-  }
-
-  drawStoneTile(x, y) {
-    this.context.fillStyle = '#3c3f43';
-    this.context.fillRect(x, y + 23, TILE_SIZE, 9);
-    this.context.fillStyle = '#272a2e';
-    this.context.fillRect(x + 3, y + 29, TILE_SIZE - 6, 5);
-
-    this.context.fillStyle = '#6b7076';
-    this.context.fillRect(x, y, TILE_SIZE, 26);
-    this.context.fillStyle = '#8a9098';
-    this.context.fillRect(x + 2, y + 2, TILE_SIZE - 4, 22);
-    this.context.fillStyle = '#aab0b8';
-    this.context.fillRect(x + 4, y + 5, 9, 4);
-    this.context.fillRect(x + 18, y + 14, 8, 3);
-    this.context.fillStyle = '#555a60';
-    this.context.fillRect(x + 5, y + 19, 7, 3);
-    this.context.fillRect(x + 20, y + 8, 6, 3);
   }
 
   drawWorkbench(x, y) {

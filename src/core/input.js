@@ -6,6 +6,8 @@ export class Input {
     this.virtualMovement = { x: 0, y: 0 };
 
     window.addEventListener('keydown', (event) => {
+      if (this.isEditableTarget(event.target)) return;
+
       const key = this.normalizeKey(event.key);
       this.lastKey = key;
       if (this.shouldPreventDefault(key)) {
@@ -19,6 +21,8 @@ export class Input {
     }, { capture: true });
 
     window.addEventListener('keyup', (event) => {
+      if (this.isEditableTarget(event.target)) return;
+
       const key = this.normalizeKey(event.key);
       this.lastKey = key;
       if (this.shouldPreventDefault(key)) {
@@ -37,6 +41,11 @@ export class Input {
   normalizeKey(key) {
     if (key === 'Spacebar') return ' ';
     return key.length === 1 ? key.toLowerCase() : key;
+  }
+
+  isEditableTarget(target) {
+    const tagName = target?.tagName?.toLowerCase?.();
+    return tagName === 'input' || tagName === 'textarea' || target?.isContentEditable === true;
   }
 
   shouldPreventDefault(key) {

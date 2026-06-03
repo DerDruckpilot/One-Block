@@ -71,6 +71,25 @@ export const RESOURCE_ICONS = {
   woodenSpear: '-->'
 };
 
+export const INVENTORY_TABS = [
+  { id: 'all', label: 'Alle' },
+  { id: 'resources', label: 'Rohstoffe' },
+  { id: 'tools', label: 'Werkzeuge' },
+  { id: 'building', label: 'Bauelemente' },
+  { id: 'seeds', label: 'Samen' }
+];
+
+export const RESOURCE_CATEGORIES = {
+  earth: ['resources', 'building'],
+  stone: ['resources', 'building'],
+  rawWood: ['resources'],
+  fiber: ['resources'],
+  grassSeed: ['seeds'],
+  workbench: ['building'],
+  woodenPickaxe: ['tools'],
+  woodenSpear: ['tools']
+};
+
 export const BASIC_RESOURCE_DROPS = [
   { resource: 'earth', amount: 1, weight: 50 },
   { resource: 'rawWood', amount: 1, weight: 20 },
@@ -91,6 +110,7 @@ export const WORKBENCH_RECIPE = {
   name: 'Werkbank',
   result: 'workbench',
   resultAmount: 1,
+  craftingContext: 'normal',
   requiresWorkbench: false,
   costs: {
     rawWood: 5,
@@ -103,6 +123,7 @@ export const WOODEN_PICKAXE_RECIPE = {
   name: 'Holzspitzhacke',
   result: 'woodenPickaxe',
   resultAmount: 1,
+  craftingContext: 'workbench',
   requiresWorkbench: true,
   costs: {
     rawWood: 8,
@@ -115,6 +136,7 @@ export const WOODEN_SPEAR_RECIPE = {
   name: 'Holzspeer',
   result: 'woodenSpear',
   resultAmount: 1,
+  craftingContext: 'workbench',
   requiresWorkbench: true,
   costs: {
     rawWood: 6,
