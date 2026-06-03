@@ -1,4 +1,5 @@
 import { Game } from './core/game.js';
+import { updateOrientationState } from './ui/orientation.js';
 
 const canvas = document.querySelector('#game');
 const hudElement = document.querySelector('#hud-content');
@@ -7,6 +8,10 @@ const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
 const inventoryPanel = document.querySelector('#inventory-panel');
 const craftingPanel = document.querySelector('#crafting-panel');
+const joystickElement = document.querySelector('#touch-joystick');
+const joystickKnobElement = document.querySelector('#touch-joystick-knob');
+const actionButton = document.querySelector('#touch-action');
+const attackButton = document.querySelector('#touch-attack');
 
 const getLocalStorage = () => {
   try {
@@ -17,14 +22,22 @@ const getLocalStorage = () => {
 };
 
 const game = new Game(canvas, hudElement, {
+  actionButton,
+  attackButton,
   craftingButton,
   craftingPanel,
   hotbarElement,
   inventoryButton,
   inventoryPanel,
+  joystickElement,
+  joystickKnobElement,
   storage: getLocalStorage()
 });
 game.start();
+
+updateOrientationState();
+window.addEventListener('resize', () => updateOrientationState());
+window.addEventListener('orientationchange', () => updateOrientationState());
 
 if (window.navigator && 'serviceWorker' in window.navigator) {
   window.addEventListener('load', () => {

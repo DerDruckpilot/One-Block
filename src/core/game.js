@@ -14,6 +14,7 @@ import {
   WORKBENCH_INTERACTION_DISTANCE
 } from '../config/constants.js';
 import { Input } from './input.js';
+import { TouchInput } from './touch-input.js';
 import { Camera } from './camera.js';
 import { TileMap } from '../world/tile-map.js';
 import { Player } from '../entities/player.js';
@@ -34,6 +35,12 @@ export class Game {
     this.canvas.tabIndex = 0;
     this.context = canvas.getContext('2d');
     this.input = new Input();
+    this.touchInput = new TouchInput({
+      actionButton: options.actionButton,
+      attackButton: options.attackButton,
+      joystickElement: options.joystickElement,
+      joystickKnobElement: options.joystickKnobElement
+    });
     this.camera = new Camera();
     this.tileMap = new TileMap();
     this.inventory = new ResourceInventory();
@@ -97,8 +104,12 @@ export class Game {
   }
 
   resizeCanvas() {
-    this.canvas.width = GAME_VIEW.width;
-    this.canvas.height = GAME_VIEW.height;
+    const pixelRatio = Math.max(1, Math.min(globalThis.devicePixelRatio || 1, 3));
+    this.canvas.dataset.logicalWidth = String(GAME_VIEW.width);
+    this.canvas.dataset.logicalHeight = String(GAME_VIEW.height);
+    this.canvas.width = Math.round(GAME_VIEW.width * pixelRatio);
+    this.canvas.height = Math.round(GAME_VIEW.height * pixelRatio);
+    this.context.setTransform?.(pixelRatio, 0, 0, pixelRatio, 0, 0);
   }
 
   loop(timestamp) {
@@ -116,6 +127,7 @@ export class Game {
 
   update(deltaSeconds) {
     this.falling = false;
+    this.input.setVirtualMovement(this.touchInput.getMovementVector());
     this.player.update(deltaSeconds, this.input, this.tileMap);
     this.handleVoidFall();
     this.camera.centerOn(this.player.getCenterPosition());
@@ -132,6 +144,7 @@ export class Game {
       this.tryPlaceSelectedItem();
     }
 
+    this.handleTouchActions();
     this.handleDebugToggle();
     const didReset = this.handleReset(deltaSeconds);
     if (!didReset) {
@@ -180,6 +193,61 @@ export class Game {
         this.crystalSystem.use();
       }
       this.saveGame();
+    }
+  }
+
+  isNearCrystal() {
+    const foot = this.player.getFootPosition();
+    return this.tileMap.isNearCrystalWorld(
+      foot.x,
+      foot.y,
+      CRYSTAL_INTERACTION_DISTANCE
+    );
+  }
+
+  tryContextAction() {
+    const placement = this.getPlacementPreview();
+    if (placement.canPlace) {
+      return this.tryPlaceSelectedItem();
+    }
+
+    if (this.isNearCrystal()) {
+      this.tryUseCrystal();
+      return true;
+    }
+
+    this.crystalSystem.lastMessage = 'Keine Aktion möglich.';
+    return false;
+  }
+
+  tryAttackAction() {
+    const activeItem = this.getActiveHotbarItem();
+
+    if (activeItem === 'woodenPickaxe' && this.inventory.get('woodenPickaxe') > 0) {
+      if (this.isNearCrystal()) {
+        this.tryUseCrystal();
+        return true;
+      }
+      this.crystalSystem.lastMessage = 'Kein Ziel.';
+      return false;
+    }
+
+    if (activeItem === 'woodenSpear' && this.inventory.get('woodenSpear') > 0) {
+      this.crystalSystem.lastMessage = 'Kein Ziel.';
+      return false;
+    }
+
+    this.crystalSystem.lastMessage = 'Keine Waffe ausgewählt.';
+    return false;
+  }
+
+  handleTouchActions() {
+    if (this.touchInput.consumeActionPress()) {
+      this.tryContextAction();
+    }
+
+    if (this.touchInput.consumeAttackPress()) {
+      this.tryAttackAction();
     }
   }
 
@@ -641,6 +709,7 @@ export class Game {
 
   getDebugState() {
     const input = this.input.getDebugState();
+    const touch = this.touchInput.getDebugState();
     const foot = this.player.getFootPosition();
     const support = this.tileMap.getSupportStateAtWorld(foot.x, foot.y);
 
@@ -655,6 +724,8 @@ export class Game {
       inVoid: support.inVoid,
       falling: this.falling,
       movementKeys: input.movementKeys,
+      virtualMovement: input.virtualMovement,
+      touch,
       lastKey: input.lastKey,
       saveStatus: this.saveStatus,
       activeHotbarSlot: this.activeHotbarSlot,

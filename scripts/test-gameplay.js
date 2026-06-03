@@ -12,6 +12,7 @@ import {
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
+import { TouchInput } from '../src/core/touch-input.js';
 import { Player } from '../src/entities/player.js';
 import { SAVE_KEY, SaveSystem } from '../src/systems/save-system.js';
 import { TileMap } from '../src/world/tile-map.js';
@@ -21,6 +22,7 @@ import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
+import { isPortraitViewport, updateOrientationState } from '../src/ui/orientation.js';
 import { PointerHitboxSystem } from '../src/ui/pointer-hitboxes.js';
 
 const inputWith = (...pressedKeys) => ({
@@ -81,6 +83,7 @@ const createRectElement = (rect, options = {}) => ({
 const createPointerEvent = (clientX, clientY) => ({
   clientX,
   clientY,
+  pointerId: 1,
   defaultPrevented: false,
   propagationStopped: false,
   preventDefault() {
@@ -91,7 +94,55 @@ const createPointerEvent = (clientX, clientY) => ({
   }
 });
 
+const createInteractiveRectElement = (rect, options = {}) => {
+  const listeners = {};
+  const classNames = new Set();
+
+  return {
+    ...createRectElement(rect, options),
+    classList: {
+      add(className) {
+        classNames.add(className);
+      },
+      remove(className) {
+        classNames.delete(className);
+      },
+      contains(className) {
+        return classNames.has(className);
+      },
+      toggle() {}
+    },
+    style: {},
+    listeners,
+    addEventListener(type, callback) {
+      listeners[type] = callback;
+    },
+    setPointerCapture() {},
+    releasePointerCapture() {}
+  };
+};
+
 const map = new TileMap();
+
+{
+  assert.equal(isPortraitViewport({ width: 390, height: 844 }), true, 'portrait viewport is detected');
+  assert.equal(isPortraitViewport({ width: 844, height: 390 }), false, 'landscape viewport is detected');
+
+  const classNames = new Set();
+  const root = {
+    classList: {
+      toggle(className, enabled) {
+        if (enabled) classNames.add(className);
+        else classNames.delete(className);
+      }
+    }
+  };
+
+  assert.equal(updateOrientationState({ root, viewport: { innerWidth: 390, innerHeight: 844 } }), 'portrait', 'orientation state reports portrait');
+  assert.equal(classNames.has('is-portrait'), true, 'orientation state marks portrait root class');
+  assert.equal(updateOrientationState({ root, viewport: { innerWidth: 844, innerHeight: 390 } }), 'landscape', 'orientation state reports landscape');
+  assert.equal(classNames.has('is-landscape'), true, 'orientation state marks landscape root class');
+}
 
 {
   const listeners = {};
@@ -190,6 +241,44 @@ const map = new TileMap();
   player.update(0.25, inputWith('d'), map);
 
   assert.ok(player.x > startX, 'player moves freely to the right');
+}
+
+{
+  const joystick = createInteractiveRectElement({ left: 0, top: 0, width: 100, height: 100 });
+  const knob = createInteractiveRectElement({ left: 0, top: 0, width: 40, height: 40 });
+  const actionButton = createInteractiveRectElement({ left: 200, top: 0, width: 80, height: 80 });
+  const touchInput = new TouchInput({
+    actionButton,
+    joystickElement: joystick,
+    joystickKnobElement: knob
+  });
+
+  joystick.listeners.pointerdown({ ...createPointerEvent(50, 50), pointerId: 11 });
+  joystick.listeners.pointermove({ ...createPointerEvent(100, 50), pointerId: 11 });
+  actionButton.listeners.pointerdown({ ...createPointerEvent(220, 20), pointerId: 22 });
+
+  assert.ok(touchInput.getMovementVector().x > 0.9, 'joystick input produces a rightward movement vector');
+  assert.equal(touchInput.getDebugState().joystickActive, true, 'joystick keeps its own active pointer');
+  assert.equal(touchInput.getDebugState().actionPressed, true, 'action button tracks its own touch pointer');
+  assert.equal(touchInput.getDebugState().pointerCount, 2, 'multi-touch separates joystick and action pointers');
+  assert.equal(touchInput.consumeActionPress(), true, 'action press can be consumed once');
+  assert.equal(touchInput.consumeActionPress(), false, 'consumed action press does not repeat');
+
+  actionButton.listeners.pointerup({ ...createPointerEvent(220, 20), pointerId: 22 });
+  assert.equal(touchInput.getDebugState().joystickActive, true, 'releasing action does not cancel joystick movement');
+  joystick.listeners.pointercancel({ ...createPointerEvent(100, 50), pointerId: 11 });
+  assert.deepEqual(touchInput.getMovementVector(), { x: 0, y: 0 }, 'pointercancel clears joystick movement');
+}
+
+{
+  const player = createSpawnedPlayer();
+  const startX = player.x;
+  const input = inputWith();
+  input.getVirtualMovement = () => ({ x: 1, y: 0 });
+
+  player.update(0.25, input, map);
+
+  assert.ok(player.x > startX, 'virtual joystick movement moves the player');
 }
 
 {
@@ -398,6 +487,10 @@ const map = new TileMap();
   const canvas = {
     width: 960,
     height: 540,
+    dataset: {
+      logicalWidth: '960',
+      logicalHeight: '540'
+    },
     focus() {},
     getBoundingClientRect() {
       return { left: 0, top: 0, width: 480, height: 270 };
@@ -429,6 +522,84 @@ const map = new TileMap();
   assert.equal(selectedSlot, 3, 'hotbar slot can be selected by pointer hitbox');
   assert.equal(event.defaultPrevented, true, 'hotbar UI pointer event is consumed');
   assert.equal(event.propagationStopped, true, 'hotbar UI pointer event does not leak into gameplay');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  const canvas = {
+    width: 1920,
+    height: 1080,
+    dataset: {
+      logicalWidth: '960',
+      logicalHeight: '540'
+    },
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 480, height: 270 };
+    }
+  };
+  let inventoryToggled = false;
+  let hotbarSelected = false;
+  const overlappingButton = createRectElement({ left: 100, top: 100, width: 80, height: 50 });
+  const overlappingSlot = createRectElement(
+    { left: 100, top: 100, width: 80, height: 50 },
+    { dataset: { hotbarSlot: '0', resource: 'earth' } }
+  );
+  const hitboxes = new PointerHitboxSystem({
+    canvas,
+    hotbarElement: createRectElement(
+      { left: 90, top: 90, width: 120, height: 80 },
+      { querySelectorAll: () => [overlappingSlot] }
+    ),
+    inventoryButton: overlappingButton,
+    onHotbarSelect() {
+      hotbarSelected = true;
+    },
+    onInventoryToggle() {
+      inventoryToggled = true;
+    },
+    pointerTarget
+  });
+
+  const canvasPoint = hitboxes.clientToCanvasPoint(240, 135);
+  assert.equal(canvasPoint.x, 480, 'pointer mapping uses logical canvas width instead of DPR backing width');
+  assert.equal(canvasPoint.y, 270, 'pointer mapping uses logical canvas height instead of DPR backing height');
+
+  pointerdown(createPointerEvent(120, 120));
+  assert.equal(inventoryToggled, true, 'top menu hitbox wins over overlapping lower-priority hotbar');
+  assert.equal(hotbarSelected, false, 'lower-priority hotbar hitbox is not triggered by top menu click');
+}
+
+{
+  const previousPixelRatio = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 2;
+  const context = {
+    transform: null,
+    setTransform(...args) {
+      this.transform = args;
+    }
+  };
+  const canvas = {
+    dataset: {},
+    focus() {},
+    addEventListener() {},
+    getContext: () => context
+  };
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game(canvas, { innerHTML: '' });
+
+  game.resizeCanvas();
+
+  assert.equal(canvas.width, GAME_VIEW.width * 2, 'canvas backing width scales with devicePixelRatio');
+  assert.equal(canvas.height, GAME_VIEW.height * 2, 'canvas backing height scales with devicePixelRatio');
+  assert.equal(canvas.dataset.logicalWidth, String(GAME_VIEW.width), 'canvas stores logical width for pointer mapping');
+  assert.deepEqual(context.transform, [2, 0, 0, 2, 0, 0], 'render context is scaled back to logical game units');
+  globalThis.devicePixelRatio = previousPixelRatio;
 }
 
 {
@@ -730,6 +901,71 @@ const map = new TileMap();
   assert.equal(game.tileMap.getTile(2, 0), 'earth', 'placed earth becomes a world tile');
   assert.equal(game.inventory.get('earth'), 1, 'placing earth consumes one earth resource');
   assert.equal(game.crystalSystem.lastMessage, 'Erde platziert.', 'successful placement writes a clear log message');
+}
+
+{
+  const actionButton = createInteractiveRectElement({ left: 800, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
+
+  game.inventory.add('earth', 1);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 31 });
+  game.update(0.016);
+
+  assert.equal(game.tileMap.getTile(2, 0), 'earth', 'mobile action button places a valid selected item');
+  assert.equal(game.inventory.get('earth'), 0, 'mobile action placement consumes the selected resource');
+  assert.equal(game.crystalSystem.lastMessage, 'Erde platziert.', 'mobile action placement writes the existing placement log');
+}
+
+{
+  const actionButton = createInteractiveRectElement({ left: 800, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
+
+  actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 32 });
+  game.update(0.016);
+
+  const totalResources = Object.values(game.inventory.resources).reduce((sum, amount) => sum + amount, 0);
+  assert.equal(totalResources, 1, 'mobile action button activates the crystal when placement is not valid');
+  assert.equal(game.crystalSystem.lastMessage.startsWith('Kristall:'), true, 'mobile crystal action keeps the existing crystal log');
+}
+
+{
+  const attackButton = createInteractiveRectElement({ left: 720, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { attackButton });
+
+  game.crystalSystem.random = () => 0.1;
+  game.inventory.add('woodenPickaxe', 1);
+  game.hotbarSlots[0] = 'woodenPickaxe';
+  game.activeHotbarSlot = 0;
+  attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 33 });
+  game.update(0.016);
+
+  assert.equal(game.inventory.get('stone'), 1, 'mobile attack button uses selected pickaxe on the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'mobile pickaxe attack uses the existing pickaxe crystal logic');
+}
+
+{
+  const attackButton = createInteractiveRectElement({ left: 720, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { attackButton });
+
+  game.inventory.add('woodenSpear', 1);
+  game.hotbarSlots[0] = 'woodenSpear';
+  attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 34 });
+  game.update(0.016);
+  assert.equal(game.crystalSystem.lastMessage, 'Kein Ziel.', 'mobile attack with spear reports no target');
+
+  game.hotbarSlots[0] = 'earth';
+  attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 35 });
+  game.update(0.016);
+  assert.equal(game.crystalSystem.lastMessage, 'Keine Waffe ausgewählt.', 'mobile attack without weapon reports missing weapon');
 }
 
 {
