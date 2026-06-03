@@ -5,7 +5,9 @@ export class TouchInput {
     joystickElement = null,
     joystickKnobElement = null,
     actionButton = null,
-    attackButton = null
+    attackButton = null,
+    pointerTarget = globalThis.window,
+    isUiBlocked = (event) => TouchInput.isDefaultUiTarget(event.target)
   } = {}) {
     this.joystickElement = joystickElement;
     this.joystickKnobElement = joystickKnobElement;
@@ -14,13 +16,24 @@ export class TouchInput {
     this.joystickPointerId = null;
     this.buttonPointers = new Map();
     this.vector = { x: 0, y: 0 };
+    this.origin = null;
     this.actionPressedThisFrame = false;
     this.attackPressedThisFrame = false;
     this.enabled = true;
+    this.pointerTarget = pointerTarget;
+    this.isUiBlocked = isUiBlocked;
 
     this.bindJoystick();
+    this.bindDynamicSurface();
     this.bindButton(actionButton, 'action');
     this.bindButton(attackButton, 'attack');
+    this.setJoystickVisible(false);
+  }
+
+  static isDefaultUiTarget(target) {
+    return Boolean(target?.closest?.(
+      '#inventory-panel, #crafting-panel, #top-menu, #hotbar, #touch-action, #touch-attack, button, input, textarea'
+    ));
   }
 
   bindJoystick() {
@@ -28,10 +41,7 @@ export class TouchInput {
       if (!this.enabled) return;
       if (this.joystickPointerId !== null) return;
       this.consumeEvent(event);
-      this.joystickPointerId = event.pointerId;
-      this.joystickElement.setPointerCapture?.(event.pointerId);
-      this.updateJoystickVector(event);
-      this.joystickElement.classList?.add('is-active');
+      this.startJoystick(event);
     });
 
     this.joystickElement?.addEventListener?.('pointermove', (event) => {
@@ -48,6 +58,50 @@ export class TouchInput {
         this.clearJoystick();
       });
     }
+  }
+
+  bindDynamicSurface() {
+    this.pointerTarget?.addEventListener?.('pointerdown', (event) => {
+      if (!this.shouldStartDynamicJoystick(event)) return;
+      this.consumeEvent(event);
+      this.startJoystick(event);
+    }, { capture: true });
+
+    this.pointerTarget?.addEventListener?.('pointermove', (event) => {
+      if (!this.enabled) return;
+      if (event.pointerId !== this.joystickPointerId) return;
+      this.consumeEvent(event);
+      this.updateJoystickVector(event);
+    }, { capture: true });
+
+    for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      this.pointerTarget?.addEventListener?.(eventName, (event) => {
+        if (event.pointerId !== this.joystickPointerId) return;
+        this.consumeEvent(event);
+        this.clearJoystick();
+      }, { capture: true });
+    }
+  }
+
+  shouldStartDynamicJoystick(event) {
+    if (!this.enabled) return false;
+    if (this.joystickPointerId !== null) return false;
+    if (event.pointerType === 'mouse') return false;
+    if (this.isUiBlocked(event)) return false;
+
+    const viewportWidth = globalThis.innerWidth || this.pointerTarget?.innerWidth || 0;
+    if (viewportWidth > 0 && event.clientX > viewportWidth / 2) return false;
+    return true;
+  }
+
+  startJoystick(event) {
+    this.joystickPointerId = event.pointerId;
+    this.origin = { x: Number(event.clientX || 0), y: Number(event.clientY || 0) };
+    this.positionJoystickAtOrigin();
+    this.setJoystickVisible(true);
+    this.joystickElement?.setPointerCapture?.(event.pointerId);
+    this.updateJoystickVector(event);
+    this.joystickElement?.classList?.add('is-active');
   }
 
   bindButton(button, action) {
@@ -92,14 +146,16 @@ export class TouchInput {
 
   updateJoystickVector(event) {
     const rect = this.joystickElement?.getBoundingClientRect?.();
-    if (!rect || rect.width <= 0 || rect.height <= 0) {
+    const width = rect?.width || 112;
+    const height = rect?.height || 112;
+    if (width <= 0 || height <= 0) {
       this.vector = { x: 0, y: 0 };
       return;
     }
 
-    const radius = Math.min(rect.width, rect.height) / 2;
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
+    const radius = Math.min(width, height) / 2;
+    const centerX = this.origin?.x ?? rect.left + width / 2;
+    const centerY = this.origin?.y ?? rect.top + height / 2;
     const offsetX = event.clientX - centerX;
     const offsetY = event.clientY - centerY;
     const distance = Math.hypot(offsetX, offsetY);
@@ -128,11 +184,26 @@ export class TouchInput {
 
   clearJoystick() {
     this.joystickPointerId = null;
+    this.origin = null;
     this.vector = { x: 0, y: 0 };
     if (this.joystickKnobElement) {
       this.joystickKnobElement.style.transform = 'translate(-50%, -50%)';
     }
     this.joystickElement?.classList?.remove('is-active');
+    this.setJoystickVisible(false);
+  }
+
+  positionJoystickAtOrigin() {
+    if (!this.joystickElement || !this.origin) return;
+    this.joystickElement.style.left = `${this.origin.x}px`;
+    this.joystickElement.style.top = `${this.origin.y}px`;
+    this.joystickElement.style.bottom = 'auto';
+    this.joystickElement.style.transform = 'translate(-50%, -50%)';
+  }
+
+  setJoystickVisible(visible) {
+    if (!this.joystickElement) return;
+    this.joystickElement.hidden = visible !== true;
   }
 
   getMovementVector() {
@@ -164,6 +235,7 @@ export class TouchInput {
     return {
       enabled: this.enabled,
       joystickActive: this.joystickPointerId !== null,
+      joystickOrigin: this.origin ? { ...this.origin } : null,
       actionPressed: this.isButtonHeld('action'),
       attackPressed: this.isButtonHeld('attack'),
       pointerCount: this.buttonPointers.size + (this.joystickPointerId !== null ? 1 : 0)

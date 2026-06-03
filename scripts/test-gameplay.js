@@ -12,6 +12,7 @@ import {
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
+import { Enemy } from '../src/entities/enemy.js';
 import { TouchInput } from '../src/core/touch-input.js';
 import { Player } from '../src/entities/player.js';
 import { SAVE_KEY, SaveSystem } from '../src/systems/save-system.js';
@@ -19,6 +20,8 @@ import { TileMap } from '../src/world/tile-map.js';
 import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { chooseWeightedDrop, CrystalSystem } from '../src/systems/crystal-system.js';
 import { CraftingSystem } from '../src/systems/crafting-system.js';
+import { EnemySystem } from '../src/systems/enemy-system.js';
+import { LogSystem } from '../src/systems/log-system.js';
 import { TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
@@ -304,6 +307,78 @@ const map = new TileMap();
   assert.equal(touchInput.getDebugState().joystickActive, true, 'releasing action does not cancel joystick movement');
   joystick.listeners.pointercancel({ ...createPointerEvent(100, 50), pointerId: 11 });
   assert.deepEqual(touchInput.getMovementVector(), { x: 0, y: 0 }, 'pointercancel clears joystick movement');
+}
+
+{
+  const previousWidth = globalThis.innerWidth;
+  globalThis.innerWidth = 800;
+  const pointerListeners = {};
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      pointerListeners[type] = callback;
+    }
+  };
+  const joystick = createInteractiveRectElement({ left: 64, top: 144, width: 112, height: 112 });
+  const knob = createInteractiveRectElement({ left: 44, top: 44, width: 40, height: 40 });
+  const touchInput = new TouchInput({
+    joystickElement: joystick,
+    joystickKnobElement: knob,
+    pointerTarget
+  });
+  const freeTarget = { closest: () => null };
+
+  pointerListeners.pointerdown({ ...createPointerEvent(120, 200), pointerId: 61, target: freeTarget });
+  assert.equal(touchInput.getDebugState().joystickActive, true, 'dynamic joystick starts from a free left-side touch');
+  assert.deepEqual(touchInput.getDebugState().joystickOrigin, { x: 120, y: 200 }, 'dynamic joystick origin is the touch start point');
+  assert.equal(joystick.hidden, false, 'dynamic joystick becomes visible while held');
+  assert.equal(joystick.style.left, '120px', 'dynamic joystick is positioned at the touch origin');
+
+  pointerListeners.pointermove({ ...createPointerEvent(176, 200), pointerId: 61, target: freeTarget });
+  assert.ok(touchInput.getMovementVector().x > 0.9, 'dynamic joystick movement is relative to the origin');
+
+  pointerListeners.pointerup({ ...createPointerEvent(176, 200), pointerId: 61, target: freeTarget });
+  assert.equal(joystick.hidden, true, 'dynamic joystick hides after release');
+  assert.deepEqual(touchInput.getMovementVector(), { x: 0, y: 0 }, 'dynamic joystick clears movement after release');
+  globalThis.innerWidth = previousWidth;
+}
+
+{
+  const previousWidth = globalThis.innerWidth;
+  globalThis.innerWidth = 800;
+  const pointerListeners = {};
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      pointerListeners[type] = callback;
+    }
+  };
+  const joystick = createInteractiveRectElement({ left: 0, top: 0, width: 112, height: 112 });
+  const touchInput = new TouchInput({
+    joystickElement: joystick,
+    pointerTarget
+  });
+  const uiTarget = { closest: () => ({}) };
+
+  pointerListeners.pointerdown({ ...createPointerEvent(120, 200), pointerId: 62, target: uiTarget });
+  assert.equal(touchInput.getDebugState().joystickActive, false, 'dynamic joystick does not start over UI');
+  assert.equal(joystick.hidden, true, 'dynamic joystick stays hidden when UI blocks the touch');
+  pointerListeners.pointerdown({ ...createPointerEvent(620, 200), pointerId: 63, target: { closest: () => null } });
+  assert.equal(touchInput.getDebugState().joystickActive, false, 'dynamic joystick does not start in the right screen half');
+  pointerListeners.pointerdown({ ...createPointerEvent(120, 200), pointerId: 64, pointerType: 'mouse', target: { closest: () => null } });
+  assert.equal(touchInput.getDebugState().joystickActive, false, 'dynamic joystick does not start from desktop mouse clicks');
+  globalThis.innerWidth = previousWidth;
+}
+
+{
+  const log = new LogSystem();
+  for (let index = 1; index <= 7; index += 1) {
+    log.add(`Eintrag ${index}`);
+  }
+
+  assert.deepEqual(
+    log.toJSON(),
+    ['Eintrag 7', 'Eintrag 6', 'Eintrag 5', 'Eintrag 4', 'Eintrag 3'],
+    'log system keeps the latest five entries newest-first'
+  );
 }
 
 {
@@ -889,6 +964,12 @@ const map = new TileMap();
   assert.equal(game.tryUseCrystal(), false, 'direct crystal interaction is blocked while paused');
   assert.equal(game.tryAttackAction(), false, 'direct attack is blocked while paused');
   assert.equal(game.touchInput.getDebugState().enabled, false, 'touch input is disabled while paused');
+  game.enemySystem.spawnNearCrystal(game.tileMap);
+  const enemy = game.enemySystem.enemies[0];
+  const enemyX = enemy.x;
+  const enemyY = enemy.y;
+  game.update(0.5);
+  assert.deepEqual({ x: enemy.x, y: enemy.y }, { x: enemyX, y: enemyY }, 'paused game stops enemy movement');
 
   game.input.pressedThisFrame.add('i');
   game.input.pressedThisFrame.add('b');
@@ -1278,12 +1359,108 @@ const map = new TileMap();
   game.hotbarSlots[0] = 'woodenSpear';
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 34 });
   game.update(0.016);
-  assert.equal(game.crystalSystem.lastMessage, 'Kein Ziel.', 'mobile attack with spear reports no target');
+  assert.equal(game.crystalSystem.lastMessage, 'Eine Kreatur erscheint!', 'mobile spear attack at the crystal starts an encounter');
+  assert.equal(game.enemySystem.activeCount(), 1, 'mobile spear crystal attack spawns one enemy');
 
   game.hotbarSlots[0] = 'earth';
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 35 });
   game.update(0.016);
   assert.equal(game.crystalSystem.lastMessage, 'Keine Waffe ausgewählt.', 'mobile attack without weapon reports missing weapon');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.crystalSystem.random = () => 0.1;
+  game.inventory.add('woodenPickaxe', 1);
+  game.hotbarSlots[0] = 'woodenPickaxe';
+  assert.equal(game.tryAttackAction(), true, 'wooden pickaxe attack works at the crystal');
+  assert.equal(game.inventory.get('stone'), 1, 'wooden pickaxe attack uses stone drop logic');
+  assert.equal(game.attackFeedback.type, 'crystalHit', 'wooden pickaxe attack shows crystal hit feedback');
+  assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'wooden pickaxe attack logs the hit');
+
+  game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
+  assert.equal(game.tryAttackAction(), false, 'wooden pickaxe attack fails without a valid target');
+  assert.equal(game.crystalSystem.lastMessage, 'Kein Ziel für Spitzhacke.', 'wooden pickaxe without target writes a clear log');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('woodenSpear', 1);
+  game.hotbarSlots[0] = 'woodenSpear';
+  game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
+  assert.equal(game.tryAttackAction(), false, 'spear attack without target fails cleanly');
+  assert.equal(game.crystalSystem.lastMessage, 'Kein Ziel.', 'spear attack without target writes no-target log');
+  assert.equal(game.attackFeedback.type, 'spear', 'spear attack shows attack arc feedback even on a miss');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('woodenSpear', 1);
+  game.hotbarSlots[0] = 'woodenSpear';
+  assert.equal(game.tryAttackAction(), true, 'spear attack at the crystal starts an encounter');
+  assert.equal(game.enemySystem.activeCount(), 1, 'spear crystal encounter spawns one active enemy');
+  assert.equal(game.enemySystem.enemies[0].hp, 4, 'enemy starts with four hit points');
+  assert.equal(game.enemySystem.enemies[0].healthVisible, false, 'enemy health bar is hidden before first hit');
+
+  game.player.facing = { x: -1, y: 0 };
+  assert.equal(game.tryAttackAction(), false, 'second spear crystal encounter does not spawn another enemy');
+  assert.equal(game.enemySystem.activeCount(), 1, 'spear crystal encounter is capped at one active enemy');
+  assert.equal(game.crystalSystem.lastMessage, 'Es ist bereits eine Kreatur da.', 'existing enemy writes a no-spam log');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('woodenSpear', 1);
+  game.hotbarSlots[0] = 'woodenSpear';
+  game.enemySystem.spawnNearCrystal(game.tileMap);
+  const enemy = game.enemySystem.enemies[0];
+  const startX = enemy.x;
+  const startY = enemy.y;
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: -1 };
+
+  assert.equal(game.tryAttackAction(), true, 'spear attack can hit an enemy');
+  assert.equal(enemy.hp, 3, 'wooden spear hit deals exactly one damage');
+  assert.equal(enemy.healthVisible, true, 'enemy health bar becomes visible after first hit');
+  assert.ok(enemy.knockback.seconds > 0, 'spear hit applies knockback');
+  enemy.update(0.08, game.tileMap, game.player);
+  assert.notDeepEqual({ x: enemy.x, y: enemy.y }, { x: startX, y: startY }, 'enemy knockback changes enemy position');
+
+  for (let hit = 0; hit < 3; hit += 1) {
+    enemy.setTilePosition({ x: 1, y: 0 });
+    enemy.knockback = { x: 0, y: 0, seconds: 0 };
+    game.tryAttackAction();
+  }
+  assert.equal(game.enemySystem.activeCount(), 0, 'enemy is removed after reaching zero hit points');
+  assert.equal(game.crystalSystem.lastMessage, 'Kreatur besiegt.', 'defeated enemy writes a defeat log');
+}
+
+{
+  const enemySystem = new EnemySystem();
+  const tileMap = new TileMap();
+  const player = createSpawnedPlayer();
+  const enemy = Enemy.fromTile({ x: 1, y: 0 });
+  enemySystem.enemies.push(enemy);
+  player.setPosition(
+    4 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  const startX = enemy.x;
+
+  enemySystem.update(1, tileMap, player);
+
+  assert.equal(enemy.x, startX, 'enemy does not voluntarily walk from a tile into the void');
 }
 
 {
@@ -1563,6 +1740,13 @@ const map = new TileMap();
   );
   game.player.facing = { x: 1, y: 0 };
   game.tryPlaceSelectedItem();
+  game.enemySystem.spawnNearCrystal(game.tileMap);
+  game.enemySystem.enemies[0].hp = 2;
+  game.enemySystem.enemies[0].healthVisible = true;
+  for (let index = 1; index <= 6; index += 1) {
+    game.setLog(`Log ${index}`);
+  }
+  game.saveGame();
 
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
@@ -1581,6 +1765,11 @@ const map = new TileMap();
   assert.equal(loadedGame.tileMap.getTile(1, 1), 'grass', 'saved grass tile loads from local storage');
   assert.equal(loadedGame.tileMap.getObject(2, 0), 'workbench', 'saved placed workbench loads as world object');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 1 }, 'saved player position loads from local storage');
+  assert.equal(loadedGame.enemySystem.activeCount(), 1, 'saved active enemy loads from local storage');
+  assert.equal(loadedGame.enemySystem.enemies[0].hp, 2, 'saved enemy hit points load from local storage');
+  assert.equal(loadedGame.enemySystem.enemies[0].healthVisible, true, 'saved enemy health-bar state loads from local storage');
+  assert.equal(loadedGame.logSystem.toJSON().length, 5, 'loaded log keeps at most five entries');
+  assert.equal(loadedGame.logSystem.toJSON().includes('Log 6'), true, 'saved log entries load from local storage');
 
   loadedGame.hotbarSlots = ['earth', 'stone', 'woodenPickaxe', null];
   loadedGame.selectHotbarSlot(2);
@@ -1617,6 +1806,7 @@ const map = new TileMap();
   game.tileMap.setWorkbench(1, 1);
   game.tileMap.setGrass(1, 0);
   game.tileMap.setStone(2, 0);
+  game.enemySystem.spawnNearCrystal(game.tileMap);
   game.hotbarSlots = ['stone', 'woodenPickaxe', null, 'woodenSpear'];
   game.activeHotbarSlot = 3;
   game.saveGame();
@@ -1637,6 +1827,8 @@ const map = new TileMap();
   assert.equal(game.tileMap.getTile(2, 0), null, 'reset clears placed stone tiles outside the start island');
   assert.deepEqual(game.hotbarSlots, DEFAULT_HOTBAR_SLOTS, 'reset restores default hotbar assignment');
   assert.equal(game.activeHotbarSlot, 0, 'reset restores first active hotbar slot');
+  assert.equal(game.enemySystem.activeCount(), 0, 'reset removes active enemies');
+  assert.deepEqual(game.logSystem.toJSON(), ['Speicherstand gelöscht. Neustart am Kristall.'], 'reset resets log history');
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
   assert.equal(game.crystalSystem.lastMessage, 'Speicherstand gelöscht. Neustart am Kristall.', 'reset writes a clear log message');
 }
@@ -1750,10 +1942,11 @@ const map = new TileMap();
   game.hotbarSlots[0] = 'woodenPickaxe';
   game.activeHotbarSlot = 0;
 
-  game.tryUseCrystal();
+  game.tryAttackAction();
 
-  assert.equal(game.inventory.get('stone'), 1, 'selected wooden pickaxe unlocks stone drops at the crystal');
-  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'pickaxe crystal use writes a stone drop log');
+  assert.equal(game.inventory.get('stone'), 1, 'wooden pickaxe attack unlocks stone drops at the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'pickaxe attack writes the drop log');
+  assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'pickaxe attack logs the crystal hit feedback');
 }
 
 console.log('Gameplay-Basics OK.');
