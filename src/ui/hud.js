@@ -34,6 +34,8 @@ export class Hud {
         Hotbar: ${debug.activeHotbarSlot + 1} / ${debug.activeHotbarItem || 'leer'}<br>
         Angriff: ${debug.attackState || 'none'}<br>
         Gegner: ${debug.activeEnemies || 0}<br>
+        Drops: ${debug.activeDrops || 0}<br>
+        Tageszeit: ${this.formatNumber(debug.dayNightTime || 0)} / ${debug.dayNightPhase || 'Tag'}<br>
         Touch: stick ${touch.joystickActive ? 'true' : 'false'}, origin ${touch.joystickOrigin ? `${this.formatNumber(touch.joystickOrigin.x)}, ${this.formatNumber(touch.joystickOrigin.y)}` : 'none'}, action ${touch.actionPressed ? 'true' : 'false'}, attack ${touch.attackPressed ? 'true' : 'false'}, pointer ${touch.pointerCount}<br>
         Touch-Vektor: ${this.formatNumber(virtualMovement.x)}, ${this.formatNumber(virtualMovement.y)}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>

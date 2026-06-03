@@ -20,17 +20,28 @@ import { Camera } from './camera.js';
 import { TileMap } from '../world/tile-map.js';
 import { Player } from '../entities/player.js';
 import { ResourceInventory } from '../systems/resource-inventory.js';
-import { CrystalSystem } from '../systems/crystal-system.js';
+import { chooseWeightedDrop, CrystalSystem } from '../systems/crystal-system.js';
 import { RenderSystem } from '../systems/render-system.js';
 import { BackgroundSystem } from '../systems/background-system.js';
 import { SaveSystem } from '../systems/save-system.js';
 import { CraftingSystem } from '../systems/crafting-system.js';
+import { DayNightSystem } from '../systems/day-night-system.js';
+import { DropSystem } from '../systems/drop-system.js';
 import { EnemySystem } from '../systems/enemy-system.js';
 import { LogSystem } from '../systems/log-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
 import { MenuPanels } from '../ui/menu-panels.js';
 import { PointerHitboxSystem } from '../ui/pointer-hitboxes.js';
+
+const PLACEABLE_OBJECT_ITEMS = new Set([
+  OBJECT_TYPES.workbench,
+  OBJECT_TYPES.torch,
+  OBJECT_TYPES.campfire,
+  OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.table,
+  OBJECT_TYPES.chair
+]);
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -52,6 +63,8 @@ export class Game {
     this.respawnPlayer();
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.craftingSystem = new CraftingSystem(this.inventory);
+    this.dropSystem = new DropSystem();
+    this.dayNightSystem = new DayNightSystem();
     this.enemySystem = new EnemySystem();
     this.logSystem = new LogSystem();
     this.backgroundSystem = new BackgroundSystem();
@@ -153,6 +166,8 @@ export class Game {
       this.camera.centerOn(this.player.getCenterPosition());
       this.backgroundSystem.update(deltaSeconds);
       this.handleEnemyEvents(this.enemySystem.update(deltaSeconds, this.tileMap, this.player));
+      this.handleDropCollections(this.dropSystem.update(deltaSeconds, this.player, this.inventory, this.tileMap));
+      this.dayNightSystem.update(deltaSeconds);
       this.updateAttackFeedback(deltaSeconds);
 
       if (this.input.wasPressed(' ', 'e', 'Enter')) {
@@ -221,8 +236,8 @@ export class Game {
     );
 
     if (isCloseToCrystal) {
-      this.crystalSystem.use();
-      this.setLog(this.crystalSystem.lastMessage);
+      const drop = this.rollCrystalDrop();
+      this.spawnVisibleDrop(drop, `Kristall wirft ${RESOURCE_LABELS[drop.resource]} aus.`);
       this.saveGame();
       return true;
     }
@@ -285,8 +300,8 @@ export class Game {
 
     this.setCrystalHitFeedback();
     this.setLog('Du schlägst Splitter aus dem Kristall.');
-    this.crystalSystem.use(PICKAXE_RESOURCE_DROPS, (drop) => `${RESOURCE_LABELS[drop.resource]} erhalten.`);
-    this.setLog(this.crystalSystem.lastMessage);
+    const drop = this.rollCrystalDrop(PICKAXE_RESOURCE_DROPS);
+    this.spawnVisibleDrop(drop, `${RESOURCE_LABELS[drop.resource]} splittert heraus.`);
     this.saveGame();
     return true;
   }
@@ -326,6 +341,31 @@ export class Game {
   setLog(message) {
     this.logSystem.add(message);
     this.crystalSystem.lastMessage = this.logSystem.latest(message);
+  }
+
+  rollCrystalDrop(dropTable = undefined) {
+    this.crystalSystem.hitCounter += 1;
+    const randomValue = this.crystalSystem.random();
+    return dropTable ? chooseWeightedDrop(dropTable, randomValue) : chooseWeightedDrop(randomValue);
+  }
+
+  spawnVisibleDrop(drop, message) {
+    const visibleDrop = this.dropSystem.spawnFromCrystal(drop, this.tileMap);
+    if (!visibleDrop) {
+      this.inventory.add(drop.resource, drop.amount);
+      this.setLog(`${RESOURCE_LABELS[drop.resource]} eingesammelt.`);
+      return false;
+    }
+
+    this.setLog(message);
+    return true;
+  }
+
+  handleDropCollections(collections) {
+    for (const collection of collections) {
+      this.setLog(collection.message);
+      this.saveGame();
+    }
   }
 
   handleEnemyEvents(events) {
@@ -396,10 +436,10 @@ export class Game {
       this.setLog('Stein platziert.');
     }
 
-    if (activeItem === OBJECT_TYPES.workbench) {
-      this.tileMap.setWorkbench(placement.x, placement.y);
-      this.inventory.remove(OBJECT_TYPES.workbench, 1);
-      this.setLog('Werkbank platziert.');
+    if (PLACEABLE_OBJECT_ITEMS.has(activeItem)) {
+      this.tileMap.setObject(placement.x, placement.y, activeItem);
+      this.inventory.remove(activeItem, 1);
+      this.setLog(`${RESOURCE_LABELS[activeItem]} platziert.`);
     }
 
     if (activeItem === 'grassSeed') {
@@ -429,8 +469,8 @@ export class Game {
       };
     }
 
-    if (activeItem === OBJECT_TYPES.workbench) {
-      return this.getWorkbenchPlacementPreview(target, playerTile);
+    if (PLACEABLE_OBJECT_ITEMS.has(activeItem)) {
+      return this.getObjectPlacementPreview(activeItem, target, playerTile);
     }
 
     if (activeItem === 'grassSeed') {
@@ -492,11 +532,15 @@ export class Game {
   }
 
   getWorkbenchPlacementPreview(target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
-    if (this.inventory.get(OBJECT_TYPES.workbench) <= 0) {
+    return this.getObjectPlacementPreview(OBJECT_TYPES.workbench, target, playerTile);
+  }
+
+  getObjectPlacementPreview(resource, target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
+    if (this.inventory.get(resource) <= 0) {
       return {
         ...target,
         canPlace: false,
-        message: 'Nicht genug Werkbank.'
+        message: 'Nicht genug Material.'
       };
     }
 
@@ -512,7 +556,7 @@ export class Game {
       return {
         ...target,
         canPlace: false,
-        message: 'Werkbank braucht ein vorhandenes Tile.'
+        message: 'Hier kann das nicht platziert werden.'
       };
     }
 
@@ -535,7 +579,7 @@ export class Game {
     return {
       ...target,
       canPlace: true,
-      message: 'Werkbank kann platziert werden.'
+      message: `${RESOURCE_LABELS[resource]} kann platziert werden.`
     };
   }
 
@@ -769,6 +813,8 @@ export class Game {
     this.inventory = new ResourceInventory();
     this.crystalSystem = new CrystalSystem(this.inventory);
     this.craftingSystem = new CraftingSystem(this.inventory);
+    this.dropSystem = new DropSystem();
+    this.dayNightSystem = new DayNightSystem();
     this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
     this.activeHotbarSlot = 0;
     this.selectedInventoryResource = null;
@@ -780,6 +826,8 @@ export class Game {
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
     this.enemySystem.clear();
+    this.dropSystem.clear();
+    this.dayNightSystem.reset();
     this.attackFeedback = null;
     this.logSystem.reset('Speicherstand gelöscht. Neustart am Kristall.');
     this.crystalSystem.lastMessage = this.logSystem.latest();
@@ -820,6 +868,8 @@ export class Game {
     this.loadHotbarState(save);
     this.logSystem.load(save.logs);
     this.enemySystem.load(save.enemies, this.tileMap);
+    this.dropSystem.load(save.drops, this.tileMap);
+    this.dayNightSystem.load(save.dayNightTime);
 
     this.setLog('Speicherstand geladen.');
     this.saveStatus = 'loaded';
@@ -842,6 +892,8 @@ export class Game {
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
       enemies: this.enemySystem.toJSON(),
+      drops: this.dropSystem.toJSON(),
+      dayNightTime: this.dayNightSystem.toJSON(),
       logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
       activeHotbarSlot: this.activeHotbarSlot,
@@ -860,12 +912,14 @@ export class Game {
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderObjects(this.tileMap, this.camera);
+    this.renderSystem.renderDrops(this.dropSystem.drops, this.camera);
     this.renderSystem.renderEnemies(this.enemySystem.enemies, this.camera);
     if (!this.isGamePaused()) {
       this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
+    this.renderSystem.renderLighting(this.dayNightSystem, this.tileMap, this.camera, GAME_VIEW);
   }
 
   updateMenuButtonStates() {
@@ -908,7 +962,10 @@ export class Game {
       activeHotbarSlot: this.activeHotbarSlot,
       activeHotbarItem: this.getActiveHotbarItem(),
       attackState: this.attackFeedback?.type || 'none',
-      activeEnemies: this.enemySystem.activeCount()
+      activeEnemies: this.enemySystem.activeCount(),
+      dayNightTime: this.dayNightSystem.time,
+      dayNightPhase: this.dayNightSystem.getPhase(),
+      activeDrops: this.dropSystem.drops.length
     };
   }
 

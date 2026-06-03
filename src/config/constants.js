@@ -26,6 +26,10 @@ export const SPEAR_ATTACK_RANGE = TILE_SIZE * 1.75;
 export const SPEAR_ATTACK_DOT = 0.25;
 export const SPEAR_DAMAGE = 1;
 export const ATTACK_FEEDBACK_SECONDS = 0.18;
+export const DROP_PICKUP_DISTANCE = TILE_SIZE * 0.72;
+export const DROP_ANIMATION_SECONDS = 0.42;
+export const DAY_NIGHT_CYCLE_SECONDS = 120;
+export const DAY_NIGHT_START_TIME = 0.18;
 
 export const TILE_TYPES = {
   earth: 'earth',
@@ -35,7 +39,12 @@ export const TILE_TYPES = {
 };
 
 export const OBJECT_TYPES = {
-  workbench: 'workbench'
+  workbench: 'workbench',
+  torch: 'torch',
+  campfire: 'campfire',
+  woodWall: 'woodWall',
+  table: 'table',
+  chair: 'chair'
 };
 
 export const RESOURCE_LABELS = {
@@ -46,12 +55,17 @@ export const RESOURCE_LABELS = {
   grassSeed: 'Grassamen',
   workbench: 'Werkbank',
   woodenPickaxe: 'Holzspitzhacke',
-  woodenSpear: 'Holzspeer'
+  woodenSpear: 'Holzspeer',
+  torch: 'Fackel',
+  campfire: 'Lagerfeuer',
+  woodWall: 'Holzwand',
+  table: 'Tisch',
+  chair: 'Stuhl'
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 export const WORLD_RESOURCES = ['earth', 'stone'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'torch', 'campfire', 'woodWall', 'table', 'chair'];
 export const INVENTORY_RESOURCES = ['earth', 'stone', 'rawWood', 'fiber', 'grassSeed', ...TOOL_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
 export const DEFAULT_HOTBAR_SLOTS = ['earth', 'rawWood', 'fiber', 'grassSeed'];
@@ -64,7 +78,12 @@ export const RESOURCE_SHORT_LABELS = {
   grassSeed: 'GS',
   workbench: 'WB',
   woodenPickaxe: 'HP',
-  woodenSpear: 'HS'
+  woodenSpear: 'HS',
+  torch: 'TO',
+  campfire: 'CF',
+  woodWall: 'WW',
+  table: 'TA',
+  chair: 'CH'
 };
 
 export const RESOURCE_ICONS = {
@@ -75,7 +94,12 @@ export const RESOURCE_ICONS = {
   grassSeed: '**',
   workbench: '#',
   woodenPickaxe: '/\\',
-  woodenSpear: '-->'
+  woodenSpear: '-->',
+  torch: '!',
+  campfire: '^',
+  woodWall: '|#|',
+  table: 'T',
+  chair: 'h'
 };
 
 export const INVENTORY_TABS = [
@@ -94,7 +118,12 @@ export const RESOURCE_CATEGORIES = {
   grassSeed: ['seeds'],
   workbench: ['building'],
   woodenPickaxe: ['tools'],
-  woodenSpear: ['tools']
+  woodenSpear: ['tools'],
+  torch: ['building'],
+  campfire: ['building'],
+  woodWall: ['building'],
+  table: ['building'],
+  chair: ['building']
 };
 
 export const BASIC_RESOURCE_DROPS = [
@@ -125,6 +154,32 @@ export const WORKBENCH_RECIPE = {
   }
 };
 
+export const TORCH_RECIPE = {
+  id: 'torch',
+  name: 'Fackel',
+  result: 'torch',
+  resultAmount: 1,
+  craftingContext: 'normal',
+  requiresWorkbench: false,
+  costs: {
+    rawWood: 1,
+    fiber: 1
+  }
+};
+
+export const CAMPFIRE_RECIPE = {
+  id: 'campfire',
+  name: 'Lagerfeuer',
+  result: 'campfire',
+  resultAmount: 1,
+  craftingContext: 'normal',
+  requiresWorkbench: false,
+  costs: {
+    stone: 3,
+    rawWood: 2
+  }
+};
+
 export const WOODEN_PICKAXE_RECIPE = {
   id: 'woodenPickaxe',
   name: 'Holzspitzhacke',
@@ -151,8 +206,52 @@ export const WOODEN_SPEAR_RECIPE = {
   }
 };
 
+export const WOOD_WALL_RECIPE = {
+  id: 'woodWall',
+  name: 'Holzwand',
+  result: 'woodWall',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 3,
+    fiber: 1
+  }
+};
+
+export const TABLE_RECIPE = {
+  id: 'table',
+  name: 'Tisch',
+  result: 'table',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 6,
+    fiber: 2
+  }
+};
+
+export const CHAIR_RECIPE = {
+  id: 'chair',
+  name: 'Stuhl',
+  result: 'chair',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 4,
+    fiber: 1
+  }
+};
+
 export const CRAFTING_RECIPES = [
   WORKBENCH_RECIPE,
+  TORCH_RECIPE,
+  CAMPFIRE_RECIPE,
   WOODEN_PICKAXE_RECIPE,
-  WOODEN_SPEAR_RECIPE
+  WOODEN_SPEAR_RECIPE,
+  WOOD_WALL_RECIPE,
+  TABLE_RECIPE,
+  CHAIR_RECIPE
 ];

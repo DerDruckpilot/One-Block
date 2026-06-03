@@ -37,6 +37,14 @@ const game = new Game(canvas, hudElement, {
 });
 game.start();
 
+const preventGameTouchDefault = (event) => {
+  if (event.target?.closest?.('#inventory-panel, #crafting-panel')) return;
+  event.preventDefault();
+};
+
+document.addEventListener('touchstart', preventGameTouchDefault, { passive: false });
+document.addEventListener('touchmove', preventGameTouchDefault, { passive: false });
+
 updateOrientationState();
 window.addEventListener('resize', () => updateOrientationState());
 window.addEventListener('orientationchange', () => updateOrientationState());

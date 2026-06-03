@@ -138,6 +138,8 @@ body {
   scrollbar-color: #d7a762 #3a2418;
   line-height: 1.35;
   pointer-events: auto;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .menu-panel[hidden] {
