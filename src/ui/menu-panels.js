@@ -1,39 +1,51 @@
-import { INVENTORY_RESOURCES, RESOURCE_LABELS } from '../config/constants.js';
+import { INVENTORY_RESOURCES, RESOURCE_ICONS, RESOURCE_LABELS } from '../config/constants.js';
 
 export class MenuPanels {
   constructor({ inventoryPanel, craftingPanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
+    this.lastInventoryHtml = '';
+    this.lastCraftingHtml = '';
   }
 
-  update({ craftingOpen, inventory, inventoryOpen, recipeStates, hasWorkbenchAccess }) {
-    this.renderInventory(inventory, inventoryOpen);
+  update({ craftingOpen, inventory, inventoryOpen, recipeStates, hasWorkbenchAccess, selectedInventoryResource }) {
+    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource);
     this.renderCrafting(inventory, craftingOpen, recipeStates, hasWorkbenchAccess);
   }
 
-  renderInventory(inventory, isOpen) {
+  renderInventory(inventory, isOpen, selectedInventoryResource = null) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
 
     if (!isOpen) {
-      this.inventoryPanel.innerHTML = '';
+      this.setInventoryHtml('');
       return;
     }
 
     const rows = INVENTORY_RESOURCES
-      .filter((resource) => inventory.get(resource) > 0 || ['earth', 'rawWood', 'fiber', 'grassSeed'].includes(resource))
       .map((resource) => `
-        <div class="menu-row">
-          <span>${RESOURCE_LABELS[resource]}</span>
+        <button
+          class="menu-row inventory-item${selectedInventoryResource === resource ? ' is-selected' : ''}"
+          type="button"
+          data-inventory-resource="${resource}"
+          aria-pressed="${selectedInventoryResource === resource ? 'true' : 'false'}"
+        >
+          <span><span class="menu-icon">${RESOURCE_ICONS[resource]}</span> ${RESOURCE_LABELS[resource]}</span>
           <strong>${inventory.get(resource)}</strong>
-        </div>
+        </button>
       `)
       .join('');
 
-    this.inventoryPanel.innerHTML = `
+    const selectedText = selectedInventoryResource
+      ? `${RESOURCE_LABELS[selectedInventoryResource]} ausgewählt`
+      : 'Kein Item für Hotbar-Zuweisung ausgewählt';
+
+    this.setInventoryHtml(`
       <h2>Inventar</h2>
+      <div class="menu-note">Item anklicken, dann Hotbar-Slot anklicken.</div>
+      <div class="menu-note">${selectedText}</div>
       <div class="menu-list">${rows}</div>
-    `;
+    `);
   }
 
   renderCrafting(inventory, isOpen, recipeStates, hasWorkbenchAccess) {
@@ -41,7 +53,7 @@ export class MenuPanels {
     this.craftingPanel.hidden = !isOpen;
 
     if (!isOpen) {
-      this.craftingPanel.innerHTML = '';
+      this.setCraftingHtml('');
       return;
     }
 
@@ -50,11 +62,11 @@ export class MenuPanels {
       : 'Für weitere Rezepte nahe an eine Werkbank stellen';
     const recipes = recipeStates.map((recipeState) => this.renderRecipe(inventory, recipeState)).join('');
 
-    this.craftingPanel.innerHTML = `
+    this.setCraftingHtml(`
       <h2>Crafting</h2>
       <div class="menu-note">${accessText}</div>
       <div class="recipe-list">${recipes}</div>
-    `;
+    `);
   }
 
   renderRecipe(inventory, recipeState) {
@@ -87,5 +99,19 @@ export class MenuPanels {
         </button>
       </div>
     `;
+  }
+
+  setInventoryHtml(html) {
+    if (html !== this.lastInventoryHtml) {
+      this.inventoryPanel.innerHTML = html;
+      this.lastInventoryHtml = html;
+    }
+  }
+
+  setCraftingHtml(html) {
+    if (html !== this.lastCraftingHtml) {
+      this.craftingPanel.innerHTML = html;
+      this.lastCraftingHtml = html;
+    }
   }
 }

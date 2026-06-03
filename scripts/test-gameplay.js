@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 
 import {
   CRYSTAL_INTERACTION_DISTANCE,
+  DEFAULT_HOTBAR_SLOTS,
   GAME_VIEW,
+  HOTBAR_SLOT_COUNT,
+  PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
@@ -130,16 +133,6 @@ const map = new TileMap();
   });
   assert.equal(input.wasPressed('3'), true, 'keydown registers hotbar slot key');
   assert.equal(prevented, true, 'hotbar slot key default behavior is prevented');
-
-  prevented = false;
-  listeners.keydown({
-    key: '6',
-    preventDefault() {
-      prevented = true;
-    }
-  });
-  assert.equal(input.wasPressed('6'), true, 'keydown registers extended hotbar slot key');
-  assert.equal(prevented, true, 'extended hotbar slot key default behavior is prevented');
 
   prevented = false;
   listeners.keydown({
@@ -352,15 +345,20 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
-  assert.equal(game.activeHotbarResource, 'earth', 'earth is the default active hotbar item');
+  assert.deepEqual(game.hotbarSlots, DEFAULT_HOTBAR_SLOTS, 'new games start with the default four hotbar slots');
+  assert.equal(game.activeHotbarSlot, 0, 'first hotbar slot is active by default');
+  assert.equal(game.getActiveHotbarItem(), 'earth', 'earth is the default active hotbar item');
   game.input.pressedThisFrame.add('2');
   game.handleHotbarSelection();
-  assert.equal(game.activeHotbarResource, 'rawWood', 'number keys select hotbar slots');
+  assert.equal(game.activeHotbarSlot, 1, 'number keys select hotbar slots');
+  assert.equal(game.getActiveHotbarItem(), 'rawWood', 'active hotbar item follows the selected slot');
 
   game.selectHotbarResource('fiber');
-  assert.equal(game.activeHotbarResource, 'fiber', 'hotbar selection accepts known resources');
+  assert.equal(game.activeHotbarSlot, 2, 'selecting an assigned resource activates its slot');
+  game.hotbarSlots[2] = null;
+  assert.equal(game.getActiveHotbarItem(), null, 'hotbar slots may be empty');
   assert.equal(game.selectHotbarResource('unknown'), false, 'hotbar selection rejects unknown resources');
-  assert.equal(game.activeHotbarResource, 'fiber', 'invalid hotbar resource does not change selection');
+  assert.equal(game.activeHotbarSlot, 2, 'invalid hotbar resource does not change selection');
 }
 
 {
@@ -371,18 +369,22 @@ const map = new TileMap();
 
   hotbar.update({
     inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5 },
-    activeResource: 'rawWood'
+    activeSlot: 1,
+    slots: ['earth', 'rawWood', 'fiber', 'grassSeed']
   });
 
+  assert.equal((element.innerHTML.match(/data-hotbar-slot=/g) || []).length, HOTBAR_SLOT_COUNT, 'hotbar renders exactly four slots');
   assert.equal(element.innerHTML.includes('data-resource="earth"'), true, 'hotbar renders earth slot');
   assert.equal(element.innerHTML.includes('data-resource="rawWood"'), true, 'hotbar renders raw wood slot');
   assert.equal(element.innerHTML.includes('is-active'), true, 'hotbar marks the active slot');
 
   hotbar.update({
     inventory: { earth: 2, rawWood: 3, fiber: 4, grassSeed: 5, workbench: 1 },
-    activeResource: 'workbench'
+    activeSlot: 0,
+    slots: ['workbench', null, 'fiber', 'grassSeed']
   });
   assert.equal(element.innerHTML.includes('data-resource="workbench"'), true, 'hotbar shows workbench once available');
+  assert.equal(element.innerHTML.includes('is-empty'), true, 'hotbar can render empty assigned slots');
 }
 
 {
@@ -392,7 +394,7 @@ const map = new TileMap();
       if (type === 'pointerdown') pointerdown = callback;
     }
   };
-  let selectedResource = null;
+  let selectedSlot = null;
   const canvas = {
     width: 960,
     height: 540,
@@ -403,7 +405,7 @@ const map = new TileMap();
   };
   const hotbarSlot = createRectElement(
     { left: 100, top: 400, width: 80, height: 56 },
-    { dataset: { resource: 'grassSeed' } }
+    { dataset: { hotbarSlot: '3', resource: 'grassSeed' } }
   );
   const hitboxes = new PointerHitboxSystem({
     canvas,
@@ -411,8 +413,8 @@ const map = new TileMap();
       { left: 90, top: 390, width: 100, height: 76 },
       { querySelectorAll: () => [hotbarSlot] }
     ),
-    onHotbarSelect(resource) {
-      selectedResource = resource;
+    onHotbarSelect(slotIndex) {
+      selectedSlot = slotIndex;
     },
     pointerTarget
   });
@@ -424,9 +426,63 @@ const map = new TileMap();
   const event = createPointerEvent(120, 420);
   pointerdown(event);
 
-  assert.equal(selectedResource, 'grassSeed', 'hotbar slot can be selected by pointer hitbox');
+  assert.equal(selectedSlot, 3, 'hotbar slot can be selected by pointer hitbox');
   assert.equal(event.defaultPrevented, true, 'hotbar UI pointer event is consumed');
   assert.equal(event.propagationStopped, true, 'hotbar UI pointer event does not leak into gameplay');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+    }
+  };
+  const canvas = {
+    width: 960,
+    height: 540,
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 960, height: 540 };
+    }
+  };
+  const inventoryItem = createRectElement(
+    { left: 320, top: 150, width: 260, height: 32 },
+    { dataset: { inventoryResource: 'stone' } }
+  );
+  const inventoryPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelectorAll: () => [inventoryItem] }
+  );
+  const hotbarSlot = createRectElement(
+    { left: 420, top: 460, width: 80, height: 56 },
+    { dataset: { hotbarSlot: '1' } }
+  );
+
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game(
+    {
+      getContext: () => ({}),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 })
+    },
+    { innerHTML: '' },
+    {
+      hotbarElement: createRectElement(
+        { left: 410, top: 450, width: 100, height: 76 },
+        { querySelectorAll: () => [hotbarSlot] }
+      ),
+      inventoryPanel,
+      pointerTarget
+    }
+  );
+  game.inventoryOpen = true;
+
+  pointerdown(createPointerEvent(330, 160));
+  assert.equal(game.selectedInventoryResource, 'stone', 'inventory item click selects an item for hotbar assignment');
+
+  pointerdown(createPointerEvent(430, 470));
+  assert.equal(game.hotbarSlots[1], 'stone', 'clicking a hotbar slot assigns the selected inventory item');
+  assert.equal(game.activeHotbarSlot, 1, 'assigned hotbar slot becomes active');
 }
 
 {
@@ -502,6 +558,11 @@ const map = new TileMap();
     false,
     'wooden pickaxe recipe is unavailable without workbench access'
   );
+  assert.equal(
+    crafting.getRecipeStates({ hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenSpear').isAvailable,
+    false,
+    'wooden spear recipe is unavailable without workbench access'
+  );
 
   inventory.add('rawWood', 5);
   inventory.add('fiber', 2);
@@ -521,6 +582,21 @@ const map = new TileMap();
   assert.equal(inventory.get('fiber'), 0, 'wooden pickaxe crafting consumes fibers');
   assert.equal(inventory.get('woodenPickaxe'), 1, 'wooden pickaxe crafting adds the tool item');
   assert.equal(pickaxeResult.message, 'Holzspitzhacke hergestellt.', 'wooden pickaxe crafting returns a clear log message');
+
+  inventory.add('rawWood', 6);
+  inventory.add('fiber', 6);
+  const spearResult = crafting.craft('woodenSpear', { hasWorkbenchAccess: true });
+  assert.equal(spearResult.crafted, true, 'wooden spear can be crafted near a workbench');
+  assert.equal(inventory.get('rawWood'), 0, 'wooden spear crafting consumes raw wood');
+  assert.equal(inventory.get('fiber'), 0, 'wooden spear crafting consumes fibers');
+  assert.equal(inventory.get('woodenSpear'), 1, 'wooden spear crafting adds the tool item');
+  assert.equal(spearResult.message, 'Holzspeer hergestellt.', 'wooden spear crafting returns a clear log message');
+
+  inventory.add('rawWood', 12);
+  inventory.add('fiber', 12);
+  crafting.craft('woodenSpear', { hasWorkbenchAccess: true });
+  crafting.craft('woodenSpear', { hasWorkbenchAccess: true });
+  assert.equal(inventory.get('woodenSpear'), 3, 'workbench crafting can run repeatedly while resources are available');
 }
 
 {
@@ -542,14 +618,20 @@ const map = new TileMap();
     hasWorkbenchAccess: false,
     inventory,
     inventoryOpen: true,
-    recipeStates: crafting.getRecipeStates({ hasWorkbenchAccess: false })
+    recipeStates: crafting.getRecipeStates({ hasWorkbenchAccess: false }),
+    selectedInventoryResource: 'rawWood'
   });
 
   assert.equal(inventoryPanel.hidden, false, 'inventory panel opens');
   assert.equal(inventoryPanel.innerHTML.includes('Erde'), true, 'inventory panel lists base resources');
+  assert.equal(inventoryPanel.innerHTML.includes('Stein'), true, 'inventory panel lists stone resources');
+  assert.equal(inventoryPanel.innerHTML.includes('Holzspeer'), true, 'inventory panel lists tool items even at zero count');
+  assert.equal(inventoryPanel.innerHTML.includes('data-inventory-resource="rawWood"'), true, 'inventory panel exposes clickable item rows');
+  assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hotbar-Slot anklicken'), true, 'inventory panel explains hotbar assignment');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'crafting panel shows workbench-gated recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), true, 'crafting panel shows wooden spear recipe');
   assert.equal(craftingPanel.innerHTML.includes('Für weitere Rezepte nahe an eine Werkbank stellen'), true, 'crafting panel explains missing workbench access');
   assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
 }
@@ -654,6 +736,27 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  game.inventory.add('stone', 1);
+  game.selectHotbarResource('stone');
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.getPlacementPreview().canPlace, true, 'stone can be placed in front of the player');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'selected stone can be placed');
+  assert.equal(game.tileMap.getTile(2, 0), 'stone', 'placed stone becomes a world tile');
+  assert.equal(game.inventory.get('stone'), 0, 'placing stone consumes one stone resource');
+  assert.equal(game.tileMap.isGround(2, 0), true, 'stone tiles are walkable support');
+  assert.equal(game.tileMap.canPlaceWorkbench(2, 0, { x: 1, y: 0 }), true, 'stone tiles can accept placed objects');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein platziert.', 'successful stone placement writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   game.inventory.add('earth', 2);
   game.selectHotbarResource('rawWood');
   game.player.setPosition(
@@ -673,6 +776,15 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  game.hotbarSlots[0] = null;
+  assert.equal(game.tryPlaceSelectedItem(), false, 'empty active hotbar slot cannot place anything');
+  assert.equal(game.crystalSystem.lastMessage, 'Kein Item ausgewählt.', 'empty active slot writes a clear log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   game.inventory.add('workbench', 1);
   game.selectHotbarResource('workbench');
   game.player.setPosition(
@@ -685,7 +797,7 @@ const map = new TileMap();
   assert.equal(game.tryPlaceSelectedItem(), true, 'selected workbench can be placed');
   assert.equal(game.tileMap.getObject(1, 1), 'workbench', 'placed workbench becomes a world object');
   assert.equal(game.inventory.get('workbench'), 0, 'placing workbench consumes one workbench');
-  assert.equal(game.activeHotbarResource, 'earth', 'hotbar returns to earth after placing the last workbench');
+  assert.equal(game.getActiveHotbarItem(), 'workbench', 'placing a workbench keeps the selected hotbar slot stable');
   assert.equal(game.crystalSystem.lastMessage, 'Werkbank platziert.', 'successful workbench placement writes a clear log message');
   assert.equal(game.hasWorkbenchAccess(), true, 'placed workbench is functional when player stands nearby');
 }
@@ -765,6 +877,17 @@ const map = new TileMap();
 
   assert.equal(game.tryPlaceSelectedItem(), false, 'wooden pickaxe cannot be placed in this slice');
   assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'wooden pickaxe writes a non-placeable log message');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('woodenSpear', 1);
+  game.selectHotbarResource('woodenSpear');
+
+  assert.equal(game.tryPlaceSelectedItem(), false, 'wooden spear cannot be placed in this slice');
+  assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'wooden spear writes a non-placeable log message');
 }
 
 {
@@ -862,8 +985,10 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
   game.inventory.add('earth', 3);
+  game.inventory.add('stone', 2);
   game.inventory.add('workbench', 2);
   game.inventory.add('woodenPickaxe', 1);
+  game.inventory.add('woodenSpear', 1);
   game.inventory.add('grassSeed', 1);
   game.selectHotbarResource('earth');
   game.player.setPosition(
@@ -877,6 +1002,13 @@ const map = new TileMap();
   game.selectHotbarResource('grassSeed');
   game.player.facing = { x: 0, y: 1 };
   game.tryPlaceSelectedItem();
+  game.selectHotbarResource('stone');
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryPlaceSelectedItem();
 
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
@@ -886,17 +1018,23 @@ const map = new TileMap();
   assert.equal(game.saveStatus, 'saved', 'placing earth marks save status as saved');
   assert.equal(loadedGame.saveStatus, 'loaded', 'valid save marks save status as loaded');
   assert.equal(loadedGame.tileMap.getTile(2, 0), 'earth', 'saved placed earth loads as world tile');
+  assert.equal(loadedGame.tileMap.getTile(2, 1), 'stone', 'saved placed stone loads as world tile');
   assert.equal(loadedGame.inventory.get('earth'), 2, 'saved resources load from local storage');
+  assert.equal(loadedGame.inventory.get('stone'), 1, 'saved stone resources load from local storage');
   assert.equal(loadedGame.inventory.get('workbench'), 1, 'saved workbench item count loads from local storage');
   assert.equal(loadedGame.inventory.get('woodenPickaxe'), 1, 'saved wooden pickaxe item count loads from local storage');
+  assert.equal(loadedGame.inventory.get('woodenSpear'), 1, 'saved wooden spear item count loads from local storage');
   assert.equal(loadedGame.tileMap.getTile(1, 1), 'grass', 'saved grass tile loads from local storage');
   assert.equal(loadedGame.tileMap.getObject(2, 0), 'workbench', 'saved placed workbench loads as world object');
-  assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 0 }, 'saved player position loads from local storage');
+  assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 1 }, 'saved player position loads from local storage');
 
-  loadedGame.selectHotbarResource('fiber');
+  loadedGame.hotbarSlots = ['earth', 'stone', 'woodenPickaxe', null];
+  loadedGame.selectHotbarSlot(2);
   loadedGame.saveGame();
   const reloadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
-  assert.equal(reloadedGame.activeHotbarResource, 'fiber', 'active hotbar slot loads from local storage');
+  assert.deepEqual(reloadedGame.hotbarSlots, ['earth', 'stone', 'woodenPickaxe', null], 'hotbar assignments load from local storage');
+  assert.equal(reloadedGame.activeHotbarSlot, 2, 'active hotbar slot loads from local storage');
+  assert.equal(reloadedGame.getActiveHotbarItem(), 'woodenPickaxe', 'active hotbar item is restored from slot assignment');
 }
 
 {
@@ -918,10 +1056,15 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
 
   game.inventory.add('earth', 1);
+  game.inventory.add('stone', 1);
   game.inventory.add('workbench', 1);
   game.inventory.add('woodenPickaxe', 1);
+  game.inventory.add('woodenSpear', 1);
   game.tileMap.setWorkbench(1, 1);
   game.tileMap.setGrass(1, 0);
+  game.tileMap.setStone(2, 0);
+  game.hotbarSlots = ['stone', 'woodenPickaxe', null, 'woodenSpear'];
+  game.activeHotbarSlot = 3;
   game.saveGame();
   game.input.keys.add('r');
   game.update(1);
@@ -931,10 +1074,15 @@ const map = new TileMap();
 
   assert.equal(storage.getItem(SAVE_KEY), null, 'reset clears the saved game');
   assert.equal(game.inventory.get('earth'), 0, 'reset restores empty resources');
+  assert.equal(game.inventory.get('stone'), 0, 'reset clears stone resources');
   assert.equal(game.inventory.get('workbench'), 0, 'reset clears crafted workbench items');
   assert.equal(game.inventory.get('woodenPickaxe'), 0, 'reset clears crafted wooden pickaxes');
+  assert.equal(game.inventory.get('woodenSpear'), 0, 'reset clears crafted wooden spears');
   assert.equal(game.tileMap.getObject(1, 1), null, 'reset clears placed workbenches');
   assert.equal(game.tileMap.getTile(1, 0), 'earth', 'reset restores grass tiles back to the start island earth');
+  assert.equal(game.tileMap.getTile(2, 0), null, 'reset clears placed stone tiles outside the start island');
+  assert.deepEqual(game.hotbarSlots, DEFAULT_HOTBAR_SLOTS, 'reset restores default hotbar assignment');
+  assert.equal(game.activeHotbarSlot, 0, 'reset restores first active hotbar slot');
   assert.deepEqual(game.player.getTilePosition(), PLAYER_SPAWN_TILE, 'reset respawns beside the crystal');
   assert.equal(game.crystalSystem.lastMessage, 'Speicherstand gelöscht. Neustart am Kristall.', 'reset writes a clear log message');
 }
@@ -1017,6 +1165,10 @@ const map = new TileMap();
   assert.equal(chooseWeightedDrop(0.70).resource, 'fiber', 'fiber starts after raw wood weight');
   assert.equal(chooseWeightedDrop(0.89).resource, 'fiber', 'fiber covers the next 20 percent');
   assert.equal(chooseWeightedDrop(0.90).resource, 'grassSeed', 'grass seed covers the final 10 percent');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0).resource, 'stone', 'pickaxe crystal drops start with stone');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.44).resource, 'stone', 'stone covers the first 45 percent of pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.45).resource, 'earth', 'earth follows stone in pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.75).resource, 'rawWood', 'raw wood follows earth in pickaxe drops');
 
   const inventory = new ResourceInventory();
   const randomValues = [0.10, 0.55, 0.75, 0.95];
@@ -1034,6 +1186,20 @@ const map = new TileMap();
   assert.equal(inventory.get('rawWood'), 1, 'weighted crystal sequence can drop raw wood');
   assert.equal(inventory.get('fiber'), 1, 'weighted crystal sequence can drop fibers');
   assert.equal(inventory.get('grassSeed'), 1, 'weighted crystal sequence can drop grass seeds');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0.1;
+  game.inventory.add('woodenPickaxe', 1);
+  game.hotbarSlots[0] = 'woodenPickaxe';
+  game.activeHotbarSlot = 0;
+
+  game.tryUseCrystal();
+
+  assert.equal(game.inventory.get('stone'), 1, 'selected wooden pickaxe unlocks stone drops at the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'pickaxe crystal use writes a stone drop log');
 }
 
 console.log('Gameplay-Basics OK.');

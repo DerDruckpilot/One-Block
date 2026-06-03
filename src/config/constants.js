@@ -23,7 +23,8 @@ export const WORKBENCH_INTERACTION_DISTANCE = TILE_SIZE * 1.8;
 export const TILE_TYPES = {
   earth: 'earth',
   crystal: 'crystal',
-  grass: 'grass'
+  grass: 'grass',
+  stone: 'stone'
 };
 
 export const OBJECT_TYPES = {
@@ -32,34 +33,42 @@ export const OBJECT_TYPES = {
 
 export const RESOURCE_LABELS = {
   earth: 'Erde',
+  stone: 'Stein',
   rawWood: 'Rohholz',
   fiber: 'Fasern',
   grassSeed: 'Grassamen',
   workbench: 'Werkbank',
-  woodenPickaxe: 'Holzspitzhacke'
+  woodenPickaxe: 'Holzspitzhacke',
+  woodenSpear: 'Holzspeer'
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe'];
-export const HOTBAR_RESOURCES = [...BASE_RESOURCES, ...TOOL_RESOURCES];
-export const INVENTORY_RESOURCES = [...BASE_RESOURCES, ...TOOL_RESOURCES];
+export const WORLD_RESOURCES = ['earth', 'stone'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear'];
+export const INVENTORY_RESOURCES = ['earth', 'stone', 'rawWood', 'fiber', 'grassSeed', ...TOOL_RESOURCES];
+export const HOTBAR_SLOT_COUNT = 4;
+export const DEFAULT_HOTBAR_SLOTS = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 
 export const RESOURCE_SHORT_LABELS = {
   earth: 'ER',
+  stone: 'ST',
   rawWood: 'RH',
   fiber: 'FA',
   grassSeed: 'GS',
   workbench: 'WB',
-  woodenPickaxe: 'HP'
+  woodenPickaxe: 'HP',
+  woodenSpear: 'HS'
 };
 
 export const RESOURCE_ICONS = {
   earth: '[]',
+  stone: '##',
   rawWood: '||',
   fiber: '~~',
   grassSeed: '**',
   workbench: '#',
-  woodenPickaxe: '/\\'
+  woodenPickaxe: '/\\',
+  woodenSpear: '-->'
 };
 
 export const BASIC_RESOURCE_DROPS = [
@@ -67,6 +76,14 @@ export const BASIC_RESOURCE_DROPS = [
   { resource: 'rawWood', amount: 1, weight: 20 },
   { resource: 'fiber', amount: 1, weight: 20 },
   { resource: 'grassSeed', amount: 1, weight: 10 }
+];
+
+export const PICKAXE_RESOURCE_DROPS = [
+  { resource: 'stone', amount: 1, weight: 45 },
+  { resource: 'earth', amount: 1, weight: 30 },
+  { resource: 'rawWood', amount: 1, weight: 10 },
+  { resource: 'fiber', amount: 1, weight: 10 },
+  { resource: 'grassSeed', amount: 1, weight: 5 }
 ];
 
 export const WORKBENCH_RECIPE = {
@@ -93,7 +110,20 @@ export const WOODEN_PICKAXE_RECIPE = {
   }
 };
 
+export const WOODEN_SPEAR_RECIPE = {
+  id: 'woodenSpear',
+  name: 'Holzspeer',
+  result: 'woodenSpear',
+  resultAmount: 1,
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 6,
+    fiber: 6
+  }
+};
+
 export const CRAFTING_RECIPES = [
   WORKBENCH_RECIPE,
-  WOODEN_PICKAXE_RECIPE
+  WOODEN_PICKAXE_RECIPE,
+  WOODEN_SPEAR_RECIPE
 ];

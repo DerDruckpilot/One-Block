@@ -12,6 +12,7 @@ export class PointerHitboxSystem {
     onCraft = () => {},
     onCraftingToggle = () => {},
     onHotbarSelect = () => {},
+    onInventoryItemSelect = () => {},
     onInventoryToggle = () => {},
     pointerTarget = globalThis.window
   }) {
@@ -27,6 +28,7 @@ export class PointerHitboxSystem {
     this.onCraft = onCraft;
     this.onCraftingToggle = onCraftingToggle;
     this.onHotbarSelect = onHotbarSelect;
+    this.onInventoryItemSelect = onInventoryItemSelect;
     this.onInventoryToggle = onInventoryToggle;
     this.hitboxes = [];
 
@@ -111,6 +113,13 @@ export class PointerHitboxSystem {
     }
 
     if (this.getInventoryOpen()) {
+      for (const itemButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-resource]') || [])) {
+        const itemHitbox = this.createElementHitbox(itemButton, `inventory-${itemButton.dataset.inventoryResource}`, () => {
+          this.onInventoryItemSelect(itemButton.dataset.inventoryResource);
+        });
+        if (itemHitbox) hitboxes.push(itemHitbox);
+      }
+
       const panelHitbox = this.createElementHitbox(this.inventoryPanel, 'inventory-panel', () => {});
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
@@ -119,11 +128,11 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
-    return Array.from(this.hotbarElement?.querySelectorAll?.('[data-resource]') || [])
+    return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(
         element,
-        `hotbar-${element.dataset.resource}`,
-        () => this.onHotbarSelect(element.dataset.resource)
+        `hotbar-${element.dataset.hotbarSlot}`,
+        () => this.onHotbarSelect(Number(element.dataset.hotbarSlot))
       ))
       .filter(Boolean);
   }

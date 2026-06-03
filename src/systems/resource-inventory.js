@@ -2,11 +2,13 @@ export class ResourceInventory {
   constructor() {
     this.resources = {
       earth: 0,
+      stone: 0,
       rawWood: 0,
       fiber: 0,
       grassSeed: 0,
       workbench: 0,
-      woodenPickaxe: 0
+      woodenPickaxe: 0,
+      woodenSpear: 0
     };
   }
 

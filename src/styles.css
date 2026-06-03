@@ -105,6 +105,8 @@ body {
   left: 50%;
   transform: translateX(-50%);
   width: min(360px, calc(100vw - 24px));
+  max-height: min(430px, calc(100vh - 140px));
+  overflow: auto;
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 12px;
@@ -136,10 +138,33 @@ body {
 .menu-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 6px 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
+}
+
+button.menu-row {
+  width: 100%;
+  border: 1px solid transparent;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.menu-row.is-selected,
+button.menu-row:hover {
+  border-color: #ffe082;
+  background: rgba(255, 224, 130, 0.16);
+}
+
+.menu-icon {
+  display: inline-block;
+  min-width: 28px;
+  color: #d5b46a;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
 .menu-row.is-missing {
@@ -189,7 +214,7 @@ body {
   bottom: max(48px, calc(env(safe-area-inset-bottom) + 48px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(6, 78px);
+  grid-template-columns: repeat(4, 78px);
   gap: 8px;
   padding: 8px;
   border: 1px solid var(--ui-border);
@@ -220,6 +245,10 @@ body {
 .hotbar-slot.is-active {
   border-color: #ffe082;
   box-shadow: 0 0 0 2px rgba(255, 224, 130, 0.25), inset 0 0 18px rgba(255, 224, 130, 0.16);
+}
+
+.hotbar-slot.is-empty {
+  opacity: 0.72;
 }
 
 .hotbar-key {
@@ -275,7 +304,7 @@ body {
   }
 
   #hotbar {
-    grid-template-columns: repeat(6, 52px);
+    grid-template-columns: repeat(4, 52px);
     gap: 6px;
   }
 
