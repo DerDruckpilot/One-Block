@@ -1,4 +1,7 @@
 import {
+  BARRIER_COLLISION_THICKNESS,
+  CONNECTABLE_BARRIER_GROUPS,
+  CONNECTABLE_BARRIER_TYPES,
   FLYING_ENTITY_BLOCKING_OBJECTS,
   GROUND_ENTITY_BLOCKING_OBJECTS,
   OBJECT_TYPES,
@@ -9,6 +12,15 @@ import {
 
 const keyOf = (x, y) => `${x},${y}`;
 const PLACEABLE_OBJECTS = new Set(Object.values(OBJECT_TYPES));
+const CONNECTABLE_BARRIERS = new Set(CONNECTABLE_BARRIER_TYPES);
+const HALF_TILE = TILE_SIZE / 2;
+
+const CONNECTION_DIRECTIONS = [
+  { name: 'up', x: 0, y: -1 },
+  { name: 'down', x: 0, y: 1 },
+  { name: 'left', x: -1, y: 0 },
+  { name: 'right', x: 1, y: 0 }
+];
 
 export class TileMap {
   constructor() {
@@ -274,8 +286,7 @@ export class TileMap {
   }
 
   isBlockingObjectAtWorld(x, y) {
-    const tile = this.worldToTile(x, y);
-    return this.isBlockedForPlayer(tile.x, tile.y);
+    return this.isBlockedForPlayerAtWorld(x, y);
   }
 
   isBlockedForPlayer(x, y) {
@@ -290,12 +301,107 @@ export class TileMap {
     return this.isObjectBlocking(x, y, FLYING_ENTITY_BLOCKING_OBJECTS);
   }
 
+  isBlockedForPlayerAtWorld(x, y) {
+    return this.isObjectBlockingAtWorld(x, y, PLAYER_BLOCKING_OBJECTS);
+  }
+
+  isBlockedForGroundEntityAtWorld(x, y) {
+    return this.isObjectBlockingAtWorld(x, y, GROUND_ENTITY_BLOCKING_OBJECTS);
+  }
+
+  isBlockedForFlyingEntityAtWorld(x, y) {
+    return this.isObjectBlockingAtWorld(x, y, FLYING_ENTITY_BLOCKING_OBJECTS);
+  }
+
   isObjectBlocking(x, y, blockingTypes) {
     const object = this.getObject(x, y);
     if (!object || !blockingTypes.includes(object)) return false;
     if (object === OBJECT_TYPES.gate && this.isGateOpen(x, y)) return false;
     // Campfires stay walkable in this slice so mobile movement does not snag on tiny light props.
     return true;
+  }
+
+  isObjectBlockingAtWorld(worldX, worldY, blockingTypes) {
+    const tile = this.worldToTile(worldX, worldY);
+    const object = this.getObject(tile.x, tile.y);
+    if (!object || !blockingTypes.includes(object)) return false;
+    if (object === OBJECT_TYPES.gate && this.isGateOpen(tile.x, tile.y)) return false;
+    if (CONNECTABLE_BARRIERS.has(object)) {
+      return this.isPointBlockedByBarrier(worldX, worldY, tile.x, tile.y);
+    }
+    return true;
+  }
+
+  isPointBlockedByBarrier(worldX, worldY, tileX, tileY) {
+    const shape = this.getBarrierCollisionShape(tileX, tileY);
+    const localX = worldX - tileX * TILE_SIZE;
+    const localY = worldY - tileY * TILE_SIZE;
+    const halfThickness = shape.thickness / 2;
+
+    const onVertical = shape.vertical &&
+      localX >= HALF_TILE - halfThickness &&
+      localX <= HALF_TILE + halfThickness;
+    const onHorizontal = shape.horizontal &&
+      localY >= HALF_TILE - halfThickness &&
+      localY <= HALF_TILE + halfThickness;
+    const onPost = shape.post &&
+      localX >= HALF_TILE - halfThickness &&
+      localX <= HALF_TILE + halfThickness &&
+      localY >= HALF_TILE - halfThickness &&
+      localY <= HALF_TILE + halfThickness;
+
+    return onVertical || onHorizontal || onPost;
+  }
+
+  getBarrierCollisionShape(x, y) {
+    const connections = this.getConnectableConnections(x, y);
+    const horizontal = connections.left || connections.right;
+    const vertical = connections.up || connections.down;
+    return {
+      horizontal,
+      vertical,
+      post: !horizontal && !vertical,
+      thickness: BARRIER_COLLISION_THICKNESS,
+      variant: this.getConnectableVariant(x, y),
+      connections
+    };
+  }
+
+  getConnectableConnections(x, y) {
+    const type = this.getObject(x, y);
+    const connections = { up: false, down: false, left: false, right: false };
+    if (!CONNECTABLE_BARRIERS.has(type)) return connections;
+
+    for (const direction of CONNECTION_DIRECTIONS) {
+      connections[direction.name] = this.canConnectObjects(
+        type,
+        this.getObject(x + direction.x, y + direction.y)
+      );
+    }
+    return connections;
+  }
+
+  canConnectObjects(type, neighborType) {
+    if (!CONNECTABLE_BARRIERS.has(type) || !CONNECTABLE_BARRIERS.has(neighborType)) return false;
+    return Object.values(CONNECTABLE_BARRIER_GROUPS)
+      .some((group) => group.includes(type) && group.includes(neighborType));
+  }
+
+  getConnectableVariant(x, y) {
+    const connections = this.getConnectableConnections(x, y);
+    const connected = Object.entries(connections)
+      .filter(([, value]) => value)
+      .map(([name]) => name);
+
+    if (connected.length === 0) return 'single';
+    if (connected.length === 4) return 'cross';
+    if (connected.length === 3) return `t-${['up', 'right', 'down', 'left'].filter((name) => !connections[name])[0]}`;
+    if (connected.length === 2) {
+      if (connections.left && connections.right) return 'horizontal';
+      if (connections.up && connections.down) return 'vertical';
+      return `corner-${connected.join('-')}`;
+    }
+    return `end-${connected[0]}`;
   }
 
   isGateOpen(x, y) {

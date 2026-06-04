@@ -118,8 +118,7 @@ export class FlyingEnemy {
   }
 
   isBlockedAt(x, y, tileMap) {
-    const tile = tileMap.getTileAtWorldPosition(x, y);
-    return tileMap.isBlockedForFlyingEntity(tile.x, tile.y);
+    return tileMap.isBlockedForFlyingEntityAtWorld(x, y);
   }
 
   clampNearWorld(tileMap) {

@@ -308,6 +308,10 @@ export class Game {
   tryContextAction() {
     if (this.isGamePaused()) return false;
 
+    if (this.tryToggleGate()) {
+      return true;
+    }
+
     if (this.removeMode) {
       return this.tryRemoveTarget();
     }
@@ -317,11 +321,7 @@ export class Game {
       return this.tryPlaceSelectedItem();
     }
 
-    if (this.tryUseLasso()) {
-      return true;
-    }
-
-    if (this.tryToggleGate()) {
+    if (this.tryUseLasso({ requireActive: true })) {
       return true;
     }
 
@@ -542,7 +542,12 @@ export class Game {
   spawnEnemyLoot(tile, enemy) {
     const center = enemy?.getCenterPosition?.() || this.tileMap.getCrystalCenter();
     if (tile) {
-      this.dropSystem.spawnAtTile({ resource: 'stone', amount: 1 }, tile);
+      this.dropSystem.spawnNearWorld(
+        { resource: 'stone', amount: 1 },
+        this.tileMap,
+        tile.x * TILE_SIZE + TILE_SIZE / 2,
+        tile.y * TILE_SIZE + TILE_SIZE / 2
+      );
       return;
     }
     this.dropSystem.spawnNearWorld({ resource: 'stone', amount: 1 }, this.tileMap, center.x, center.y);
@@ -959,8 +964,10 @@ export class Game {
     const result = this.plantSystem.fellTree(this.tileMap, target.x, target.y);
     this.setLog(result.message);
     if (result.harvested) {
-      this.dropSystem.spawnAtTile({ resource: 'rawWood', amount: 1 }, target);
-      this.dropSystem.spawnAtTile({ resource: 'rawWood', amount: 1 }, target);
+      const centerX = target.x * TILE_SIZE + TILE_SIZE / 2;
+      const centerY = target.y * TILE_SIZE + TILE_SIZE / 2;
+      this.dropSystem.spawnNearWorld({ resource: 'rawWood', amount: this.randomIntInclusive(4, 8) }, this.tileMap, centerX, centerY);
+      this.dropSystem.spawnNearWorld({ resource: 'treeSeed', amount: this.randomIntInclusive(1, 3) }, this.tileMap, centerX, centerY);
       this.saveGame();
     }
     return true;
@@ -978,7 +985,12 @@ export class Game {
     const result = this.plantSystem.harvestGrass(this.tileMap, target.x, target.y);
     this.setLog(result.message);
     if (result.harvested) {
-      this.dropSystem.spawnAtTile({ resource: 'fiber', amount: 1 }, target);
+      this.dropSystem.spawnNearWorld(
+        { resource: 'fiber', amount: 1 },
+        this.tileMap,
+        target.x * TILE_SIZE + TILE_SIZE / 2,
+        target.y * TILE_SIZE + TILE_SIZE / 2
+      );
       this.saveGame();
     }
     return true;
@@ -991,25 +1003,36 @@ export class Game {
     const result = this.plantSystem.harvestBerryBush(target.x, target.y, this.tileMap);
     this.setLog(result.message);
     if (result.harvested) {
-      this.inventory.add('berry', 1);
+      this.dropSystem.spawnNearWorld(
+        { resource: 'berry', amount: 1 },
+        this.tileMap,
+        target.x * TILE_SIZE + TILE_SIZE / 2,
+        target.y * TILE_SIZE + TILE_SIZE / 2
+      );
       this.saveGame();
     }
     return true;
   }
 
   tryUseLasso({ requireActive = false } = {}) {
-    if (this.inventory.get('lasso') <= 0) return false;
     const activeItem = this.getActiveHotbarItem();
+    if (activeItem !== 'lasso') return false;
+    if (this.inventory.get('lasso') <= 0) {
+      if (requireActive) {
+        this.setLog('Kein Lasso.');
+        return true;
+      }
+      return false;
+    }
     const hasTethered = Boolean(this.animalSystem.getTetheredAnimal());
     const hasNearbyChicken = Boolean(this.animalSystem.findNearestChicken(this.player, LASSO_INTERACTION_DISTANCE));
     if (!hasTethered && !hasNearbyChicken) {
-      if (activeItem === 'lasso' || requireActive) {
+      if (requireActive) {
         this.setLog('Kein Tier in Reichweite.');
         return true;
       }
       return false;
     }
-    if (hasTethered && activeItem !== 'lasso' && !requireActive) return false;
 
     const result = this.animalSystem.tetherChicken(this.player, LASSO_INTERACTION_DISTANCE);
     this.setLog(result.message);
@@ -1060,6 +1083,10 @@ export class Game {
       this.saveGame();
     }
     return spawn.spawned;
+  }
+
+  randomIntInclusive(min, max) {
+    return min + Math.floor(this.crystalSystem.random() * (max - min + 1));
   }
 
   handleVoidFall() {
@@ -1420,6 +1447,7 @@ export class Game {
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
+    this.renderSystem.renderForegroundObjects(this.tileMap, this.camera);
     this.renderSystem.renderLighting(this.dayNightSystem, this.tileMap, this.camera, GAME_VIEW);
   }
 

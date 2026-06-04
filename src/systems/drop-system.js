@@ -18,16 +18,17 @@ const VALID_DROP_RESOURCES = new Set([
 ]);
 
 export class DropSystem {
-  constructor() {
+  constructor(random = Math.random) {
     this.drops = [];
     this.nextId = 1;
+    this.random = random;
   }
 
   spawnFromCrystal(drop, tileMap) {
-    const targetTile = this.findDropTile(tileMap);
+    const crystal = tileMap.getCrystalCenter();
+    const targetTile = this.findDropTileNearWorld(tileMap, crystal.x, crystal.y);
     if (!targetTile) return null;
 
-    const crystal = tileMap.getCrystalCenter();
     return this.spawn({
       resource: drop.resource,
       amount: drop.amount,
@@ -53,11 +54,7 @@ export class DropSystem {
   }
 
   spawnNearWorld(drop, tileMap, x, y) {
-    const tile = tileMap.getTileAtWorldPosition(x, y);
-    if (this.canHoldDrop(tileMap, tile.x, tile.y)) {
-      return this.spawnAtTile(drop, tile);
-    }
-    const fallback = this.findNearestDropTile(tileMap, x, y);
+    const fallback = this.findDropTileNearWorld(tileMap, x, y);
     return fallback ? this.spawnAtTile(drop, fallback) : null;
   }
 
@@ -105,27 +102,25 @@ export class DropSystem {
   }
 
   findDropTile(tileMap) {
-    const preferred = [
-      { x: 1, y: 0 },
-      { x: -1, y: 0 },
-      { x: 0, y: 1 },
-      { x: 0, y: -1 },
-      { x: 1, y: 1 },
-      { x: -1, y: 1 },
-      { x: 1, y: -1 },
-      { x: -1, y: -1 }
-    ];
+    const crystal = tileMap.getCrystalCenter();
+    return this.findDropTileNearWorld(tileMap, crystal.x, crystal.y);
+  }
 
-    const tile = preferred.find((candidate) => this.canHoldDrop(tileMap, candidate.x, candidate.y));
-    if (tile) return tile;
-
-    let fallback = null;
-    tileMap.forEachTile((candidate) => {
-      if (!fallback && this.canHoldDrop(tileMap, candidate.x, candidate.y)) {
-        fallback = { x: candidate.x, y: candidate.y };
+  findDropTileNearWorld(tileMap, x, y, radius = 2) {
+    const origin = tileMap.getTileAtWorldPosition(x, y);
+    const candidates = [];
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const candidate = { x: origin.x + dx, y: origin.y + dy };
+        if (this.canHoldDrop(tileMap, candidate.x, candidate.y)) {
+          candidates.push(candidate);
+        }
       }
-    });
-    return fallback;
+    }
+    if (candidates.length > 0) {
+      return this.pickRandomTile(candidates);
+    }
+    return this.findNearestDropTile(tileMap, x, y);
   }
 
   findNearestDropTile(tileMap, x, y) {
@@ -144,8 +139,15 @@ export class DropSystem {
     return fallback;
   }
 
+  pickRandomTile(tiles) {
+    return tiles[Math.floor(this.random() * tiles.length)] || tiles[0] || null;
+  }
+
   canHoldDrop(tileMap, x, y) {
-    return tileMap.isGround(x, y) && !tileMap.isCrystal(x, y) && !tileMap.getObject(x, y);
+    return tileMap.isGround(x, y) &&
+      !tileMap.isCrystal(x, y) &&
+      !tileMap.getObject(x, y) &&
+      !tileMap.isBlockedForGroundEntity(x, y);
   }
 
   load(drops, tileMap) {

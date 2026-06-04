@@ -117,7 +117,7 @@ export class Animal {
     const tile = tileMap.getTileAtWorldPosition(foot.x, foot.y);
     return tileMap.isGround(tile.x, tile.y) &&
       !tileMap.isCrystal(tile.x, tile.y) &&
-      !tileMap.isBlockedForGroundEntity(tile.x, tile.y);
+      !tileMap.isBlockedForGroundEntityAtWorld(foot.x, foot.y);
   }
 
   findNearestFollowTile(tileMap, player) {
@@ -132,7 +132,10 @@ export class Animal {
     return candidates.find((tile) => (
       tileMap.isGround(tile.x, tile.y) &&
       !tileMap.isCrystal(tile.x, tile.y) &&
-      !tileMap.isBlockedForGroundEntity(tile.x, tile.y)
+      !tileMap.isBlockedForGroundEntityAtWorld(
+        tile.x * TILE_SIZE + TILE_SIZE / 2,
+        tile.y * TILE_SIZE + TILE_SIZE / 2
+      )
     )) || null;
   }
 

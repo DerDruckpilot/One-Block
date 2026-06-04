@@ -73,6 +73,18 @@ export const OBJECT_TYPES = {
   berryBush: 'berryBush'
 };
 
+export const CONNECTABLE_BARRIER_GROUPS = {
+  wall: [OBJECT_TYPES.woodWall],
+  fence: [OBJECT_TYPES.fence, OBJECT_TYPES.gate]
+};
+
+export const CONNECTABLE_BARRIER_TYPES = [
+  ...CONNECTABLE_BARRIER_GROUPS.wall,
+  ...CONNECTABLE_BARRIER_GROUPS.fence
+];
+
+export const BARRIER_COLLISION_THICKNESS = 8;
+
 export const PLAYER_BLOCKING_OBJECTS = [
   OBJECT_TYPES.workbench,
   OBJECT_TYPES.table,
