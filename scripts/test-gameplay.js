@@ -7,11 +7,14 @@ import {
   DEFAULT_HOTBAR_SLOTS,
   GAME_VIEW,
   HOTBAR_SLOT_COUNT,
+  BOW_RANGE,
+  FLYING_ENEMY_MAX_TILE_DISTANCE,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   RESOURCE_LABELS,
+  SLINGSHOT_RANGE,
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
@@ -2236,6 +2239,351 @@ const map = new TileMap();
   assert.equal(game.dropSystem.drops[0].resource, 'stone', 'wooden pickaxe attack unlocks stone drops at the crystal');
   assert.equal(game.crystalSystem.lastMessage, 'Stein splittert heraus.', 'pickaxe attack writes the visible drop log');
   assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'pickaxe attack logs the crystal hit feedback');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  const spawn = game.animalSystem.spawn(game.tileMap);
+  assert.equal(spawn.spawned, true, 'passive animal can spawn on the start island');
+  const foot = spawn.animal.getFootPosition();
+  const tile = game.tileMap.getTileAtWorldPosition(foot.x, foot.y);
+  assert.equal(game.tileMap.isGround(tile.x, tile.y), true, 'passive animal spawns on a valid ground tile');
+  assert.equal(game.tileMap.isCrystal(tile.x, tile.y), false, 'passive animal does not spawn on the crystal');
+}
+
+{
+  const { Animal } = await import('../src/entities/animal.js');
+  const animal = Animal.fromTile({ x: 1, y: 1 });
+  animal.direction = { x: 1, y: 0 };
+  animal.decisionSeconds = 10;
+  animal.update(4, map, () => 0);
+  const tile = map.getTileAtWorldPosition(animal.getFootPosition().x, animal.getFootPosition().y);
+
+  assert.notEqual(tile.x, 2, 'passive animal does not voluntarily walk into void');
+  assert.equal(map.isPlayerSupported({ getFootPosition: () => animal.getFootPosition() }), true, 'passive animal remains supported by tile logic');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.animalSystem.spawn(game.tileMap);
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.animalSystem.activeCount(), 1, 'passive animals save and load');
+
+  loadedGame.input.keys.add('r');
+  loadedGame.update(2.1);
+  assert.equal(loadedGame.animalSystem.activeCount(), 0, 'reset removes passive animals');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+
+  inventory.add('rawWood', 4);
+  inventory.add('fiber', 6);
+  inventory.add('stone', 2);
+  assert.equal(crafting.craft('slingshot', { hasWorkbenchAccess: true }).crafted, true, 'slingshot can be crafted at workbench');
+  assert.equal(inventory.get('slingshot'), 1, 'slingshot crafting adds weapon item');
+
+  inventory.add('rawWood', 8);
+  inventory.add('fiber', 8);
+  assert.equal(crafting.craft('bow', { hasWorkbenchAccess: true }).crafted, true, 'bow can be crafted at workbench');
+  assert.equal(inventory.get('bow'), 1, 'bow crafting adds weapon item');
+
+  inventory.add('rawWood', 1);
+  inventory.add('stone', 1);
+  assert.equal(crafting.craft('arrow').crafted, true, 'arrows can be crafted in normal crafting');
+  assert.equal(inventory.get('arrow'), 4, 'arrow recipe creates four arrows');
+
+  inventory.add('stone', 1);
+  assert.equal(crafting.craft('stoneBall').crafted, true, 'stone balls can be crafted in normal crafting');
+  assert.equal(inventory.get('stoneBall'), 4, 'stone ball recipe creates four stone balls');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.inventory.add('slingshot', 1);
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 7);
+  game.inventory.add('stoneBall', 5);
+  game.hotbarSlots = ['slingshot', 'bow', 'arrow', 'stoneBall'];
+  game.activeHotbarSlot = 1;
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.inventory.get('slingshot'), 1, 'saved slingshot loads from storage');
+  assert.equal(loadedGame.inventory.get('bow'), 1, 'saved bow loads from storage');
+  assert.equal(loadedGame.inventory.get('arrow'), 7, 'saved arrows load from storage');
+  assert.equal(loadedGame.inventory.get('stoneBall'), 5, 'saved stone balls load from storage');
+  assert.deepEqual(loadedGame.hotbarSlots, ['slingshot', 'bow', 'arrow', 'stoneBall'], 'new items can be assigned to the four-slot hotbar');
+  assert.equal(loadedGame.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar remains capped at four slots with new items');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('slingshot', 1);
+  game.selectHotbarResource('slingshot');
+  game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
+
+  assert.equal(game.tryAttackAction(), false, 'slingshot does not shoot without stone balls');
+  assert.equal(game.crystalSystem.lastMessage, 'Keine Steinkugeln.', 'slingshot without ammo writes a clear log');
+
+  game.inventory.add('stoneBall', 2);
+  assert.equal(game.tryAttackAction(), true, 'slingshot shoots with stone balls');
+  assert.equal(game.inventory.get('stoneBall'), 1, 'slingshot consumes one stone ball per shot');
+  assert.equal(game.projectileSystem.projectiles[0].range, SLINGSHOT_RANGE, 'slingshot projectile uses two tile range');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('bow', 1);
+  game.selectHotbarResource('bow');
+  game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
+
+  assert.equal(game.tryAttackAction(), false, 'bow does not shoot without arrows');
+  assert.equal(game.crystalSystem.lastMessage, 'Keine Pfeile.', 'bow without ammo writes a clear log');
+
+  game.inventory.add('arrow', 2);
+  assert.equal(game.tryAttackAction(), true, 'bow shoots with arrows');
+  assert.equal(game.inventory.get('arrow'), 1, 'bow consumes one arrow per shot');
+  assert.equal(game.projectileSystem.projectiles[0].range, BOW_RANGE, 'bow projectile uses four tile range');
+}
+
+{
+  const { ProjectileSystem } = await import('../src/systems/projectile-system.js');
+  const projectileSystem = new ProjectileSystem();
+  projectileSystem.spawn({ type: 'stoneBall', x: 0, y: 0, direction: { x: 1, y: 0 } });
+  projectileSystem.update(1, { enemies: [] }, { enemies: [] });
+  assert.equal(projectileSystem.activeCount(), 0, 'slingshot projectile disappears after range is exceeded');
+
+  projectileSystem.spawn({ type: 'arrow', x: 0, y: 0, direction: { x: 1, y: 0 } });
+  projectileSystem.update(1, { enemies: [] }, { enemies: [] });
+  assert.equal(projectileSystem.activeCount(), 0, 'bow projectile disappears after range is exceeded');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  for (let x = 2; x <= 7; x += 1) game.tileMap.setEarth(x, 0);
+  const enemy = Enemy.fromTile({ x: 7, y: 0 });
+  game.enemySystem.enemies.push(enemy);
+  game.inventory.add('slingshot', 1);
+  game.inventory.add('stoneBall', 1);
+  game.selectHotbarResource('slingshot');
+  game.player.setPosition(
+    5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryAttackAction();
+  game.update(0.25);
+
+  assert.equal(enemy.hp, 3, 'slingshot projectile deals one damage to ground enemy');
+  assert.equal(enemy.healthVisible, true, 'projectile hit reveals ground enemy health bar');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  for (let x = 2; x <= 8; x += 1) game.tileMap.setEarth(x, 0);
+  const enemy = Enemy.fromTile({ x: 8, y: 0 });
+  game.enemySystem.enemies.push(enemy);
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 1);
+  game.selectHotbarResource('bow');
+  game.player.setPosition(
+    5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryAttackAction();
+  game.update(0.35);
+
+  assert.equal(enemy.hp, 2, 'bow projectile deals two damage to ground enemy');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const { FlyingEnemy } = await import('../src/entities/flying-enemy.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  for (let x = 2; x <= 8; x += 1) game.tileMap.setEarth(x, 0);
+  const flying = new FlyingEnemy({ x: 8 * TILE_SIZE, y: 0 });
+  game.flyingEnemySystem.enemies.push(flying);
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 1);
+  game.selectHotbarResource('bow');
+  game.player.setPosition(
+    5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryAttackAction();
+  game.update(0.35);
+
+  assert.equal(flying.hp, 1, 'bow projectile deals two damage to flying enemy');
+  assert.equal(flying.healthVisible, true, 'projectile hit reveals flying enemy health bar');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('slingshot', 1);
+  game.inventory.add('stoneBall', 1);
+  game.selectHotbarResource('slingshot');
+
+  assert.equal(game.tryAttackAction(), true, 'slingshot attack at crystal starts flying encounter');
+  assert.equal(game.flyingEnemySystem.activeCount(), 1, 'crystal ranged encounter spawns one flying enemy');
+  assert.equal(game.tryAttackAction(), false, 'ranged crystal encounter does not spam flying enemies');
+  assert.equal(game.crystalSystem.lastMessage, 'Es ist bereits eine Kreatur da.', 'existing flying encounter writes no-spam log');
+}
+
+{
+  const { FlyingEnemy } = await import('../src/entities/flying-enemy.js');
+  const flying = new FlyingEnemy({ x: 12 * TILE_SIZE, y: 12 * TILE_SIZE });
+  flying.update(0.1, map, createSpawnedPlayer());
+  const nearest = flying.findNearestGroundCenter(map);
+  const center = flying.getCenterPosition();
+  assert.ok(
+    Math.hypot(center.x - nearest.x, center.y - nearest.y) <= FLYING_ENEMY_MAX_TILE_DISTANCE * TILE_SIZE + 0.01,
+    'flying enemy stays within three tiles of the built world'
+  );
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.flyingEnemySystem.spawnNearCrystal(game.tileMap);
+  game.flyingEnemySystem.enemies[0].hp = 2;
+  game.flyingEnemySystem.enemies[0].healthVisible = true;
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  assert.equal(loadedGame.flyingEnemySystem.activeCount(), 1, 'flying enemies save and load');
+  assert.equal(loadedGame.flyingEnemySystem.enemies[0].hp, 2, 'flying enemy hit points load');
+  assert.equal(loadedGame.flyingEnemySystem.enemies[0].healthVisible, true, 'flying enemy health visibility loads');
+  loadedGame.flyingEnemySystem.enemies[0].x = 1000;
+  loadedGame.flyingEnemySystem.enemies[0].y = 1000;
+  loadedGame.flyingEnemySystem.update(0.1, loadedGame.tileMap, loadedGame.player);
+  assert.equal(loadedGame.flyingEnemySystem.activeCount(), 1, 'flying enemy does not fall into void');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  for (let x = 2; x <= 5; x += 1) game.tileMap.setEarth(x, 0);
+  const enemy = Enemy.fromTile({ x: 5, y: 0 });
+  game.enemySystem.enemies.push(enemy);
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 2);
+  game.selectHotbarResource('bow');
+  game.player.setPosition(
+    2 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.tryAttackAction();
+  game.update(0.35);
+  game.tryAttackAction();
+  game.update(0.35);
+
+  assert.equal(game.enemySystem.activeCount(), 0, 'projectiles can defeat ground enemies');
+  assert.ok(game.dropSystem.drops.length > 0, 'defeated ground enemy creates a safe visible loot drop');
+  const dropTile = game.tileMap.getTileAtWorldPosition(game.dropSystem.drops[0].x, game.dropSystem.drops[0].y);
+  assert.equal(game.tileMap.isGround(dropTile.x, dropTile.y), true, 'enemy loot lands on a valid tile');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('earth', 1);
+  game.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  game.input.pressedThisFrame.add('e');
+  game.update(0.016);
+  assert.equal(game.tileMap.getTile(2, 0), 'earth', 'E key uses the same context action to place selected items');
+
+  const gameWithWorkbench = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  gameWithWorkbench.tileMap.setWorkbench(1, 1);
+  gameWithWorkbench.input.pressedThisFrame.add(' ');
+  gameWithWorkbench.update(0.016);
+  assert.equal(gameWithWorkbench.craftingOpen, true, 'Space key opens workbench crafting through context action');
+  assert.equal(gameWithWorkbench.craftingContext, 'workbench', 'Space key opens workbench context when near workbench');
+
+  const gameWithCrystal = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  gameWithCrystal.input.pressedThisFrame.add('e');
+  gameWithCrystal.update(0.016);
+  assert.equal(gameWithCrystal.dropSystem.drops.length, 1, 'E key activates crystal through context action');
+
+  const gameWithB = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  gameWithB.inventory.add('earth', 1);
+  gameWithB.player.setPosition(
+    1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  gameWithB.player.facing = { x: 1, y: 0 };
+  gameWithB.input.pressedThisFrame.add('b');
+  gameWithB.update(0.016);
+  assert.equal(gameWithB.tileMap.getTile(2, 0), 'earth', 'B remains a direct placement key');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.animalSystem.spawn(game.tileMap);
+  game.enemySystem.spawnNearCrystal(game.tileMap);
+  game.projectileSystem.spawn({ type: 'arrow', x: 0, y: 0, direction: { x: 1, y: 0 } });
+  const animalX = game.animalSystem.animals[0].x;
+  const enemyX = game.enemySystem.enemies[0].x;
+  const projectileX = game.projectileSystem.projectiles[0].x;
+  game.inventoryOpen = true;
+  game.update(0.5);
+
+  assert.equal(game.animalSystem.animals[0].x, animalX, 'pause stops passive animal movement');
+  assert.equal(game.enemySystem.enemies[0].x, enemyX, 'pause stops enemy movement');
+  assert.equal(game.projectileSystem.projectiles[0].x, projectileX, 'pause stops projectile movement');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.inventory.add('slingshot', 1);
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 1);
+  game.inventory.add('stoneBall', 1);
+  game.animalSystem.spawn(game.tileMap);
+  game.flyingEnemySystem.spawnNearCrystal(game.tileMap);
+  game.projectileSystem.spawn({ type: 'arrow', x: 0, y: 0, direction: { x: 1, y: 0 } });
+  game.saveGame();
+  game.input.keys.add('r');
+  game.update(2.1);
+
+  assert.equal(storage.getItem(SAVE_KEY), null, 'reset clears save with new entities');
+  assert.equal(game.inventory.get('slingshot'), 0, 'reset clears slingshot');
+  assert.equal(game.inventory.get('bow'), 0, 'reset clears bow');
+  assert.equal(game.inventory.get('arrow'), 0, 'reset clears arrows');
+  assert.equal(game.inventory.get('stoneBall'), 0, 'reset clears stone balls');
+  assert.equal(game.animalSystem.activeCount(), 0, 'reset clears animals');
+  assert.equal(game.flyingEnemySystem.activeCount(), 0, 'reset clears flying enemies');
+  assert.equal(game.projectileSystem.activeCount(), 0, 'reset clears projectiles');
 }
 
 console.log('Gameplay-Basics OK.');

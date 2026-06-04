@@ -30,6 +30,27 @@ export class DropSystem {
     });
   }
 
+  spawnAtTile(drop, tile) {
+    if (!tile) return null;
+    return this.spawn({
+      resource: drop.resource,
+      amount: drop.amount,
+      x: tile.x * TILE_SIZE + TILE_SIZE / 2,
+      y: tile.y * TILE_SIZE + TILE_SIZE / 2,
+      tile,
+      age: DROP_ANIMATION_SECONDS
+    });
+  }
+
+  spawnNearWorld(drop, tileMap, x, y) {
+    const tile = tileMap.getTileAtWorldPosition(x, y);
+    if (this.canHoldDrop(tileMap, tile.x, tile.y)) {
+      return this.spawnAtTile(drop, tile);
+    }
+    const fallback = this.findNearestDropTile(tileMap, x, y);
+    return fallback ? this.spawnAtTile(drop, fallback) : null;
+  }
+
   spawn({ resource, amount = 1, x, y, startX = x, startY = y, tile = null, age = DROP_ANIMATION_SECONDS }) {
     if (!VALID_DROP_RESOURCES.has(resource)) return null;
     const drop = {
@@ -92,6 +113,22 @@ export class DropSystem {
     tileMap.forEachTile((candidate) => {
       if (!fallback && this.canHoldDrop(tileMap, candidate.x, candidate.y)) {
         fallback = { x: candidate.x, y: candidate.y };
+      }
+    });
+    return fallback;
+  }
+
+  findNearestDropTile(tileMap, x, y) {
+    let fallback = null;
+    let fallbackDistance = Infinity;
+    tileMap.forEachTile((candidate) => {
+      if (!this.canHoldDrop(tileMap, candidate.x, candidate.y)) return;
+      const centerX = candidate.x * TILE_SIZE + TILE_SIZE / 2;
+      const centerY = candidate.y * TILE_SIZE + TILE_SIZE / 2;
+      const distance = Math.hypot(x - centerX, y - centerY);
+      if (distance < fallbackDistance) {
+        fallback = { x: candidate.x, y: candidate.y };
+        fallbackDistance = distance;
       }
     });
     return fallback;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-3-5';
+const CACHE_NAME = 'one-block-v0-3-6';
 
 const CORE_ASSETS = [
   './',
@@ -12,14 +12,19 @@ const CORE_ASSETS = [
   './src/core/touch-input.js',
   './src/core/camera.js',
   './src/world/tile-map.js',
+  './src/entities/animal.js',
   './src/entities/enemy.js',
+  './src/entities/flying-enemy.js',
   './src/entities/player.js',
+  './src/systems/animal-system.js',
   './src/systems/crystal-system.js',
   './src/systems/crafting-system.js',
   './src/systems/day-night-system.js',
   './src/systems/drop-system.js',
   './src/systems/enemy-system.js',
+  './src/systems/flying-enemy-system.js',
   './src/systems/log-system.js',
+  './src/systems/projectile-system.js',
   './src/systems/resource-inventory.js',
   './src/systems/save-system.js',
   './src/systems/render-system.js',

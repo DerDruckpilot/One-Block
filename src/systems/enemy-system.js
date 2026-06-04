@@ -16,7 +16,7 @@ export class EnemySystem {
     for (const enemy of this.enemies) {
       enemy.update(deltaSeconds, tileMap, player);
       if (!enemy.isSupported(tileMap)) {
-        events.push({ type: 'void', enemy });
+        events.push({ type: 'void', enemy, tile: enemy.lastGroundTile });
       }
     }
 
@@ -64,7 +64,11 @@ export class EnemySystem {
       };
     }
 
-    const defeated = enemy.takeDamage(SPEAR_DAMAGE, player.getCenterPosition());
+    return this.applyDamage(enemy, SPEAR_DAMAGE, player.getCenterPosition());
+  }
+
+  applyDamage(enemy, amount, source) {
+    const defeated = enemy.takeDamage(amount, source);
     if (defeated) {
       this.enemies = this.enemies.filter((candidate) => candidate !== enemy);
     }
@@ -121,7 +125,7 @@ export class EnemySystem {
   }
 
   canSpawnAt(tileMap, x, y) {
-    return tileMap.isGround(x, y) && !tileMap.isCrystal(x, y);
+    return tileMap.isGround(x, y) && !tileMap.isCrystal(x, y) && !tileMap.getObject(x, y);
   }
 
   load(enemies, tileMap) {
