@@ -3398,6 +3398,19 @@ const map = new TileMap();
   assert.equal(connectMap.getConnectableVariant(0, 0), 'horizontal', 'door/wall horizontal connection is computed');
   connectMap.removeObject(1, 0);
   assert.equal(connectMap.getConnectableVariant(0, 0), 'end-left', 'door connection updates after neighbor removal');
+  const verticalConnectMap = new TileMap();
+  verticalConnectMap.setObject(0, 0, OBJECT_TYPES.door);
+  verticalConnectMap.setObject(0, -1, OBJECT_TYPES.woodWall);
+  verticalConnectMap.setObject(0, 1, OBJECT_TYPES.woodWall);
+  assert.equal(verticalConnectMap.getConnectableVariant(0, 0), 'vertical', 'door/wall vertical connection updates after placement');
+  const saveObjects = verticalConnectMap.objectsToJSON();
+  const loadedConnectMap = new TileMap();
+  loadedConnectMap.loadObjects(saveObjects);
+  assert.deepEqual(
+    loadedConnectMap.getConnectableConnections(0, 0),
+    verticalConnectMap.getConnectableConnections(0, 0),
+    'connectable barrier variants are reconstructed from neighbors after load'
+  );
 }
 
 {
@@ -3447,6 +3460,22 @@ const map = new TileMap();
   assert.equal(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate).centerPost, false, 'gate profile does not use the normal fence center post');
 
   const horizontalShape = { horizontal: true, vertical: false, connections: { left: true, right: true, up: false, down: false } };
+  const stableVariant = renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, horizontalShape, false);
+  assert.deepEqual(
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, horizontalShape, false),
+    stableVariant,
+    'wood wall visual variant is stable across repeated render decisions'
+  );
+  assert.deepEqual(
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, horizontalShape, false),
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, horizontalShape, false),
+    'wood wall variant depends on type and neighbors, not player movement'
+  );
+  assert.notDeepEqual(
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false),
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, true),
+    'door visual variant changes only when open state changes'
+  );
   renderer.drawWoodWall(0, 0, horizontalShape);
   const wallCalls = [...context.calls];
   assert.equal(wallCalls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wood wall is rendered upward onto the barrier line instead of flat on the tile');
@@ -3494,9 +3523,43 @@ const map = new TileMap();
   assert.notDeepEqual(verticalWallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'vertical wall rendering is not identical to vertical fence rendering');
 
   context.calls.length = 0;
+  const cornerShape = { horizontal: true, vertical: true, variant: 'corner-right-down', connections: { left: false, right: true, up: false, down: true } };
+  renderer.drawWoodWall(0, 0, cornerShape);
+  assert.equal(context.calls.some((call) =>
+    call.fn === 'fillRect' &&
+    call.fillStyle === '#3a2418' &&
+    call.args[0] === 10 &&
+    call.args[1] === 2 &&
+    call.args[2] === 12 &&
+    call.args[3] === 28
+  ), false, 'wood wall corners do not draw a doubled lower center-post artifact');
+  context.calls.length = 0;
+  const tShape = { horizontal: true, vertical: true, variant: 't-up', connections: { left: true, right: true, up: false, down: true } };
+  renderer.drawDoor(0, 0, false, tShape);
+  assert.equal(context.calls.some((call) =>
+    call.fn === 'fillRect' &&
+    call.fillStyle === '#2e1d14' &&
+    call.args[0] === 11 &&
+    call.args[1] === 3 &&
+    call.args[2] === 11 &&
+    call.args[3] === 26
+  ), false, 'wall door T-junctions do not draw a doubled lower center-post artifact');
+
+  context.calls.length = 0;
   const barrierMap = new TileMap();
   barrierMap.setObject(0, 0, OBJECT_TYPES.woodWall);
   barrierMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  const behindForegroundContext = createDrawContext();
+  const behindForegroundRenderer = new RenderSystem(behindForegroundContext);
+  behindForegroundRenderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 }, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 10 }]);
+  const secondBehindForegroundContext = createDrawContext();
+  const secondBehindForegroundRenderer = new RenderSystem(secondBehindForegroundContext);
+  secondBehindForegroundRenderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 }, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 10 }]);
+  assert.deepEqual(
+    behindForegroundContext.calls.filter((call) => call.fn === 'fillRect').map((call) => ({ args: call.args, fillStyle: call.fillStyle })),
+    secondBehindForegroundContext.calls.filter((call) => call.fn === 'fillRect').map((call) => ({ args: call.args, fillStyle: call.fillStyle })),
+    'barrier foreground redraw is deterministic when it is needed for occlusion'
+  );
   renderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 }, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 10 }]);
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), false, 'player in front of a horizontal wall is not covered by the foreground strip');
   context.calls.length = 0;
@@ -3504,6 +3567,14 @@ const map = new TileMap();
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'player behind a horizontal wall is covered by the foreground strip');
   assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 8 }]), false, 'foreground barrier test treats lower Y as in front');
   assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 8 }]), true, 'foreground barrier test treats upper Y as behind');
+
+  const { Game } = await import('../src/core/game.js');
+  const previewGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  previewGame.tileMap.setObject(1, 1, OBJECT_TYPES.woodWall);
+  previewGame.tileMap.setObject(2, 1, OBJECT_TYPES.woodWall);
+  const beforePreviewVariant = previewGame.tileMap.getConnectableVariant(1, 1);
+  renderer.renderPlacementPreview({ x: 2, y: 2, canPlace: true }, { x: 0, y: 0 });
+  assert.equal(previewGame.tileMap.getConnectableVariant(1, 1), beforePreviewVariant, 'placement preview does not mutate connectable barrier variants');
 }
 
 {
@@ -3540,6 +3611,14 @@ const map = new TileMap();
   assert.equal(profile.outerEdge, false, 'interior ground surface does not render as outer edge');
   assert.equal(profile.connectedSurfaceHorizontal, true, 'ground rendering connects same-type tiles horizontally');
   assert.equal(profile.connectedSurfaceVertical, true, 'ground rendering connects same-type tiles vertically');
+  assert.equal(profile.seamlessHorizontal, true, 'same-type horizontal surfaces overlap to close internal seams');
+  assert.equal(profile.seamlessVertical, true, 'same-type vertical surfaces overlap to close internal seams');
+  assert.equal(terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), 'tile detail variants are deterministic by position and type');
+  assert.deepEqual(
+    terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap),
+    terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap),
+    'tile render profiles are deterministic across repeated calls'
+  );
   terrainMap.setEarth(1, 0);
   const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
   assert.equal(edgeProfile.transitionEdge, true, 'ground rendering detects different-type transition edges');
