@@ -68,13 +68,14 @@ export const OBJECT_TYPES = {
   chair: 'chair',
   fence: 'fence',
   gate: 'gate',
+  door: 'door',
   sapling: 'sapling',
   tree: 'tree',
   berryBush: 'berryBush'
 };
 
 export const CONNECTABLE_BARRIER_GROUPS = {
-  wall: [OBJECT_TYPES.woodWall],
+  wall: [OBJECT_TYPES.woodWall, OBJECT_TYPES.door],
   fence: [OBJECT_TYPES.fence, OBJECT_TYPES.gate]
 };
 
@@ -91,6 +92,7 @@ export const PLAYER_BLOCKING_OBJECTS = [
   OBJECT_TYPES.woodWall,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
+  OBJECT_TYPES.door,
   OBJECT_TYPES.tree
 ];
 
@@ -100,11 +102,13 @@ export const GROUND_ENTITY_BLOCKING_OBJECTS = [
   OBJECT_TYPES.woodWall,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
+  OBJECT_TYPES.door,
   OBJECT_TYPES.tree
 ];
 
 export const FLYING_ENTITY_BLOCKING_OBJECTS = [
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.door,
   OBJECT_TYPES.tree
 ];
 
@@ -116,7 +120,8 @@ export const REMOVABLE_OBJECT_TYPES = [
   OBJECT_TYPES.table,
   OBJECT_TYPES.chair,
   OBJECT_TYPES.fence,
-  OBJECT_TYPES.gate
+  OBJECT_TYPES.gate,
+  OBJECT_TYPES.door
 ];
 
 export const CRYSTAL_ENCOUNTER_DROPS = [
@@ -150,12 +155,13 @@ export const RESOURCE_LABELS = {
   chair: 'Stuhl',
   lasso: 'Lasso',
   fence: 'Zaun',
-  gate: 'Tor'
+  gate: 'Tor',
+  door: 'Tür'
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 export const WORLD_RESOURCES = ['earth', 'stone', 'clay'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'woodWall', 'fence', 'gate', 'table', 'chair'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'woodWall', 'door', 'fence', 'gate', 'table', 'chair'];
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
 export const INVENTORY_RESOURCES = ['earth', 'stone', 'clay', 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', 'berry', ...AMMO_RESOURCES, ...TOOL_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
@@ -187,7 +193,8 @@ export const RESOURCE_SHORT_LABELS = {
   chair: 'CH',
   lasso: 'LA',
   fence: 'ZA',
-  gate: 'TO'
+  gate: 'TO',
+  door: 'TU'
 };
 
 export const RESOURCE_ICONS = {
@@ -216,7 +223,8 @@ export const RESOURCE_ICONS = {
   chair: 'h',
   lasso: 'o-',
   fence: '|=',
-  gate: '[]'
+  gate: '[]',
+  door: 'D'
 };
 
 export const INVENTORY_TABS = [
@@ -250,6 +258,7 @@ export const RESOURCE_CATEGORIES = {
   torch: ['building'],
   campfire: ['building'],
   woodWall: ['building'],
+  door: ['building'],
   table: ['building'],
   chair: ['building'],
   lasso: ['tools'],
@@ -262,7 +271,7 @@ export const BUILD_MENU_CATEGORIES = [
   { id: 'nature', label: 'Natur', resources: ['grassSeed', 'treeSeed'] },
   { id: 'light', label: 'Licht', resources: ['torch', 'campfire'] },
   { id: 'furniture', label: 'Möbel', resources: ['table', 'chair'] },
-  { id: 'building', label: 'Bau', resources: ['woodWall', 'fence', 'gate'] },
+  { id: 'building', label: 'Bau', resources: ['woodWall', 'door', 'fence', 'gate'] },
   { id: 'stations', label: 'Stationen', resources: ['workbench'] }
 ];
 
@@ -507,6 +516,19 @@ export const GATE_RECIPE = {
   }
 };
 
+export const DOOR_RECIPE = {
+  id: 'door',
+  name: 'Tür',
+  result: 'door',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 4,
+    fiber: 2
+  }
+};
+
 export const CRAFTING_RECIPES = [
   WORKBENCH_RECIPE,
   TORCH_RECIPE,
@@ -521,6 +543,7 @@ export const CRAFTING_RECIPES = [
   SCYTHE_RECIPE,
   LASSO_RECIPE,
   WOOD_WALL_RECIPE,
+  DOOR_RECIPE,
   FENCE_RECIPE,
   GATE_RECIPE,
   TABLE_RECIPE,

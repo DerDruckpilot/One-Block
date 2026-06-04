@@ -17,6 +17,8 @@ const VALID_DROP_RESOURCES = new Set([
   'berry'
 ]);
 
+const DROP_TILE_OFFSET = 8;
+
 export class DropSystem {
   constructor(random = Math.random) {
     this.drops = [];
@@ -28,14 +30,15 @@ export class DropSystem {
     const crystal = tileMap.getCrystalCenter();
     const targetTile = this.findDropTileNearWorld(tileMap, crystal.x, crystal.y);
     if (!targetTile) return null;
+    const targetPosition = this.positionWithinTile(targetTile);
 
     return this.spawn({
       resource: drop.resource,
       amount: drop.amount,
       startX: crystal.x,
       startY: crystal.y - 16,
-      x: targetTile.x * TILE_SIZE + TILE_SIZE / 2,
-      y: targetTile.y * TILE_SIZE + TILE_SIZE / 2,
+      x: targetPosition.x,
+      y: targetPosition.y,
       tile: targetTile,
       age: 0
     });
@@ -43,11 +46,12 @@ export class DropSystem {
 
   spawnAtTile(drop, tile) {
     if (!tile) return null;
+    const targetPosition = this.positionWithinTile(tile);
     return this.spawn({
       resource: drop.resource,
       amount: drop.amount,
-      x: tile.x * TILE_SIZE + TILE_SIZE / 2,
-      y: tile.y * TILE_SIZE + TILE_SIZE / 2,
+      x: targetPosition.x,
+      y: targetPosition.y,
       tile,
       age: DROP_ANIMATION_SECONDS
     });
@@ -143,6 +147,13 @@ export class DropSystem {
     return tiles[Math.floor(this.random() * tiles.length)] || tiles[0] || null;
   }
 
+  positionWithinTile(tile) {
+    return {
+      x: tile.x * TILE_SIZE + TILE_SIZE / 2 + (this.random() - 0.5) * DROP_TILE_OFFSET * 2,
+      y: tile.y * TILE_SIZE + TILE_SIZE / 2 + (this.random() - 0.5) * DROP_TILE_OFFSET * 2
+    };
+  }
+
   canHoldDrop(tileMap, x, y) {
     return tileMap.isGround(x, y) &&
       !tileMap.isCrystal(x, y) &&
@@ -163,8 +174,9 @@ export class DropSystem {
       if (!this.canHoldDrop(tileMap, tile.x, tile.y)) {
         const fallback = this.findDropTile(tileMap);
         if (!fallback) continue;
-        x = fallback.x * TILE_SIZE + TILE_SIZE / 2;
-        y = fallback.y * TILE_SIZE + TILE_SIZE / 2;
+        const fallbackPosition = this.positionWithinTile(fallback);
+        x = fallbackPosition.x;
+        y = fallbackPosition.y;
       }
 
       this.spawn({

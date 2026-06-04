@@ -23,6 +23,7 @@ export class ResourceInventory {
       torch: 0,
       campfire: 0,
       woodWall: 0,
+      door: 0,
       fence: 0,
       gate: 0,
       table: 0,

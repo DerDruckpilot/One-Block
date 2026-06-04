@@ -90,6 +90,9 @@ export class RenderSystem {
       if (object.type === OBJECT_TYPES.woodWall) {
         this.drawWoodWall(screenX, screenY, tileMap.getBarrierCollisionShape(object.x, object.y));
       }
+      if (object.type === OBJECT_TYPES.door) {
+        this.drawDoor(screenX, screenY, object.open, tileMap.getBarrierCollisionShape(object.x, object.y));
+      }
       if (object.type === OBJECT_TYPES.table) {
         this.drawTable(screenX, screenY);
       }
@@ -377,12 +380,14 @@ export class RenderSystem {
   drawWoodWall(x, y, shape = null) {
     this.context.save();
     this.drawBarrierShape(x, y, shape, {
+      kind: 'wall',
       post: '#3a2418',
-      main: '#8a5a35',
+      main: '#7a4a2c',
       highlight: '#c08a53',
-      accent: '#5b331c',
-      thickness: 8,
-      capHeight: 18
+      accent: '#2e1d14',
+      thickness: 10,
+      capHeight: 26,
+      height: 28
     });
     this.context.restore();
   }
@@ -414,12 +419,14 @@ export class RenderSystem {
   drawFence(x, y, shape = null) {
     this.context.save();
     this.drawBarrierShape(x, y, shape, {
+      kind: 'fence',
       post: '#3a2418',
       main: '#9a6238',
       highlight: '#b77a43',
       accent: '#6a4126',
       thickness: 6,
-      capHeight: 14
+      capHeight: 18,
+      height: 16
     });
     this.context.restore();
   }
@@ -428,24 +435,44 @@ export class RenderSystem {
     this.context.save();
     if (open) {
       this.drawBarrierShape(x, y, shape, {
+        kind: 'gate',
         post: '#3a2418',
-        main: '#75b861',
-        highlight: '#9ee482',
+        main: '#8d633f',
+        highlight: '#d19a5b',
         accent: '#4f8f3f',
         thickness: 5,
-        capHeight: 12,
+        capHeight: 18,
+        height: 16,
         open
       });
     } else {
       this.drawBarrierShape(x, y, shape, {
+        kind: 'gate',
         post: '#3a2418',
         main: '#a86d3f',
         highlight: '#d49458',
         accent: '#6a4126',
         thickness: 6,
-        capHeight: 14
+        capHeight: 20,
+        height: 17
       });
     }
+    this.context.restore();
+  }
+
+  drawDoor(x, y, open = false, shape = null) {
+    this.context.save();
+    this.drawBarrierShape(x, y, shape, {
+      kind: 'door',
+      post: '#2e1d14',
+      main: open ? '#9b6a3f' : '#6f4328',
+      highlight: open ? '#d09a5c' : '#b87b45',
+      accent: open ? '#d9ba73' : '#f0c96b',
+      thickness: 9,
+      capHeight: 22,
+      height: 26,
+      open
+    });
     this.context.restore();
   }
 
@@ -456,11 +483,13 @@ export class RenderSystem {
     const single = !hasHorizontal && !hasVertical;
     const thickness = palette.thickness;
     const half = Math.floor(thickness / 2);
+    const visualHeight = palette.height || palette.capHeight;
     const centerX = x + TILE_SIZE / 2;
     const centerY = y + TILE_SIZE / 2;
+    const topY = centerY - visualHeight / 2;
 
     this.context.fillStyle = palette.post;
-    this.context.fillRect(centerX - half - 1, centerY - half - 1, thickness + 2, thickness + 2);
+    this.context.fillRect(centerX - half - 1, topY, thickness + 2, visualHeight);
 
     if (single || hasVertical) {
       this.context.fillStyle = palette.main;
@@ -469,22 +498,70 @@ export class RenderSystem {
       this.context.fillRect(centerX - half, top, thickness, bottom - top);
       this.context.fillStyle = palette.highlight;
       this.context.fillRect(centerX - half + 1, top + 2, 2, Math.max(3, bottom - top - 4));
+      if (palette.kind === 'wall' || palette.kind === 'door') {
+        this.context.fillStyle = palette.accent;
+        this.context.fillRect(centerX + half - 2, top + 3, 2, Math.max(3, bottom - top - 6));
+      }
     }
 
     if (single || hasHorizontal) {
       this.context.fillStyle = palette.main;
       const left = connections.left ? x : centerX - palette.capHeight / 2;
       const right = connections.right ? x + TILE_SIZE : centerX + palette.capHeight / 2;
-      this.context.fillRect(left, centerY - half, right - left, thickness);
+      const horizontalTop = palette.kind === 'wall' || palette.kind === 'door'
+        ? centerY - Math.floor(visualHeight * 0.65)
+        : centerY - half - 5;
+      const horizontalHeight = palette.kind === 'wall' || palette.kind === 'door'
+        ? visualHeight
+        : thickness;
+      this.context.fillRect(left, horizontalTop, right - left, horizontalHeight);
       this.context.fillStyle = palette.highlight;
-      this.context.fillRect(left + 2, centerY - half + 1, Math.max(3, right - left - 4), 2);
+      this.context.fillRect(left + 2, horizontalTop + 3, Math.max(3, right - left - 4), 2);
+      if (palette.kind === 'fence' || palette.kind === 'gate') {
+        this.context.fillRect(left + 2, horizontalTop + 9, Math.max(3, right - left - 4), 2);
+      } else {
+        this.context.fillStyle = palette.accent;
+        this.context.fillRect(left + 3, horizontalTop + 12, Math.max(3, right - left - 6), 2);
+        this.context.fillRect(left + 3, horizontalTop + 20, Math.max(3, right - left - 6), 2);
+      }
     }
 
     this.context.fillStyle = palette.accent;
     this.context.fillRect(centerX - 3, centerY - 3, 6, 6);
     if (palette.open) {
-      this.context.fillRect(centerX + 5, centerY - 8, 4, 14);
+      this.context.fillRect(centerX + 5, centerY - 10, 4, 16);
     }
+
+    if (palette.kind === 'door') {
+      this.context.fillStyle = palette.accent;
+      this.context.fillRect(centerX + (palette.open ? 7 : 4), centerY - 1, 3, 3);
+      this.context.fillStyle = '#2e1d14';
+      this.context.fillRect(centerX - half - 2, topY + 3, 2, 6);
+      this.context.fillRect(centerX - half - 2, topY + visualHeight - 9, 2, 6);
+    }
+
+    if (palette.kind === 'gate') {
+      this.context.fillStyle = '#2e1d14';
+      this.context.fillRect(centerX - half - 2, centerY - 8, 2, 5);
+      this.context.fillStyle = palette.accent;
+      this.context.fillRect(centerX + 4, centerY - 1, 3, 3);
+    }
+  }
+
+  getBarrierRenderProfile(type, open = false) {
+    if (type === OBJECT_TYPES.woodWall) {
+      return { kind: 'wall', mass: 'solid', connectsWith: 'wall', openable: false };
+    }
+    if (type === OBJECT_TYPES.door) {
+      return { kind: 'door', mass: open ? 'open-solid' : 'solid', connectsWith: 'wall', openable: true, open };
+    }
+    if (type === OBJECT_TYPES.fence) {
+      return { kind: 'fence', mass: 'open', connectsWith: 'fence', openable: false };
+    }
+    if (type === OBJECT_TYPES.gate) {
+      return { kind: 'gate', mass: open ? 'open-light' : 'light', connectsWith: 'fence', openable: true, open };
+    }
+    return { kind: 'object', mass: 'none', connectsWith: 'none', openable: false };
   }
 
   drawSapling(x, y, stage = 1) {
@@ -518,14 +595,16 @@ export class RenderSystem {
     this.context.fillStyle = '#8a5a35';
     this.context.fillRect(x + 15, y - 20, 3, 43);
     this.context.fillStyle = '#2f6f35';
-    this.context.fillRect(x - 23, y - 45, 28, 16);
-    this.context.fillRect(x + 4, y - 56, 30, 18);
-    this.context.fillRect(x + 30, y - 44, 25, 16);
-    this.context.fillRect(x - 10, y - 32, 50, 18);
+    this.context.fillRect(x - 23, y - 45, 24, 15);
+    this.context.fillRect(x + 4, y - 56, 27, 17);
+    this.context.fillRect(x + 34, y - 43, 21, 15);
+    this.context.fillRect(x - 9, y - 31, 20, 16);
+    this.context.fillRect(x + 18, y - 32, 22, 16);
     this.context.fillStyle = '#4f9e42';
-    this.context.fillRect(x - 12, y - 50, 20, 10);
-    this.context.fillRect(x + 16, y - 52, 22, 11);
-    this.context.fillRect(x + 3, y - 38, 35, 10);
+    this.context.fillRect(x - 12, y - 50, 18, 10);
+    this.context.fillRect(x + 15, y - 52, 20, 11);
+    this.context.fillRect(x + 3, y - 38, 18, 10);
+    this.context.fillRect(x + 27, y - 37, 16, 9);
     this.context.fillStyle = '#83c85e';
     this.context.fillRect(x - 5, y - 45, 5, 3);
     this.context.fillRect(x + 23, y - 48, 5, 3);

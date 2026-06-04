@@ -13,6 +13,7 @@ import {
 const keyOf = (x, y) => `${x},${y}`;
 const PLACEABLE_OBJECTS = new Set(Object.values(OBJECT_TYPES));
 const CONNECTABLE_BARRIERS = new Set(CONNECTABLE_BARRIER_TYPES);
+const OPENABLE_BARRIERS = new Set([OBJECT_TYPES.gate, OBJECT_TYPES.door]);
 const HALF_TILE = TILE_SIZE / 2;
 
 const CONNECTION_DIRECTIONS = [
@@ -74,7 +75,7 @@ export class TileMap {
 
   setObject(x, y, type) {
     this.objects.set(keyOf(x, y), type);
-    if (type === OBJECT_TYPES.gate) {
+    if (OPENABLE_BARRIERS.has(type)) {
       this.objectStates.set(keyOf(x, y), { open: false });
     } else if (![OBJECT_TYPES.sapling, OBJECT_TYPES.tree, OBJECT_TYPES.berryBush].includes(type)) {
       this.objectStates.delete(keyOf(x, y));
@@ -136,7 +137,7 @@ export class TileMap {
     for (const object of objects) {
       if (PLACEABLE_OBJECTS.has(object.type)) {
         this.objects.set(keyOf(object.x, object.y), object.type);
-        if (object.type === OBJECT_TYPES.gate) {
+        if (OPENABLE_BARRIERS.has(object.type)) {
           this.objectStates.set(keyOf(object.x, object.y), { open: object.open === true });
         }
       }
@@ -316,7 +317,7 @@ export class TileMap {
   isObjectBlocking(x, y, blockingTypes) {
     const object = this.getObject(x, y);
     if (!object || !blockingTypes.includes(object)) return false;
-    if (object === OBJECT_TYPES.gate && this.isGateOpen(x, y)) return false;
+    if (OPENABLE_BARRIERS.has(object) && this.isOpen(x, y)) return false;
     // Campfires stay walkable in this slice so mobile movement does not snag on tiny light props.
     return true;
   }
@@ -325,7 +326,7 @@ export class TileMap {
     const tile = this.worldToTile(worldX, worldY);
     const object = this.getObject(tile.x, tile.y);
     if (!object || !blockingTypes.includes(object)) return false;
-    if (object === OBJECT_TYPES.gate && this.isGateOpen(tile.x, tile.y)) return false;
+    if (OPENABLE_BARRIERS.has(object) && this.isOpen(tile.x, tile.y)) return false;
     if (CONNECTABLE_BARRIERS.has(object)) {
       return this.isPointBlockedByBarrier(worldX, worldY, tile.x, tile.y);
     }
@@ -405,12 +406,28 @@ export class TileMap {
   }
 
   isGateOpen(x, y) {
+    return this.isOpen(x, y);
+  }
+
+  isDoorOpen(x, y) {
+    return this.isOpen(x, y);
+  }
+
+  isOpen(x, y) {
     return this.objectStates.get(keyOf(x, y))?.open === true;
   }
 
   toggleGate(x, y) {
-    if (this.getObject(x, y) !== OBJECT_TYPES.gate) return null;
-    const open = !this.isGateOpen(x, y);
+    return this.toggleOpenable(x, y);
+  }
+
+  toggleDoor(x, y) {
+    return this.toggleOpenable(x, y);
+  }
+
+  toggleOpenable(x, y) {
+    if (!OPENABLE_BARRIERS.has(this.getObject(x, y))) return null;
+    const open = !this.isOpen(x, y);
     this.objectStates.set(keyOf(x, y), { open });
     return open;
   }
