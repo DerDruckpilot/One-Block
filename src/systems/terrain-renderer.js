@@ -9,6 +9,31 @@ const edgeMap = {
   water: { top: '#4eb3d8', mid: '#277aa8', side: '#1d4d70', dark: '#12314e', light: '#a4ecff' }
 };
 
+const hexToRgb = (hex) => {
+  const value = hex.replace('#', '');
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16)
+  };
+};
+
+const rgbToHex = ({ r, g, b }) => `#${
+  [r, g, b]
+    .map((channel) => Math.max(0, Math.min(255, Math.round(channel))).toString(16).padStart(2, '0'))
+    .join('')
+}`;
+
+const blendHex = (first, second, ratio = 0.5) => {
+  const a = hexToRgb(first);
+  const b = hexToRgb(second);
+  return rgbToHex({
+    r: a.r * (1 - ratio) + b.r * ratio,
+    g: a.g * (1 - ratio) + b.g * ratio,
+    b: a.b * (1 - ratio) + b.b * ratio
+  });
+};
+
 export class TerrainRenderer {
   drawTile(context, tile, tileMap, screenX, screenY) {
     if (tile.type === TILE_TYPES.crystal) {
@@ -77,7 +102,7 @@ export class TerrainRenderer {
       context.fillRect(x + 1, y + 23, TILE_SIZE - 2, 2);
     }
 
-    this.drawTransitionDetails(context, tile, palette, x, y, edges, same);
+    this.drawTransitionDetails(context, tile, tileMap, palette, x, y, edges, same);
 
     this.drawTileDetails(context, tile, palette, x, y, this.detailVariant(tile));
     if (tile.type !== TILE_TYPES.water && tileMap.isWatered?.(tile.x, tile.y)) {
@@ -173,6 +198,7 @@ export class TerrainRenderer {
       horizontalTransitionSealed: (edges.hasLeft && !same.left) || (edges.hasRight && !same.right),
       horizontalTransitionFill: palette.mid,
       verticalTransitionSealed: (edges.hasUp && !same.up) || (edges.hasDown && !same.down),
+      transitionBlendFill: this.getTransitionBlendFill(tile, tileMap),
       internalSeamsSuppressed: (same.left || same.right || same.up || same.down) && !edges.bottomOuter,
       connectedSurfaceHorizontal: same.left || same.right,
       connectedSurfaceVertical: same.up || same.down,
@@ -182,7 +208,21 @@ export class TerrainRenderer {
     };
   }
 
-  drawTransitionDetails(context, tile, palette, x, y, edges, same) {
+  getTransitionBlendFill(tile, tileMap, direction = 'right') {
+    const offsets = {
+      up: { x: 0, y: -1, tone: 'top' },
+      down: { x: 0, y: 1, tone: 'mid' },
+      left: { x: -1, y: 0, tone: 'mid' },
+      right: { x: 1, y: 0, tone: 'mid' }
+    };
+    const offset = offsets[direction] || offsets.right;
+    const currentPalette = edgeMap[tile.type] || edgeMap.earth;
+    const neighborType = tileMap.getTile(tile.x + offset.x, tile.y + offset.y);
+    const neighborPalette = edgeMap[neighborType] || currentPalette;
+    return blendHex(currentPalette[offset.tone], neighborPalette[offset.tone], 0.48);
+  }
+
+  drawTransitionDetails(context, tile, tileMap, palette, x, y, edges, same) {
     const transition = {
       up: edges.hasUp && !same.up,
       down: edges.hasDown && !same.down,
@@ -192,22 +232,41 @@ export class TerrainRenderer {
     if (!transition.up && !transition.down && !transition.left && !transition.right) return;
 
     if (tile.type === TILE_TYPES.water) {
-      context.fillStyle = 'rgba(164, 236, 255, 0.52)';
-      if (transition.up) context.fillRect(x + 4, y + 3, TILE_SIZE - 8, 2);
-      if (transition.down) context.fillRect(x + 4, y + 21, TILE_SIZE - 8, 2);
-      if (transition.left) context.fillRect(x + 3, y + 5, 2, 16);
-      if (transition.right) context.fillRect(x + TILE_SIZE - 5, y + 5, 2, 16);
-      context.fillStyle = 'rgba(18, 49, 78, 0.24)';
-      if (transition.down) context.fillRect(x + 5, y + 24, TILE_SIZE - 10, 2);
+      if (transition.up) {
+        context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'up');
+        context.fillRect(x + 2, y, TILE_SIZE - 4, 4);
+      }
+      if (transition.down) {
+        context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'down');
+        context.fillRect(x + 3, y + 21, TILE_SIZE - 6, 4);
+      }
+      if (transition.left) {
+        context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'left');
+        context.fillRect(x - 1, y + 4, 4, 19);
+      }
+      if (transition.right) {
+        context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'right');
+        context.fillRect(x + TILE_SIZE - 3, y + 4, 4, 19);
+      }
       return;
     }
 
-    context.fillStyle = palette.top;
-    if (transition.up) context.fillRect(x + 5, y + 3, TILE_SIZE - 10, 1);
-    context.fillStyle = palette.mid;
-    if (transition.left) context.fillRect(x, y + 5, 2, 18);
-    if (transition.right) context.fillRect(x + TILE_SIZE - 2, y + 5, 2, 18);
-    if (transition.down) context.fillRect(x + 3, y + 22, TILE_SIZE - 6, 2);
+    if (transition.up) {
+      context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'up');
+      context.fillRect(x + 2, y, TILE_SIZE - 4, 4);
+    }
+    if (transition.left) {
+      context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'left');
+      context.fillRect(x - 1, y + 3, 4, 23);
+    }
+    if (transition.right) {
+      context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'right');
+      context.fillRect(x + TILE_SIZE - 3, y + 3, 4, 23);
+    }
+    if (transition.down) {
+      context.fillStyle = this.getTransitionBlendFill(tile, tileMap, 'down');
+      context.fillRect(x + 2, y + 21, TILE_SIZE - 4, 4);
+    }
   }
 
   drawTileDetails(context, tile, palette, x, y, variant = 0) {

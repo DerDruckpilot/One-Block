@@ -368,6 +368,27 @@ export class TileMap {
     };
   }
 
+  getWallDoorRenderState(x, y) {
+    const type = this.getObject(x, y);
+    if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door].includes(type)) return null;
+    const connections = this.getConnectableConnections(x, y);
+    const horizontal = connections.left || connections.right;
+    const vertical = connections.up || connections.down;
+
+    return {
+      type,
+      x,
+      y,
+      open: type === OBJECT_TYPES.door ? this.isDoorOpen(x, y) : false,
+      connections,
+      horizontal,
+      vertical,
+      post: !horizontal && !vertical,
+      thickness: BARRIER_COLLISION_THICKNESS,
+      variant: this.getConnectableVariant(x, y)
+    };
+  }
+
   getConnectableConnections(x, y) {
     const type = this.getObject(x, y);
     const connections = { up: false, down: false, left: false, right: false };
