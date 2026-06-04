@@ -67,7 +67,8 @@ export class FlyingEnemy {
 
     const nextX = this.x + dirX * FLYING_ENEMY_SPEED * deltaSeconds;
     const nextY = this.y + dirY * FLYING_ENEMY_SPEED * deltaSeconds;
-    if (!this.isNearWorld(nextX + this.width / 2, nextY + this.height / 2, tileMap)) {
+    if (!this.isNearWorld(nextX + this.width / 2, nextY + this.height / 2, tileMap) ||
+      this.isBlockedAt(nextX + this.width / 2, nextY + this.height / 2, tileMap)) {
       const nearest = this.findNearestGroundCenter(tileMap);
       if (nearest) {
         const backX = nearest.x - own.x;
@@ -114,6 +115,11 @@ export class FlyingEnemy {
       nearestDistance = Math.min(nearestDistance, Math.hypot(x - centerX, y - centerY));
     });
     return nearestDistance <= FLYING_ENEMY_MAX_TILE_DISTANCE * TILE_SIZE;
+  }
+
+  isBlockedAt(x, y, tileMap) {
+    const tile = tileMap.getTileAtWorldPosition(x, y);
+    return tileMap.isBlockedForFlyingEntity(tile.x, tile.y);
   }
 
   clampNearWorld(tileMap) {

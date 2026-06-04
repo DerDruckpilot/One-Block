@@ -1,4 +1,11 @@
-import { OBJECT_TYPES, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import {
+  FLYING_ENTITY_BLOCKING_OBJECTS,
+  GROUND_ENTITY_BLOCKING_OBJECTS,
+  OBJECT_TYPES,
+  PLAYER_BLOCKING_OBJECTS,
+  TILE_SIZE,
+  TILE_TYPES
+} from '../config/constants.js';
 
 const keyOf = (x, y) => `${x},${y}`;
 const PLACEABLE_OBJECTS = new Set(Object.values(OBJECT_TYPES));
@@ -7,6 +14,7 @@ export class TileMap {
   constructor() {
     this.tiles = new Map();
     this.objects = new Map();
+    this.objectStates = new Map();
     this.crystal = { x: 0, y: 0 };
     this.createStartIsland();
   }
@@ -54,10 +62,26 @@ export class TileMap {
 
   setObject(x, y, type) {
     this.objects.set(keyOf(x, y), type);
+    if (type === OBJECT_TYPES.gate) {
+      this.objectStates.set(keyOf(x, y), { open: false });
+    } else if (![OBJECT_TYPES.sapling, OBJECT_TYPES.tree, OBJECT_TYPES.berryBush].includes(type)) {
+      this.objectStates.delete(keyOf(x, y));
+    }
+  }
+
+  setObjectState(x, y, state = {}) {
+    const key = keyOf(x, y);
+    if (!this.objects.has(key)) return false;
+    this.objectStates.set(key, {
+      ...(this.objectStates.get(key) || {}),
+      ...state
+    });
+    return true;
   }
 
   removeObject(x, y) {
     this.objects.delete(keyOf(x, y));
+    this.objectStates.delete(keyOf(x, y));
   }
 
   setWorkbench(x, y) {
@@ -96,9 +120,13 @@ export class TileMap {
 
   loadObjects(objects = []) {
     this.objects.clear();
+    this.objectStates.clear();
     for (const object of objects) {
       if (PLACEABLE_OBJECTS.has(object.type)) {
         this.objects.set(keyOf(object.x, object.y), object.type);
+        if (object.type === OBJECT_TYPES.gate) {
+          this.objectStates.set(keyOf(object.x, object.y), { open: object.open === true });
+        }
       }
     }
   }
@@ -247,7 +275,38 @@ export class TileMap {
 
   isBlockingObjectAtWorld(x, y) {
     const tile = this.worldToTile(x, y);
-    return this.getObject(tile.x, tile.y) === OBJECT_TYPES.tree;
+    return this.isBlockedForPlayer(tile.x, tile.y);
+  }
+
+  isBlockedForPlayer(x, y) {
+    return this.isObjectBlocking(x, y, PLAYER_BLOCKING_OBJECTS);
+  }
+
+  isBlockedForGroundEntity(x, y) {
+    return this.isObjectBlocking(x, y, GROUND_ENTITY_BLOCKING_OBJECTS);
+  }
+
+  isBlockedForFlyingEntity(x, y) {
+    return this.isObjectBlocking(x, y, FLYING_ENTITY_BLOCKING_OBJECTS);
+  }
+
+  isObjectBlocking(x, y, blockingTypes) {
+    const object = this.getObject(x, y);
+    if (!object || !blockingTypes.includes(object)) return false;
+    if (object === OBJECT_TYPES.gate && this.isGateOpen(x, y)) return false;
+    // Campfires stay walkable in this slice so mobile movement does not snag on tiny light props.
+    return true;
+  }
+
+  isGateOpen(x, y) {
+    return this.objectStates.get(keyOf(x, y))?.open === true;
+  }
+
+  toggleGate(x, y) {
+    if (this.getObject(x, y) !== OBJECT_TYPES.gate) return null;
+    const open = !this.isGateOpen(x, y);
+    this.objectStates.set(keyOf(x, y), { open });
+    return open;
   }
 
   getCrystalCenter() {
@@ -281,7 +340,8 @@ export class TileMap {
   forEachObject(callback) {
     for (const [key, type] of this.objects.entries()) {
       const [x, y] = key.split(',').map(Number);
-      callback({ x, y, type });
+      const state = this.objectStates.get(key) || {};
+      callback({ x, y, type, ...state });
     }
   }
 }

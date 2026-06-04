@@ -6,8 +6,10 @@ const hudElement = document.querySelector('#hud-content');
 const hotbarElement = document.querySelector('#hotbar');
 const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
+const buildButton = document.querySelector('#build-button');
 const inventoryPanel = document.querySelector('#inventory-panel');
 const craftingPanel = document.querySelector('#crafting-panel');
+const buildPanel = document.querySelector('#build-panel');
 const touchControlsElement = document.querySelector('#touch-controls');
 const joystickElement = document.querySelector('#touch-joystick');
 const joystickKnobElement = document.querySelector('#touch-joystick-knob');
@@ -25,6 +27,8 @@ const getLocalStorage = () => {
 const game = new Game(canvas, hudElement, {
   actionButton,
   attackButton,
+  buildButton,
+  buildPanel,
   craftingButton,
   craftingPanel,
   hotbarElement,
@@ -38,7 +42,7 @@ const game = new Game(canvas, hudElement, {
 game.start();
 
 const preventGameTouchDefault = (event) => {
-  if (event.target?.closest?.('#inventory-panel, #crafting-panel')) return;
+  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel')) return;
   event.preventDefault();
 };
 

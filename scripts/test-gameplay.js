@@ -9,7 +9,10 @@ import {
   HOTBAR_SLOT_COUNT,
   BOW_RANGE,
   BERRY_BUSH_GROW_SECONDS,
+  CRYSTAL_ENCOUNTER_DROPS,
   FLYING_ENEMY_MAX_TILE_DISTANCE,
+  GATE_INTERACTION_DISTANCE,
+  LASSO_INTERACTION_DISTANCE,
   OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
@@ -21,6 +24,7 @@ import {
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
+import { Animal } from '../src/entities/animal.js';
 import { Enemy } from '../src/entities/enemy.js';
 import { TouchInput } from '../src/core/touch-input.js';
 import { Player } from '../src/entities/player.js';
@@ -189,7 +193,7 @@ const map = new TileMap();
   assert.equal(indexHtml.includes('user-scalable=no'), true, 'mobile viewport disables browser double-tap zoom');
   assert.equal(styles.includes('touch-action: pan-y'), true, 'menu panels keep vertical touch scrolling enabled');
   assert.equal(styles.includes('-webkit-overflow-scrolling: touch'), true, 'menu panels keep momentum scrolling on mobile Safari');
-  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
 {
@@ -1497,6 +1501,7 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { attackButton });
 
+  game.crystalSystem.random = () => 0.1;
   game.inventory.add('woodenSpear', 1);
   game.hotbarSlots[0] = 'woodenSpear';
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 34 });
@@ -1531,6 +1536,7 @@ const map = new TileMap();
 {
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0.1;
 
   game.inventory.add('woodenSpear', 1);
   game.hotbarSlots[0] = 'woodenSpear';
@@ -1543,6 +1549,7 @@ const map = new TileMap();
 {
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0.1;
 
   game.inventory.add('woodenSpear', 1);
   game.hotbarSlots[0] = 'woodenSpear';
@@ -1551,10 +1558,10 @@ const map = new TileMap();
   assert.equal(game.enemySystem.enemies[0].hp, 4, 'enemy starts with four hit points');
   assert.equal(game.enemySystem.enemies[0].healthVisible, false, 'enemy health bar is hidden before first hit');
 
-  game.player.facing = { x: -1, y: 0 };
-  assert.equal(game.tryAttackAction(), false, 'second spear crystal encounter does not spawn another enemy');
+  const cappedSpawn = game.enemySystem.spawnNearCrystal(game.tileMap);
+  assert.equal(cappedSpawn.spawned, false, 'second spear crystal encounter does not spawn another enemy');
   assert.equal(game.enemySystem.activeCount(), 1, 'spear crystal encounter is capped at one active enemy');
-  assert.equal(game.crystalSystem.lastMessage, 'Es ist bereits eine Kreatur da.', 'existing enemy writes a no-spam log');
+  assert.equal(cappedSpawn.message, 'Es ist bereits eine Kreatur da.', 'existing enemy writes a no-spam log');
 }
 
 {
@@ -2344,6 +2351,7 @@ const map = new TileMap();
 {
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0.9;
   game.inventory.add('slingshot', 1);
   game.selectHotbarResource('slingshot');
   game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
@@ -2451,6 +2459,7 @@ const map = new TileMap();
 {
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0.9;
   game.inventory.add('slingshot', 1);
   game.inventory.add('stoneBall', 1);
   game.selectHotbarResource('slingshot');
@@ -2856,6 +2865,297 @@ const map = new TileMap();
   game.update(1);
 
   assert.equal(game.plantSystem.getPlant(1, 1).growthSeconds, before, 'menu pause stops plant growth timers');
+}
+
+{
+  const scrollPanel = {
+    hidden: true,
+    _html: '',
+    _list: null,
+    set innerHTML(value) {
+      this._html = value;
+      this._list = value.includes('data-craft-scroll')
+        ? { dataset: { craftScroll: value.includes('data-craft-scroll="workbench"') ? 'workbench' : 'normal' }, scrollTop: 0 }
+        : null;
+    },
+    get innerHTML() {
+      return this._html;
+    },
+    addEventListener() {},
+    querySelector(selector) {
+      return selector === '[data-craft-scroll]' ? this._list : null;
+    }
+  };
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  const menus = new MenuPanels({ craftingPanel: scrollPanel, inventoryPanel: createRectElement({ left: 0, top: 0, width: 1, height: 1 }) });
+
+  menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'normal' }), 'normal');
+  scrollPanel.querySelector('[data-craft-scroll]').scrollTop = 88;
+  menus.selectCraftingRecipe('torch');
+  menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'normal' }), 'normal');
+  assert.equal(scrollPanel.querySelector('[data-craft-scroll]').scrollTop, 88, 'normal crafting menu preserves list scroll position');
+
+  menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }), 'workbench');
+  scrollPanel.querySelector('[data-craft-scroll]').scrollTop = 144;
+  menus.selectCraftingRecipe('bow');
+  menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }), 'workbench');
+  assert.equal(scrollPanel.querySelector('[data-craft-scroll]').scrollTop, 144, 'workbench crafting menu preserves its own list scroll position');
+  assert.equal(scrollPanel.innerHTML.includes('data-craft="bow"'), true, 'crafting button remains rendered after recipe scroll and selection');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = { addEventListener(type, callback) { if (type === 'pointerdown') pointerdown = callback; } };
+  const canvas = { width: 960, height: 540, focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) };
+  let crafted = null;
+  const craftButton = createRectElement(
+    { left: 500, top: 320, width: 160, height: 42 },
+    { dataset: { craft: 'bow' }, disabled: false }
+  );
+  const craftingPanel = createRectElement(
+    { left: 280, top: 80, width: 420, height: 340 },
+    { querySelectorAll: (selector) => (selector === '[data-craft]' ? [craftButton] : []) }
+  );
+  new PointerHitboxSystem({
+    canvas,
+    craftingPanel,
+    getCraftingOpen: () => true,
+    onCraft(recipeId) { crafted = recipeId; },
+    pointerTarget
+  });
+
+  pointerdown(createPointerEvent(520, 330));
+  assert.equal(crafted, 'bow', 'crafting button remains clickable after scroll-position changes');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.plantSystem.plantTreeSeed(game.tileMap, 1, 1);
+  let plant = game.plantSystem.getPlant(1, 1);
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.sapling, 'tree growth stage one is a sapling object');
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 1, 'tree stage one is saved as render state');
+  plant.growthSeconds = SAPLING_GROW_SECONDS * 0.3;
+  game.plantSystem.syncPlantObjectState(game.tileMap, plant);
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 2, 'young tree stage is visible before maturity');
+  game.plantSystem.update(SAPLING_GROW_SECONDS, game.tileMap);
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'tree reaches mature object stage');
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 3, 'mature tree stage is saved as render state');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'tree growth stage loads as mature tree');
+  assert.equal(loadedGame.tileMap.objectStates.get('1,1').growthStage, 3, 'loaded tree keeps mature growth stage');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.plantSystem.plantBerryBush(game.tileMap, 1, 1);
+  let plant = game.plantSystem.getPlant(1, 1);
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 1, 'berry bush starts as small bush');
+  plant.growthSeconds = BERRY_BUSH_GROW_SECONDS * 0.25;
+  game.plantSystem.update(0, game.tileMap);
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 2, 'berry bush has a larger middle stage');
+  game.plantSystem.update(BERRY_BUSH_GROW_SECONDS, game.tileMap);
+  assert.equal(game.tileMap.objectStates.get('1,1').growthStage, 3, 'ripe berry bush shows berry stage');
+  assert.equal(game.tileMap.objectStates.get('1,1').ready, true, 'ripe berry bush state is visible');
+  game.plantSystem.harvestBerryBush(1, 1, game.tileMap);
+  assert.equal(game.tileMap.objectStates.get('1,1').ready, false, 'harvested berry bush hides ripe berries');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.berryBush, 'berry bush growth state loads');
+  assert.equal(loadedGame.tileMap.objectStates.get('1,1').ready, false, 'loaded berry bush keeps harvested state');
+}
+
+{
+  const player = createSpawnedPlayer();
+  const collisionMap = new TileMap();
+  collisionMap.setWorkbench(1, 1);
+  collisionMap.setObject(1, 0, OBJECT_TYPES.table);
+  collisionMap.setObject(-1, 1, OBJECT_TYPES.woodWall);
+  collisionMap.setObject(0, -1, OBJECT_TYPES.chair);
+  collisionMap.setObject(-1, 0, OBJECT_TYPES.berryBush);
+  collisionMap.setObject(0, 1, OBJECT_TYPES.tree);
+
+  assert.equal(collisionMap.isBlockedForPlayer(1, 1), true, 'workbench blocks player movement');
+  assert.equal(collisionMap.isBlockedForGroundEntity(1, 0), true, 'table blocks ground enemies');
+  assert.equal(collisionMap.isBlockedForGroundEntity(-1, 1), true, 'wood wall blocks ground enemies');
+  assert.equal(collisionMap.isBlockedForFlyingEntity(-1, 1), true, 'wood wall blocks flying enemies');
+  assert.equal(collisionMap.isBlockedForPlayer(0, 1), true, 'tree start tile blocks player movement');
+  assert.equal(collisionMap.isBlockedForGroundEntity(0, 1), true, 'tree start tile blocks ground enemies');
+  assert.equal(collisionMap.isBlockedForFlyingEntity(0, 1), true, 'tree start tile blocks flying enemies');
+  assert.equal(collisionMap.isBlockedForPlayer(0, -1), false, 'chair remains walkable');
+  assert.equal(collisionMap.isBlockedForGroundEntity(-1, 0), false, 'berry bush remains walkable');
+
+  const before = player.x;
+  player.update(0.25, inputWith('s'), collisionMap);
+  assert.equal(player.x, before, 'blocking object does not create a void-safe area and blocks only its tile');
+}
+
+{
+  assert.equal(chooseWeightedDrop(CRYSTAL_ENCOUNTER_DROPS, 0.79).encounter, 'ground', 'crystal encounter weighting keeps 80 percent ground enemies');
+  assert.equal(chooseWeightedDrop(CRYSTAL_ENCOUNTER_DROPS, 0.80).encounter, 'flying', 'crystal encounter weighting assigns the final 20 percent to flying enemies');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  inventory.add('fiber', 8);
+  inventory.add('rawWood', 2);
+  assert.equal(crafting.craft('lasso', { hasWorkbenchAccess: true }).crafted, true, 'lasso can be crafted at a workbench');
+  assert.equal(inventory.get('lasso'), 1, 'lasso crafting adds lasso item');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  const spawn = game.animalSystem.spawn(game.tileMap);
+  game.inventory.add('lasso', 1);
+  spawn.animal.setTilePosition({ x: 1, y: 1 });
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryContextAction(), true, 'lasso can catch a nearby chicken through context action');
+  assert.equal(spawn.animal.tethered, true, 'caught chicken becomes tethered');
+  assert.equal(game.crystalSystem.lastMessage, 'Huhn eingefangen.', 'catching chicken writes a clear log');
+
+  game.player.setPosition(4 * TILE_SIZE, 1 * TILE_SIZE);
+  game.animalSystem.update(0.5, game.tileMap, game.player);
+  assert.ok(Math.hypot(spawn.animal.getFootPosition().x - game.player.getFootPosition().x, spawn.animal.getFootPosition().y - game.player.getFootPosition().y) < TILE_SIZE * 4, 'tethered chicken follows the player or recovers nearby');
+
+  game.hotbarSlots[0] = 'lasso';
+  game.activeHotbarSlot = 0;
+  assert.equal(game.tryContextAction(), true, 'active lasso releases a tethered chicken');
+  assert.equal(spawn.animal.tethered, false, 'released chicken returns to normal movement');
+  assert.equal(game.crystalSystem.lastMessage, 'Huhn losgelassen.', 'release writes a clear log');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  const spawn = game.animalSystem.spawn(game.tileMap);
+  spawn.animal.tethered = true;
+  game.inventory.add('lasso', 1);
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.inventory.get('lasso'), 1, 'lasso saves and loads');
+  assert.equal(loadedGame.animalSystem.getTetheredAnimal()?.tethered, true, 'tethered chicken state saves and loads');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  inventory.add('rawWood', 7);
+  inventory.add('fiber', 3);
+  assert.equal(crafting.craft('fence', { hasWorkbenchAccess: true }).crafted, true, 'fence can be crafted at a workbench');
+  assert.equal(inventory.get('fence'), 2, 'fence recipe creates two fence pieces');
+  assert.equal(crafting.craft('gate', { hasWorkbenchAccess: true }).crafted, true, 'gate can be crafted at a workbench');
+  assert.equal(inventory.get('gate'), 1, 'gate recipe creates one gate');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('fence', 1);
+  game.hotbarSlots[0] = 'fence';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryPlaceSelectedItem(), true, 'fence can be placed on ground');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.fence, 'placed fence becomes a world object');
+  assert.equal(game.tileMap.isBlockedForGroundEntity(1, 1), true, 'fence blocks ground entities and animals');
+
+  game.inventory.add('gate', 1);
+  game.hotbarSlots[0] = 'gate';
+  game.player.facing = { x: -1, y: 0 };
+  assert.equal(game.tryPlaceSelectedItem(), true, 'gate can be placed on ground');
+  assert.equal(game.tileMap.getObject(-1, 1), OBJECT_TYPES.gate, 'placed gate becomes a world object');
+  game.tileMap.setObject(1, 0, OBJECT_TYPES.gate);
+  game.player.facing = { x: 1, y: -1 };
+  assert.equal(game.tileMap.isBlockedForPlayer(1, 0), true, 'closed gate blocks player');
+  game.tileMap.toggleGate(1, 0);
+  assert.equal(game.tileMap.isBlockedForPlayer(1, 0), false, 'open gate is passable');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.isGateOpen(1, 0), true, 'gate open state saves and loads');
+}
+
+{
+  const mapWithFence = new TileMap();
+  mapWithFence.setObject(1, 1, OBJECT_TYPES.fence);
+  const chicken = Animal.fromTile({ x: 0, y: 1 });
+  chicken.direction = { x: 1, y: 0 };
+  chicken.update(1, mapWithFence, () => 0);
+  assert.equal(chicken.getFootPosition().x < TILE_SIZE, true, 'chickens respect fence collision and stay inside simple pens');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.toggleBuildMenu();
+  assert.equal(game.buildOpen, true, 'build menu opens');
+  assert.equal(game.isGamePaused(), true, 'build menu pauses the game');
+  game.inventory.add('woodWall', 1);
+  assert.equal(game.selectBuildResource('woodWall'), true, 'build menu selection chooses a build item');
+  assert.equal(game.getActiveHotbarItem(), 'woodWall', 'build menu selection sets active placement item');
+}
+
+{
+  let pointerdown = null;
+  const pointerTarget = { addEventListener(type, callback) { if (type === 'pointerdown') pointerdown = callback; } };
+  const canvas = { width: 960, height: 540, focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) };
+  let selected = null;
+  let removeToggled = false;
+  const buildItem = createRectElement({ left: 320, top: 150, width: 160, height: 42 }, { dataset: { buildResource: 'fence' } });
+  const removeButton = createRectElement({ left: 320, top: 100, width: 160, height: 42 }, { dataset: { buildRemove: 'true' } });
+  const buildPanel = createRectElement(
+    { left: 300, top: 80, width: 360, height: 300 },
+    { querySelectorAll: (selector) => {
+      if (selector === '[data-build-resource]') return [buildItem];
+      if (selector === '[data-build-remove]') return [removeButton];
+      return [];
+    } }
+  );
+  new PointerHitboxSystem({
+    buildPanel,
+    canvas,
+    getBuildOpen: () => true,
+    onBuildItemSelect(resource) { selected = resource; },
+    onBuildRemoveToggle() { removeToggled = true; },
+    pointerTarget
+  });
+  pointerdown(createPointerEvent(330, 160));
+  assert.equal(selected, 'fence', 'build menu item is touch/click selectable');
+  pointerdown(createPointerEvent(330, 110));
+  assert.equal(removeToggled, true, 'build menu remove mode is touch/click selectable');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.table);
+  game.removeMode = true;
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryContextAction(), true, 'remove mode removes valid target object');
+  assert.equal(game.tileMap.getObject(1, 1), null, 'removed object leaves world');
+  assert.equal(game.inventory.get('table'), 1, 'removed object returns one item');
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.fence);
+  game.tileMap.setObject(1, 0, OBJECT_TYPES.gate);
+  game.buildSelectedResource = 'fence';
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.fence, 'fence saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(1, 0), OBJECT_TYPES.gate, 'gate saves and loads');
+  assert.equal(loadedGame.buildSelectedResource, 'fence', 'build menu selection saves and loads');
+  assert.equal(loadedGame.removeMode, true, 'remove mode saves and loads when active');
+  loadedGame.input.keys.add('r');
+  loadedGame.update(2.1);
+  assert.equal(loadedGame.tileMap.getObject(1, 1), null, 'reset removes new fence object');
+  assert.equal(loadedGame.inventory.get('lasso'), 0, 'reset clears lasso item state');
+  assert.equal(loadedGame.removeMode, false, 'reset clears remove mode');
 }
 
 console.log('Gameplay-Basics OK.');

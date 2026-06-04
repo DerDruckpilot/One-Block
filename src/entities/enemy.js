@@ -106,7 +106,7 @@ export class Enemy {
     const tile = tileMap.getTileAtWorldPosition(foot.x, foot.y);
     return tileMap.isPositionSupportedByTile(foot.x, foot.y) &&
       !tileMap.isCrystal(tile.x, tile.y) &&
-      !tileMap.getObject(tile.x, tile.y);
+      !tileMap.isBlockedForGroundEntity(tile.x, tile.y);
   }
 
   setTilePosition(tile) {

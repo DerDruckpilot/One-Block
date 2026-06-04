@@ -125,7 +125,9 @@ export class EnemySystem {
   }
 
   canSpawnAt(tileMap, x, y) {
-    return tileMap.isGround(x, y) && !tileMap.isCrystal(x, y) && !tileMap.getObject(x, y);
+    return tileMap.isGround(x, y) &&
+      !tileMap.isCrystal(x, y) &&
+      !tileMap.isBlockedForGroundEntity(x, y);
   }
 
   load(enemies, tileMap) {

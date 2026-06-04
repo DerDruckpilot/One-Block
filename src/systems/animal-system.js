@@ -7,11 +7,15 @@ export class AnimalSystem {
     this.random = random;
   }
 
-  update(deltaSeconds, tileMap) {
+  update(deltaSeconds, tileMap, player = null) {
     const events = [];
 
     for (const animal of this.animals) {
-      animal.update(deltaSeconds, tileMap, this.random);
+      if (animal.tethered && player) {
+        animal.updateFollow(deltaSeconds, tileMap, player);
+      } else {
+        animal.update(deltaSeconds, tileMap, this.random);
+      }
       if (!animal.isSupported(tileMap)) {
         events.push({ type: 'void', animal });
       }
@@ -68,7 +72,7 @@ export class AnimalSystem {
   canSpawnAt(tileMap, x, y) {
     return tileMap.isGround(x, y) &&
       !tileMap.isCrystal(x, y) &&
-      !tileMap.getObject(x, y) &&
+      !tileMap.isBlockedForGroundEntity(x, y) &&
       !this.animals.some((animal) => {
         const foot = animal.getFootPosition();
         const tile = tileMap.getTileAtWorldPosition(foot.x, foot.y);
@@ -90,6 +94,43 @@ export class AnimalSystem {
       }
       this.animals.push(animal);
     }
+  }
+
+  findNearestChicken(player, maxDistance) {
+    const origin = player.getFootPosition();
+    let nearest = null;
+    let nearestDistance = Infinity;
+    for (const animal of this.animals) {
+      if (animal.type !== 'chicken' || animal.tethered) continue;
+      const foot = animal.getFootPosition();
+      const distance = Math.hypot(origin.x - foot.x, origin.y - foot.y);
+      if (distance <= maxDistance && distance < nearestDistance) {
+        nearest = animal;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
+
+  getTetheredAnimal() {
+    return this.animals.find((animal) => animal.tethered) || null;
+  }
+
+  tetherChicken(player, maxDistance) {
+    const existing = this.getTetheredAnimal();
+    if (existing) {
+      existing.tethered = false;
+      return { changed: true, animal: existing, message: 'Huhn losgelassen.' };
+    }
+
+    const animal = this.findNearestChicken(player, maxDistance);
+    if (!animal) {
+      return { changed: false, animal: null, message: 'Kein Tier in Reichweite.' };
+    }
+
+    animal.tethered = true;
+    animal.direction = { x: 0, y: 0 };
+    return { changed: true, animal, message: 'Huhn eingefangen.' };
   }
 
   getRecoveryTile(animal, tileMap) {
