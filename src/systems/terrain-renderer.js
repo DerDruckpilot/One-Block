@@ -56,6 +56,10 @@ export class TerrainRenderer {
       context.fillStyle = 'rgba(35, 23, 16, 0.16)';
       context.fillRect(x + TILE_SIZE - 1, y + 5, 1, 18);
     }
+    if (edges.hasUp && !same.up) {
+      context.fillStyle = 'rgba(255, 238, 190, 0.12)';
+      context.fillRect(x + 3, y + 2, TILE_SIZE - 6, 1);
+    }
 
     if (edges.bottomOuter) {
       const leftInset = edges.bottomContinuesLeft ? 0 : 3;
@@ -70,6 +74,8 @@ export class TerrainRenderer {
       context.fillStyle = 'rgba(35, 23, 16, 0.12)';
       context.fillRect(x + 2, y + 24, TILE_SIZE - 4, 1);
     }
+
+    this.drawTransitionDetails(context, tile, palette, x, y, edges, same);
 
     this.drawTileDetails(context, tile, palette, x, y, this.detailVariant(tile));
     if (tile.type !== TILE_TYPES.water && tileMap.isWatered?.(tile.x, tile.y)) {
@@ -130,10 +136,44 @@ export class TerrainRenderer {
         (edges.hasDown && !same.down) ||
         (edges.hasLeft && !same.left) ||
         (edges.hasRight && !same.right),
+      waterTransition: tile.type === TILE_TYPES.water && (
+        (edges.hasUp && !same.up) ||
+        (edges.hasDown && !same.down) ||
+        (edges.hasLeft && !same.left) ||
+        (edges.hasRight && !same.right)
+      ),
       connectedSurfaceHorizontal: same.left || same.right,
       connectedSurfaceVertical: same.up || same.down,
       connectedBottomEdge: edges.bottomOuter && (edges.bottomContinuesLeft || edges.bottomContinuesRight)
     };
+  }
+
+  drawTransitionDetails(context, tile, palette, x, y, edges, same) {
+    const transition = {
+      up: edges.hasUp && !same.up,
+      down: edges.hasDown && !same.down,
+      left: edges.hasLeft && !same.left,
+      right: edges.hasRight && !same.right
+    };
+    if (!transition.up && !transition.down && !transition.left && !transition.right) return;
+
+    if (tile.type === TILE_TYPES.water) {
+      context.fillStyle = 'rgba(164, 236, 255, 0.52)';
+      if (transition.up) context.fillRect(x + 4, y + 3, TILE_SIZE - 8, 2);
+      if (transition.down) context.fillRect(x + 4, y + 21, TILE_SIZE - 8, 2);
+      if (transition.left) context.fillRect(x + 3, y + 5, 2, 16);
+      if (transition.right) context.fillRect(x + TILE_SIZE - 5, y + 5, 2, 16);
+      context.fillStyle = 'rgba(18, 49, 78, 0.24)';
+      if (transition.down) context.fillRect(x + 5, y + 24, TILE_SIZE - 10, 2);
+      return;
+    }
+
+    context.fillStyle = 'rgba(255, 236, 188, 0.08)';
+    if (transition.up) context.fillRect(x + 5, y + 3, TILE_SIZE - 10, 1);
+    if (transition.left) context.fillRect(x + 2, y + 6, 1, 15);
+    if (transition.right) context.fillRect(x + TILE_SIZE - 3, y + 6, 1, 15);
+    context.fillStyle = 'rgba(35, 23, 16, 0.1)';
+    if (transition.down) context.fillRect(x + 4, y + 23, TILE_SIZE - 8, 1);
   }
 
   drawTileDetails(context, tile, palette, x, y, variant = 0) {

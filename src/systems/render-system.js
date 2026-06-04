@@ -126,11 +126,12 @@ export class RenderSystem {
     });
   }
 
-  renderForegroundBarriers(tileMap, camera) {
+  renderForegroundBarriers(tileMap, camera, subjects = []) {
     tileMap.forEachObject((object) => {
       if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.fence, OBJECT_TYPES.gate].includes(object.type)) return;
       const shape = tileMap.getBarrierCollisionShape(object.x, object.y);
       if (!shape.horizontal) return;
+      if (!this.shouldRenderBarrierForeground(object, shape, subjects)) return;
       const screenX = Math.round(object.x * TILE_SIZE - camera.x);
       const screenY = Math.round(object.y * TILE_SIZE - camera.y);
       this.drawBarrierForeground(screenX, screenY, object.type, object.open === true, shape);
@@ -485,9 +486,13 @@ export class RenderSystem {
     const centerX = x + TILE_SIZE / 2;
     const centerY = y + TILE_SIZE / 2;
     const topY = centerY - visualHeight / 2;
+    const pureHorizontal = hasHorizontal && !hasVertical && !single;
+    const skipCenterPost = pureHorizontal && (palette.kind === 'wall' || palette.kind === 'door');
 
     this.context.fillStyle = palette.post;
-    this.context.fillRect(centerX - half - 1, topY, thickness + 2, visualHeight);
+    if (!skipCenterPost) {
+      this.context.fillRect(centerX - half - 1, topY, thickness + 2, visualHeight);
+    }
 
     if (single || hasVertical) {
       this.context.fillStyle = palette.main;
@@ -525,7 +530,9 @@ export class RenderSystem {
     }
 
     this.context.fillStyle = palette.accent;
-    this.context.fillRect(centerX - 3, centerY - 3, 6, 6);
+    if (!skipCenterPost) {
+      this.context.fillRect(centerX - 3, centerY - 3, 6, 6);
+    }
     if (palette.open) {
       this.context.fillRect(centerX + 5, centerY - 10, 4, 16);
     }
@@ -534,8 +541,10 @@ export class RenderSystem {
       this.context.fillStyle = palette.accent;
       this.context.fillRect(centerX + (palette.open ? 7 : 4), centerY - 1, 3, 3);
       this.context.fillStyle = '#2e1d14';
-      this.context.fillRect(centerX - half - 2, topY + 3, 2, 6);
-      this.context.fillRect(centerX - half - 2, topY + visualHeight - 9, 2, 6);
+      if (!skipCenterPost) {
+        this.context.fillRect(centerX - half - 2, topY + 3, 2, 6);
+        this.context.fillRect(centerX - half - 2, topY + visualHeight - 9, 2, 6);
+      }
     }
 
     if (palette.kind === 'gate') {
@@ -640,6 +649,21 @@ export class RenderSystem {
       this.context.fillRect(left, centerY - 10, right - left, 3);
     }
     this.context.restore();
+  }
+
+  shouldRenderBarrierForeground(object, shape = null, subjects = []) {
+    const connections = shape?.connections || { left: false, right: false };
+    const worldLeft = (connections.left ? object.x : object.x + 0.12) * TILE_SIZE;
+    const worldRight = (connections.right ? object.x + 1 : object.x + 0.88) * TILE_SIZE;
+    const barrierY = object.y * TILE_SIZE + TILE_SIZE / 2;
+    const margin = TILE_SIZE * 0.35;
+
+    return subjects.some((subject) =>
+      subject &&
+      subject.x >= worldLeft - margin &&
+      subject.x <= worldRight + margin &&
+      subject.y < barrierY
+    );
   }
 
   getBarrierRenderProfile(type, open = false) {

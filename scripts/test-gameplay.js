@@ -3315,6 +3315,32 @@ const map = new TileMap();
 }
 
 {
+  const { Game } = await import('../src/core/game.js');
+  const gateGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  gateGame.tileMap.setObject(1, 1, OBJECT_TYPES.gate);
+  gateGame.removeMode = true;
+  setGamePlayerOnTile(gateGame, 0, 1, { x: 1, y: 0 });
+  assert.equal(gateGame.tryContextAction(), true, 'remove mode has priority before gate open/close');
+  assert.equal(gateGame.tileMap.getObject(1, 1), null, 'gate can be removed through context action while remove mode is active');
+  assert.equal(gateGame.inventory.get('gate'), 1, 'removed gate returns one gate item');
+
+  const doorGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  doorGame.tileMap.setObject(1, 1, OBJECT_TYPES.door);
+  doorGame.removeMode = true;
+  setGamePlayerOnTile(doorGame, 0, 1, { x: 1, y: 0 });
+  assert.equal(doorGame.tryContextAction(), true, 'remove mode has priority before door open/close');
+  assert.equal(doorGame.tileMap.getObject(1, 1), null, 'door can be removed through context action while remove mode is active');
+  assert.equal(doorGame.inventory.get('door'), 1, 'removed door returns one door item');
+
+  const toggleGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  toggleGame.tileMap.setObject(1, 1, OBJECT_TYPES.gate);
+  setGamePlayerOnTile(toggleGame, 0, 1, { x: 1, y: 0 });
+  assert.equal(toggleGame.tryContextAction(), true, 'gate still toggles when remove mode is inactive');
+  assert.equal(toggleGame.tileMap.getObject(1, 1), OBJECT_TYPES.gate, 'inactive remove mode leaves gate in the world');
+  assert.equal(toggleGame.tileMap.isGateOpen(1, 1), true, 'inactive remove mode keeps normal gate open/close behavior');
+}
+
+{
   const inventory = new ResourceInventory();
   const crafting = new CraftingSystem(inventory);
   inventory.add('rawWood', 4);
@@ -3424,6 +3450,14 @@ const map = new TileMap();
   renderer.drawWoodWall(0, 0, horizontalShape);
   const wallCalls = [...context.calls];
   assert.equal(wallCalls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wood wall is rendered upward onto the barrier line instead of flat on the tile');
+  assert.equal(wallCalls.some((call) =>
+    call.fn === 'fillRect' &&
+    call.fillStyle === '#3a2418' &&
+    call.args[0] === 10 &&
+    call.args[1] === 2 &&
+    call.args[2] === 12 &&
+    call.args[3] === 28
+  ), false, 'horizontal wood wall does not draw a lower center-post artifact');
   context.calls.length = 0;
   renderer.drawFence(0, 0, horizontalShape);
   assert.notDeepEqual(wallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'horizontal wall rendering is not identical to horizontal fence rendering');
@@ -3442,6 +3476,14 @@ const map = new TileMap();
   context.calls.length = 0;
   renderer.drawDoor(0, 0, false, horizontalShape);
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wall door is rendered upward with the wall barrier');
+  assert.equal(context.calls.some((call) =>
+    call.fn === 'fillRect' &&
+    call.fillStyle === '#2e1d14' &&
+    call.args[0] === 11 &&
+    call.args[1] === 3 &&
+    call.args[2] === 11 &&
+    call.args[3] === 26
+  ), false, 'horizontal door does not draw a lower center-post artifact');
 
   context.calls.length = 0;
   const verticalShape = { horizontal: false, vertical: true, connections: { left: false, right: false, up: true, down: true } };
@@ -3455,8 +3497,13 @@ const map = new TileMap();
   const barrierMap = new TileMap();
   barrierMap.setObject(0, 0, OBJECT_TYPES.woodWall);
   barrierMap.setObject(1, 0, OBJECT_TYPES.woodWall);
-  renderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 });
-  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal barriers draw a foreground strip for depth layering');
+  renderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 }, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 10 }]);
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), false, 'player in front of a horizontal wall is not covered by the foreground strip');
+  context.calls.length = 0;
+  renderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 }, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 10 }]);
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'player behind a horizontal wall is covered by the foreground strip');
+  assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 8 }]), false, 'foreground barrier test treats lower Y as in front');
+  assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 8 }]), true, 'foreground barrier test treats upper Y as behind');
 }
 
 {
@@ -3498,6 +3545,21 @@ const map = new TileMap();
   assert.equal(edgeProfile.transitionEdge, true, 'ground rendering detects different-type transition edges');
   assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
 
+  const transitionContext = createDrawContext();
+  terrain.drawTile(transitionContext, { x: 0, y: 0, type: 'grass' }, terrainMap, 0, 0);
+  assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(255, 236, 188, 0.08)'), true, 'different tile transitions draw subtle seam fill instead of leaving a gap');
+
+  const waterMap = new TileMap();
+  waterMap.tiles.clear();
+  waterMap.setWater(0, 0);
+  waterMap.setClay(1, 0);
+  waterMap.setGrass(0, 1);
+  const waterProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'water' }, waterMap);
+  assert.equal(waterProfile.waterTransition, true, 'water tiles expose transition rendering when adjacent to other ground');
+  const waterContext = createDrawContext();
+  terrain.drawTile(waterContext, { x: 0, y: 0, type: 'water' }, waterMap, 0, 0);
+  assert.equal(waterContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(164, 236, 255, 0.52)'), true, 'water transition uses a dedicated edge highlight');
+
   const lowerEdgeMap = new TileMap();
   lowerEdgeMap.tiles.clear();
   lowerEdgeMap.setStone(0, 0);
@@ -3509,6 +3571,16 @@ const map = new TileMap();
   const { RenderSystem } = await import('../src/systems/render-system.js');
   const shadowRenderer = new RenderSystem(shadowContext);
   assert.deepEqual(shadowRenderer.getIslandShadowRuns(lowerEdgeMap), [{ y: 0, start: 0, end: 2 }], 'shadow logic groups adjacent bottom-edge tiles into one run');
+
+  const saveLikeMap = new TileMap();
+  saveLikeMap.loadTiles([
+    { x: 0, y: 0, type: 'water' },
+    { x: 1, y: 0, type: 'clay' },
+    { x: 0, y: 1, type: 'water' }
+  ]);
+  const loadedWaterProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'water' }, saveLikeMap);
+  assert.equal(loadedWaterProfile.connectedSurfaceVertical, true, 'loaded tile maps reconstruct vertical ground render connections from neighbors');
+  assert.equal(loadedWaterProfile.waterTransition, true, 'loaded tile maps reconstruct water transition render state from neighbors');
 }
 
 console.log('Gameplay-Basics OK.');
