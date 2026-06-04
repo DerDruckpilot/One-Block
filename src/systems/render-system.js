@@ -88,10 +88,12 @@ export class RenderSystem {
         this.drawCampfire(screenX, screenY);
       }
       if (object.type === OBJECT_TYPES.woodWall) {
-        this.drawWoodWall(screenX, screenY, tileMap.getBarrierCollisionShape(object.x, object.y));
+        const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
+        this.drawWoodWall(screenX, screenY, renderState);
       }
       if (object.type === OBJECT_TYPES.door) {
-        this.drawDoor(screenX, screenY, object.open, tileMap.getBarrierCollisionShape(object.x, object.y));
+        const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
+        this.drawDoor(screenX, screenY, renderState?.open === true, renderState);
       }
       if (object.type === OBJECT_TYPES.table) {
         this.drawTable(screenX, screenY);
@@ -613,16 +615,8 @@ export class RenderSystem {
   }
 
   drawWallDoorShape(x, y, shape = null, palette) {
-    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
-    const variant = this.getCanonicalBarrierVariant(connections);
-    const thickness = palette.thickness;
-    const half = Math.floor(thickness / 2);
-    const visualHeight = palette.height || palette.capHeight;
-    const centerX = x + TILE_SIZE / 2;
-    const centerY = y + TILE_SIZE / 2;
-    const horizontalTop = centerY - visualHeight + 4;
-    const horizontalBottom = horizontalTop + visualHeight;
-    const verticalLeft = centerX - half;
+    const plan = this.getWallDoorRenderPlan(shape, palette);
+    const { variant, segments, visualHeight, centerX, centerY, verticalLeft } = plan;
     const drawSolidRect = (left, top, width, height) => {
       if (width <= 0 || height <= 0) return;
       this.context.fillStyle = palette.main;
@@ -638,34 +632,8 @@ export class RenderSystem {
       }
     };
 
-    const segments = [];
-    const hasHorizontal = connections.left || connections.right;
-    const hasVertical = connections.up || connections.down;
-
-    if (!hasHorizontal && !hasVertical) {
-      segments.push({ left: verticalLeft - 1, top: centerY - visualHeight / 2, width: thickness + 2, height: visualHeight });
-    } else if (hasVertical && !hasHorizontal) {
-      const top = connections.up ? y : centerY - visualHeight / 2;
-      const bottom = connections.down ? y + TILE_SIZE : centerY + visualHeight / 2;
-      segments.push({ left: verticalLeft, top, width: thickness, height: bottom - top });
-    } else {
-      if (connections.left) {
-        segments.push({ left: x, top: horizontalTop, width: centerX - half - x, height: visualHeight });
-      }
-      if (connections.right) {
-        segments.push({ left: centerX + half, top: horizontalTop, width: x + TILE_SIZE - (centerX + half), height: visualHeight });
-      }
-      if (connections.up) {
-        segments.push({ left: verticalLeft, top: y, width: thickness, height: Math.max(0, horizontalTop - y) });
-      }
-      if (connections.down) {
-        segments.push({ left: verticalLeft, top: horizontalBottom, width: thickness, height: Math.max(0, y + TILE_SIZE - horizontalBottom) });
-      }
-      segments.push({ left: verticalLeft, top: horizontalTop, width: thickness, height: visualHeight });
-    }
-
     for (const segment of segments) {
-      drawSolidRect(segment.left, segment.top, segment.width, segment.height);
+      drawSolidRect(x + segment.left, y + segment.top, segment.width, segment.height);
     }
 
     if (palette.kind === 'door') {
@@ -673,17 +641,66 @@ export class RenderSystem {
       const knobX = variant === 'vertical' || variant === 'single' || variant.startsWith('end-up') || variant.startsWith('end-down')
         ? centerX + 4
         : centerX + (palette.open ? 7 : 4);
-      this.context.fillRect(knobX, centerY - 1, 3, 3);
+      this.context.fillRect(x + knobX, y + centerY - 1, 3, 3);
       this.context.fillStyle = '#2e1d14';
       if (variant === 'single' || variant === 'vertical') {
-        this.context.fillRect(verticalLeft - 2, centerY - visualHeight / 2 + 3, 2, 6);
-        this.context.fillRect(verticalLeft - 2, centerY + visualHeight / 2 - 9, 2, 6);
+        this.context.fillRect(x + verticalLeft - 2, y + centerY - visualHeight / 2 + 3, 2, 6);
+        this.context.fillRect(x + verticalLeft - 2, y + centerY + visualHeight / 2 - 9, 2, 6);
       }
       if (palette.open) {
         this.context.fillStyle = palette.accent;
-        this.context.fillRect(centerX + 5, centerY - 10, 4, 16);
+        this.context.fillRect(x + centerX + 5, y + centerY - 10, 4, 16);
       }
     }
+  }
+
+  getWallDoorRenderPlan(shape = null, palette) {
+    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const variant = shape?.variant || this.getCanonicalBarrierVariant(connections);
+    const thickness = palette.thickness;
+    const half = Math.floor(thickness / 2);
+    const visualHeight = palette.height || palette.capHeight;
+    const centerX = TILE_SIZE / 2;
+    const centerY = TILE_SIZE / 2;
+    const horizontalTop = centerY - visualHeight + 4;
+    const horizontalBottom = horizontalTop + visualHeight;
+    const verticalLeft = centerX - half;
+    const segments = [];
+    const hasHorizontal = connections.left || connections.right;
+    const hasVertical = connections.up || connections.down;
+
+    if (!hasHorizontal && !hasVertical) {
+      segments.push({ left: verticalLeft - 1, top: centerY - visualHeight / 2, width: thickness + 2, height: visualHeight });
+    } else if (hasVertical && !hasHorizontal) {
+      const top = connections.up ? 0 : centerY - visualHeight / 2;
+      const bottom = connections.down ? TILE_SIZE : centerY + visualHeight / 2;
+      segments.push({ left: verticalLeft, top, width: thickness, height: bottom - top });
+    } else {
+      if (connections.left) {
+        segments.push({ left: 0, top: horizontalTop, width: centerX - half, height: visualHeight });
+      }
+      if (connections.right) {
+        segments.push({ left: centerX + half, top: horizontalTop, width: TILE_SIZE - (centerX + half), height: visualHeight });
+      }
+      if (connections.up) {
+        segments.push({ left: verticalLeft, top: 0, width: thickness, height: Math.max(0, horizontalTop) });
+      }
+      if (connections.down) {
+        segments.push({ left: verticalLeft, top: horizontalBottom, width: thickness, height: Math.max(0, TILE_SIZE - horizontalBottom) });
+      }
+      segments.push({ left: verticalLeft, top: horizontalTop, width: thickness, height: visualHeight });
+    }
+
+    return {
+      final: true,
+      variant,
+      connections,
+      segments: segments.filter((segment) => segment.width > 0 && segment.height > 0),
+      visualHeight,
+      centerX,
+      centerY,
+      verticalLeft
+    };
   }
 
   getBarrierJointProfile(shape = null, palette) {
@@ -691,7 +708,7 @@ export class RenderSystem {
     const hasHorizontal = shape?.horizontal || connections.left || connections.right;
     const hasVertical = shape?.vertical || connections.up || connections.down;
     const connectedCount = Object.values(connections).filter(Boolean).length;
-    const usesSolidJoin = palette.kind === 'wall' || palette.kind === 'door' || palette.kind === 'fence';
+    const usesSolidJoin = palette.kind === 'fence';
 
     return {
       splitSegments: usesSolidJoin && hasHorizontal && hasVertical,
@@ -868,7 +885,8 @@ export class RenderSystem {
             : 'single',
       connections: connected.join('|'),
       variant: this.getCanonicalBarrierVariant(connections),
-      splitSegments: joint.splitSegments
+      splitSegments: joint.splitSegments,
+      finalPlan: palette.kind === 'wall' || palette.kind === 'door'
     };
   }
 

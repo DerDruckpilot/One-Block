@@ -3027,6 +3027,22 @@ const map = new TileMap();
   barrierMap.setObject(-1, 0, OBJECT_TYPES.woodWall);
   assert.deepEqual(barrierMap.getConnectableConnections(0, 0), { up: false, down: false, left: true, right: true }, 'wood wall detects horizontal neighbors');
   assert.equal(barrierMap.getConnectableVariant(0, 0), 'horizontal', 'horizontal wall variant is computed');
+  assert.deepEqual(
+    barrierMap.getWallDoorRenderState(0, 0),
+    {
+      type: OBJECT_TYPES.woodWall,
+      x: 0,
+      y: 0,
+      open: false,
+      connections: { up: false, down: false, left: true, right: true },
+      horizontal: true,
+      vertical: false,
+      post: false,
+      thickness: 8,
+      variant: 'horizontal'
+    },
+    'wood wall render state is derived from stable position and neighbor data'
+  );
 
   barrierMap.setObject(0, -1, OBJECT_TYPES.woodWall);
   barrierMap.setObject(0, 1, OBJECT_TYPES.woodWall);
@@ -3489,12 +3505,21 @@ const map = new TileMap();
   );
   const cornerShape = { horizontal: true, vertical: true, variant: 'corner-down-right', connections: { left: false, right: true, up: false, down: true } };
   const tShape = { horizontal: true, vertical: true, variant: 'tee-up', connections: { left: true, right: true, up: false, down: true } };
-  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).splitSegments, true, 'wood wall corners use a real segmented joint variant');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).splitSegments, false, 'wood wall corners use a final render plan instead of split standard segments');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).finalPlan, true, 'wood wall corners expose a final render plan');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.door, tShape, false).finalPlan, true, 'door junctions expose a final render plan');
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.fence, cornerShape, false).splitSegments, true, 'fence corners use a real segmented joint variant');
-  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, tShape, false).splitSegments, true, 'wood wall T-junctions use a real segmented joint variant');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, tShape, false).splitSegments, false, 'wood wall T-junctions are not drawn as overlaid split standard pieces');
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).variant, 'corner-down-right', 'wood wall corner uses one canonical final corner variant');
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.door, tShape, false).variant, 'tee-up', 'door/wall junction uses one canonical final tee variant');
   assert.equal(renderer.getCanonicalBarrierVariant(cornerShape.connections), 'corner-down-right', 'corner variant is computed from stable neighbor data');
+  assert.deepEqual(
+    renderer.getWallDoorRenderPlan(cornerShape, renderer.getBarrierPalette(OBJECT_TYPES.woodWall)),
+    renderer.getWallDoorRenderPlan(cornerShape, renderer.getBarrierPalette(OBJECT_TYPES.woodWall)),
+    'wall render plan is deterministic across frames with identical input'
+  );
+  assert.equal(renderer.getWallDoorRenderPlan(cornerShape, renderer.getBarrierPalette(OBJECT_TYPES.woodWall)).final, true, 'wall corner is rendered from one final plan object');
+  assert.equal(renderer.getWallDoorRenderPlan(tShape, renderer.getBarrierPalette(OBJECT_TYPES.door)).final, true, 'door tee is rendered from one final plan object');
   renderer.drawWoodWall(0, 0, horizontalShape);
   const wallCalls = [...context.calls];
   assert.equal(wallCalls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wood wall is rendered upward onto the barrier line instead of flat on the tile');
@@ -3715,23 +3740,36 @@ const map = new TileMap();
     'tile render profiles are deterministic across repeated calls'
   );
   terrainMap.setEarth(1, 0);
+  terrainMap.setEarth(0, 1);
   const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
   assert.equal(edgeProfile.transitionEdge, true, 'ground rendering detects different-type transition edges');
   assert.equal(edgeProfile.horizontalTransitionSealed, true, 'horizontal different-type tile transitions are sealed without bright gaps');
   assert.equal(edgeProfile.horizontalTransitionFill, '#4f8f3f', 'horizontal different-type transitions use the tile material color instead of a bright gap');
+  assert.notEqual(edgeProfile.transitionBlendFill, '#4f8f3f', 'different-type transitions blend neighboring material colors instead of drawing a hard edge');
   assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
 
   const transitionContext = createDrawContext();
   terrain.drawTile(transitionContext, { x: 0, y: 0, type: 'grass' }, terrainMap, 0, 0);
+  const verticalTransitionFill = terrain.getTransitionBlendFill({ x: 0, y: 0, type: 'grass' }, terrainMap, 'down');
   assert.equal(
     transitionContext.calls.some((call) =>
       call.fn === 'fillRect' &&
-      call.fillStyle === edgeProfile.horizontalTransitionFill &&
-      call.args[0] === TILE_SIZE - 2 &&
-      call.args[2] === 2
+      call.fillStyle === edgeProfile.transitionBlendFill &&
+      call.args[0] === TILE_SIZE - 3 &&
+      call.args[2] === 4
     ),
     true,
-    'different horizontal tile transitions draw material-colored seam fill instead of leaving a gap'
+    'different horizontal tile transitions draw blended seam fill instead of leaving a hard gap'
+  );
+  assert.equal(
+    transitionContext.calls.some((call) =>
+      call.fn === 'fillRect' &&
+      call.fillStyle === verticalTransitionFill &&
+      call.args[1] === TILE_SIZE - 11 &&
+      call.args[3] === 4
+    ),
+    true,
+    'different vertical tile transitions draw blended seam fill instead of leaving a hard row gap'
   );
   assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(255, 236, 188, 0.08)'), false, 'horizontal different-type transitions do not draw bright internal seams');
   assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(35, 23, 16, 0.12)'), false, 'same-surface horizontal rows avoid dark internal transition lines');
@@ -3747,7 +3785,7 @@ const map = new TileMap();
   assert.equal(waterProfile.waterTransition, true, 'water tiles expose transition rendering when adjacent to other ground');
   const waterContext = createDrawContext();
   terrain.drawTile(waterContext, { x: 0, y: 0, type: 'water' }, waterMap, 0, 0);
-  assert.equal(waterContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(164, 236, 255, 0.52)'), true, 'water transition uses a dedicated edge highlight');
+  assert.equal(waterContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === waterProfile.transitionBlendFill), true, 'water transition uses blended material color instead of a bright inserted edge');
 
   const lowerEdgeMap = new TileMap();
   lowerEdgeMap.tiles.clear();
