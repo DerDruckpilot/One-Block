@@ -72,8 +72,8 @@ export class TerrainRenderer {
       context.fillStyle = 'rgba(0, 0, 0, 0.18)';
       context.fillRect(x + leftInset, y + 34, TILE_SIZE - leftInset - rightInset, 3);
     } else if (!same.down && edges.hasDown) {
-      context.fillStyle = 'rgba(35, 23, 16, 0.12)';
-      context.fillRect(x + 2, y + 24, TILE_SIZE - 4, 1);
+      context.fillStyle = palette.mid;
+      context.fillRect(x + 1, y + 23, TILE_SIZE - 2, 2);
     }
 
     this.drawTransitionDetails(context, tile, palette, x, y, edges, same);
@@ -147,6 +147,7 @@ export class TerrainRenderer {
   }
 
   getRenderProfile(tile, tileMap) {
+    const palette = edgeMap[tile.type] || edgeMap.earth;
     const same = this.getSameNeighborMask(tile, tileMap);
     const edges = this.getEdgeProfile(tile, tileMap);
     const surface = this.getSurfaceBounds(same, edges);
@@ -169,6 +170,8 @@ export class TerrainRenderer {
         (edges.hasRight && !same.right)
       ),
       horizontalTransitionSealed: (edges.hasLeft && !same.left) || (edges.hasRight && !same.right),
+      horizontalTransitionFill: palette.mid,
+      verticalTransitionSealed: (edges.hasUp && !same.up) || (edges.hasDown && !same.down),
       connectedSurfaceHorizontal: same.left || same.right,
       connectedSurfaceVertical: same.up || same.down,
       seamlessHorizontal: same.left || same.right ? surface.top.left < 0 || surface.top.width > TILE_SIZE : false,
@@ -197,12 +200,12 @@ export class TerrainRenderer {
       return;
     }
 
-    context.fillStyle = 'rgba(255, 236, 188, 0.08)';
+    context.fillStyle = palette.top;
     if (transition.up) context.fillRect(x + 5, y + 3, TILE_SIZE - 10, 1);
-    if (transition.left) context.fillRect(x, y + 6, 2, 15);
-    if (transition.right) context.fillRect(x + TILE_SIZE - 2, y + 6, 2, 15);
-    context.fillStyle = 'rgba(35, 23, 16, 0.1)';
-    if (transition.down) context.fillRect(x + 4, y + 23, TILE_SIZE - 8, 1);
+    context.fillStyle = palette.mid;
+    if (transition.left) context.fillRect(x, y + 5, 2, 18);
+    if (transition.right) context.fillRect(x + TILE_SIZE - 2, y + 5, 2, 18);
+    if (transition.down) context.fillRect(x + 3, y + 22, TILE_SIZE - 6, 2);
   }
 
   drawTileDetails(context, tile, palette, x, y, variant = 0) {
