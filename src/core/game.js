@@ -309,12 +309,12 @@ export class Game {
   tryContextAction() {
     if (this.isGamePaused()) return false;
 
-    if (this.tryToggleOpenableBarrier()) {
-      return true;
-    }
-
     if (this.removeMode) {
       return this.tryRemoveTarget();
+    }
+
+    if (this.tryToggleOpenableBarrier()) {
+      return true;
     }
 
     const placement = this.getPlacementPreview();
@@ -1485,9 +1485,24 @@ export class Game {
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
-    this.renderSystem.renderForegroundBarriers(this.tileMap, this.camera);
+    this.renderSystem.renderForegroundBarriers(this.tileMap, this.camera, this.getBarrierDepthSubjects());
     this.renderSystem.renderForegroundObjects(this.tileMap, this.camera);
     this.renderSystem.renderLighting(this.dayNightSystem, this.tileMap, this.camera, GAME_VIEW);
+  }
+
+  getBarrierDepthSubjects() {
+    const subjects = [this.player.getFootPosition()];
+    for (const animal of this.animalSystem.animals) {
+      subjects.push(animal.getFootPosition());
+    }
+    for (const enemy of this.enemySystem.enemies) {
+      subjects.push(enemy.getFootPosition());
+    }
+    for (const enemy of this.flyingEnemySystem.enemies) {
+      const center = enemy.getCenterPosition();
+      subjects.push({ x: center.x, y: center.y + enemy.height / 2 });
+    }
+    return subjects;
   }
 
   updateMenuButtonStates() {
