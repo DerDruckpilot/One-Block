@@ -531,6 +531,7 @@ export class RenderSystem {
           }];
 
       for (const segment of verticalSegments) {
+        if (segment.bottom <= segment.top) continue;
         this.context.fillStyle = palette.main;
         this.context.fillRect(centerX - half, segment.top, thickness, segment.bottom - segment.top);
         this.context.fillStyle = palette.highlight;
@@ -554,6 +555,7 @@ export class RenderSystem {
         : [{ left, right }];
 
       for (const segment of horizontalSegments) {
+        if (segment.right <= segment.left) continue;
         this.context.fillStyle = palette.main;
         this.context.fillRect(segment.left, horizontalTop, segment.right - segment.left, horizontalHeight);
         this.context.fillStyle = palette.highlight;
@@ -724,13 +726,15 @@ export class RenderSystem {
     const worldRight = (connections.right ? object.x + 1 : object.x + 0.88) * TILE_SIZE;
     const barrierY = object.y * TILE_SIZE + TILE_SIZE / 2;
     const margin = TILE_SIZE * 0.35;
-
-    return subjects.some((subject) =>
+    const overlappingSubjects = subjects.filter((subject) =>
       subject &&
       subject.x >= worldLeft - margin &&
-      subject.x <= worldRight + margin &&
-      subject.y < barrierY
+      subject.x <= worldRight + margin
     );
+    const hasFrontSubject = overlappingSubjects.some((subject) => subject.y >= barrierY);
+    if (hasFrontSubject) return false;
+
+    return overlappingSubjects.some((subject) => subject.y < barrierY);
   }
 
   getBarrierRenderProfile(type, open = false) {

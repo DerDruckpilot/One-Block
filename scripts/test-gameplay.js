@@ -3476,6 +3476,17 @@ const map = new TileMap();
     renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, true),
     'door visual variant changes only when open state changes'
   );
+  const stableDoorVariant = renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false);
+  assert.deepEqual(
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false),
+    stableDoorVariant,
+    'door visual variant is stable across repeated render decisions'
+  );
+  assert.deepEqual(
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false),
+    renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false),
+    'door variant depends on type, neighbors, and open state rather than player movement'
+  );
   const cornerShape = { horizontal: true, vertical: true, variant: 'corner-right-down', connections: { left: false, right: true, up: false, down: true } };
   const tShape = { horizontal: true, vertical: true, variant: 't-up', connections: { left: true, right: true, up: false, down: true } };
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).splitSegments, true, 'wood wall corners use a real segmented joint variant');
@@ -3529,6 +3540,11 @@ const map = new TileMap();
 
   context.calls.length = 0;
   renderer.drawWoodWall(0, 0, cornerShape);
+  assert.equal(
+    context.calls.some((call) => call.fn === 'fillRect' && (call.args[2] <= 0 || call.args[3] <= 0)),
+    false,
+    'wood wall corners only draw positive fixed segments'
+  );
   assert.equal(context.calls.some((call) =>
     call.fn === 'fillRect' &&
     call.fillStyle === '#3a2418' &&
@@ -3547,6 +3563,11 @@ const map = new TileMap();
   ), false, 'wood wall corners do not draw a full-height vertical overlay segment');
   context.calls.length = 0;
   renderer.drawDoor(0, 0, false, tShape);
+  assert.equal(
+    context.calls.some((call) => call.fn === 'fillRect' && (call.args[2] <= 0 || call.args[3] <= 0)),
+    false,
+    'wall door T-junctions only draw positive fixed segments'
+  );
   assert.equal(context.calls.some((call) =>
     call.fn === 'fillRect' &&
     call.fillStyle === '#2e1d14' &&
@@ -3578,6 +3599,32 @@ const map = new TileMap();
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'player behind a horizontal wall is covered by the foreground strip');
   assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 8 }]), false, 'foreground barrier test treats lower Y as in front');
   assert.equal(renderer.shouldRenderBarrierForeground({ x: 0, y: 0 }, horizontalShape, [{ x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 8 }]), true, 'foreground barrier test treats upper Y as behind');
+  assert.equal(
+    renderer.shouldRenderBarrierForeground(
+      { x: 0, y: 0 },
+      horizontalShape,
+      [
+        { x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 8 },
+        { x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 8 }
+      ]
+    ),
+    false,
+    'a player in front of a wall is never covered by another subject behind the same barrier'
+  );
+
+  const doorForegroundMap = new TileMap();
+  doorForegroundMap.setObject(0, 0, OBJECT_TYPES.door);
+  doorForegroundMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  const frontDoorContext = createDrawContext();
+  new RenderSystem(frontDoorContext).renderForegroundBarriers(
+    doorForegroundMap,
+    { x: 0, y: 0 },
+    [
+      { x: TILE_SIZE / 2, y: TILE_SIZE / 2 + 8 },
+      { x: TILE_SIZE / 2, y: TILE_SIZE / 2 - 8 }
+    ]
+  );
+  assert.equal(frontDoorContext.calls.some((call) => call.fn === 'fillRect'), false, 'player in front of a door prevents foreground occlusion from covering them');
 
   const fenceOverlayMap = new TileMap();
   fenceOverlayMap.setObject(0, 0, OBJECT_TYPES.fence);
@@ -3644,11 +3691,24 @@ const map = new TileMap();
   const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
   assert.equal(edgeProfile.transitionEdge, true, 'ground rendering detects different-type transition edges');
   assert.equal(edgeProfile.horizontalTransitionSealed, true, 'horizontal different-type tile transitions are sealed without bright gaps');
+  assert.equal(edgeProfile.horizontalTransitionFill, '#4f8f3f', 'horizontal different-type transitions use the tile material color instead of a bright gap');
   assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
 
   const transitionContext = createDrawContext();
   terrain.drawTile(transitionContext, { x: 0, y: 0, type: 'grass' }, terrainMap, 0, 0);
-  assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(255, 236, 188, 0.08)'), true, 'different tile transitions draw subtle seam fill instead of leaving a gap');
+  assert.equal(
+    transitionContext.calls.some((call) =>
+      call.fn === 'fillRect' &&
+      call.fillStyle === edgeProfile.horizontalTransitionFill &&
+      call.args[0] === TILE_SIZE - 2 &&
+      call.args[2] === 2
+    ),
+    true,
+    'different horizontal tile transitions draw material-colored seam fill instead of leaving a gap'
+  );
+  assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(255, 236, 188, 0.08)'), false, 'horizontal different-type transitions do not draw bright internal seams');
+  assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(35, 23, 16, 0.12)'), false, 'same-surface horizontal rows avoid dark internal transition lines');
+  assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(35, 23, 16, 0.1)'), false, 'different-type horizontal edges are sealed without dark divider lines');
   assert.equal(transitionContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(35, 23, 16, 0.16)'), false, 'horizontal different-type transitions do not draw dark internal grid lines');
 
   const waterMap = new TileMap();
