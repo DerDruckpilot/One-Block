@@ -3186,12 +3186,14 @@ const map = new TileMap();
 }
 
 {
-  const randomValues = [0, 0.98];
+  const randomValues = [0, 0.5, 0.5, 0.98, 0.25, 0.75];
   const dropMap = new TileMap();
   const firstDropSystem = new DropSystem(() => randomValues.shift() ?? 0);
   const first = firstDropSystem.spawnFromCrystal({ resource: 'earth', amount: 1 }, dropMap);
   const second = firstDropSystem.spawnFromCrystal({ resource: 'rawWood', amount: 1 }, dropMap);
   assert.notDeepEqual(first.tile, second.tile, 'crystal drops choose random valid landing tiles instead of always the first tile');
+  assert.notEqual(second.x, second.tile.x * TILE_SIZE + TILE_SIZE / 2, 'drop gets a horizontal offset inside its tile');
+  assert.notEqual(second.y, second.tile.y * TILE_SIZE + TILE_SIZE / 2, 'drop gets a vertical offset inside its tile');
   assert.equal(dropMap.isGround(first.tile.x, first.tile.y), true, 'crystal drop lands on a ground tile');
   assert.equal(dropMap.isCrystal(first.tile.x, first.tile.y), false, 'crystal drop avoids the crystal');
 
@@ -3307,6 +3309,164 @@ const map = new TileMap();
   assert.equal(loadedGame.tileMap.getObject(1, 1), null, 'reset removes new fence object');
   assert.equal(loadedGame.inventory.get('lasso'), 0, 'reset clears lasso item state');
   assert.equal(loadedGame.removeMode, false, 'reset clears remove mode');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  inventory.add('rawWood', 4);
+  inventory.add('fiber', 2);
+  assert.equal(crafting.craft('door', { hasWorkbenchAccess: true }).crafted, true, 'door can be crafted at a workbench');
+  assert.equal(inventory.get('door'), 1, 'door appears in inventory resources after crafting');
+}
+
+{
+  const buildPanel = {
+    hidden: true,
+    innerHTML: '',
+    addEventListener() {}
+  };
+  const menus = new MenuPanels({
+    buildPanel,
+    craftingPanel: createRectElement({ left: 0, top: 0, width: 1, height: 1 }),
+    inventoryPanel: createRectElement({ left: 0, top: 0, width: 1, height: 1 })
+  });
+  const inventory = new ResourceInventory();
+  menus.renderBuildMenu(inventory, true, 'door', false);
+  assert.equal(buildPanel.innerHTML.includes('data-build-resource="door"'), true, 'door appears in the build menu');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('door', 1);
+  game.hotbarSlots[0] = 'door';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryPlaceSelectedItem(), true, 'door can be placed on a valid ground tile');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.door, 'placed door becomes a world object');
+  assert.equal(game.inventory.get('door'), 0, 'placing door consumes one door item');
+  assert.equal(game.tileMap.isBlockedForPlayer(1, 1), true, 'closed door blocks player tile checks');
+  game.tileMap.toggleDoor(1, 1);
+  assert.equal(game.tileMap.isDoorOpen(1, 1), true, 'door can be opened');
+  assert.equal(game.tileMap.isBlockedForPlayer(1, 1), false, 'open door is passable');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.door, 'door saves and loads as a world object');
+  assert.equal(loadedGame.tileMap.isDoorOpen(1, 1), true, 'door open state saves and loads');
+}
+
+{
+  const connectMap = new TileMap();
+  connectMap.setObject(0, 0, OBJECT_TYPES.door);
+  connectMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  connectMap.setObject(-1, 0, OBJECT_TYPES.door);
+  connectMap.setObject(0, 1, OBJECT_TYPES.fence);
+  assert.equal(connectMap.getConnectableConnections(0, 0).right, true, 'door connects to wood wall');
+  assert.equal(connectMap.getConnectableConnections(0, 0).left, true, 'door connects to another door');
+  assert.equal(connectMap.getConnectableConnections(0, 0).down, false, 'door does not connect to fence');
+  assert.equal(connectMap.canConnectObjects(OBJECT_TYPES.door, OBJECT_TYPES.gate), false, 'door does not connect to gate');
+  assert.equal(connectMap.getConnectableVariant(0, 0), 'horizontal', 'door/wall horizontal connection is computed');
+  connectMap.removeObject(1, 0);
+  assert.equal(connectMap.getConnectableVariant(0, 0), 'end-left', 'door connection updates after neighbor removal');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('lasso', 1);
+  game.hotbarSlots[0] = 'lasso';
+  game.activeHotbarSlot = 0;
+  const chicken = game.animalSystem.spawn(game.tileMap).animal;
+  chicken.setTilePosition({ x: -1, y: 1 });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.door);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryContextAction(), true, 'action prioritizes door toggling before lasso and crystal');
+  assert.equal(game.tileMap.isDoorOpen(1, 1), true, 'door toggles through context action');
+  assert.equal(chicken.tethered, false, 'chicken is not caught when door action wins priority');
+}
+
+{
+  const collisionMap = new TileMap();
+  collisionMap.setObject(1, 0, OBJECT_TYPES.door);
+  collisionMap.setObject(1, -1, OBJECT_TYPES.woodWall);
+  collisionMap.setObject(1, 1, OBJECT_TYPES.woodWall);
+  assert.equal(collisionMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + 3, TILE_SIZE / 2), false, 'vertical door barrier is not a full-tile blocker at side edge');
+  assert.equal(collisionMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2), true, 'closed vertical door blocks its center stripe');
+  collisionMap.toggleDoor(1, 0);
+  assert.equal(collisionMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2), false, 'open vertical door is passable at center stripe');
+
+  const horizontalMap = new TileMap();
+  horizontalMap.setObject(1, 0, OBJECT_TYPES.door);
+  horizontalMap.setObject(0, 0, OBJECT_TYPES.woodWall);
+  horizontalMap.setObject(2, 0, OBJECT_TYPES.woodWall);
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, 3), false, 'horizontal door allows standing in front');
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE - 3), false, 'horizontal door allows standing behind');
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2), true, 'horizontal closed door blocks the barrier line');
+}
+
+{
+  const context = createDrawContext();
+  const { RenderSystem } = await import('../src/systems/render-system.js');
+  const renderer = new RenderSystem(context);
+  assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.woodWall), renderer.getBarrierRenderProfile(OBJECT_TYPES.fence), 'wood wall and fence use different render profiles');
+  assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate), renderer.getBarrierRenderProfile(OBJECT_TYPES.fence), 'gate has its own render profile');
+  assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.door), renderer.getBarrierRenderProfile(OBJECT_TYPES.woodWall), 'door has its own render profile');
+  assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate, true), renderer.getBarrierRenderProfile(OBJECT_TYPES.gate, false), 'open and closed gate render profiles differ');
+  assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.door, true), renderer.getBarrierRenderProfile(OBJECT_TYPES.door, false), 'open and closed door render profiles differ');
+
+  const horizontalShape = { horizontal: true, vertical: false, connections: { left: true, right: true, up: false, down: false } };
+  renderer.drawWoodWall(0, 0, horizontalShape);
+  const wallCalls = [...context.calls];
+  context.calls.length = 0;
+  renderer.drawFence(0, 0, horizontalShape);
+  assert.notDeepEqual(wallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'horizontal wall rendering is not identical to horizontal fence rendering');
+
+  context.calls.length = 0;
+  const verticalShape = { horizontal: false, vertical: true, connections: { left: false, right: false, up: true, down: true } };
+  renderer.drawWoodWall(0, 0, verticalShape);
+  const verticalWallCalls = [...context.calls];
+  context.calls.length = 0;
+  renderer.drawFence(0, 0, verticalShape);
+  assert.notDeepEqual(verticalWallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'vertical wall rendering is not identical to vertical fence rendering');
+}
+
+{
+  const randomValues = [0, 1, 0, 0, 1, 1];
+  const dropSystem = new DropSystem(() => randomValues.shift() ?? 0.5);
+  const dropMap = new TileMap();
+  const first = dropSystem.spawnAtTile({ resource: 'earth', amount: 1 }, { x: 1, y: 1 });
+  const second = dropSystem.spawnAtTile({ resource: 'rawWood', amount: 1 }, { x: 1, y: 1 });
+  assert.equal(dropMap.getTileAtWorldPosition(first.x, first.y).x, 1, 'drop offset remains inside target tile x');
+  assert.equal(dropMap.getTileAtWorldPosition(first.x, first.y).y, 1, 'drop offset remains inside target tile y');
+  assert.notDeepEqual({ x: first.x, y: first.y }, { x: second.x, y: second.y }, 'multiple drops on the same tile are visually offset');
+  const save = dropSystem.toJSON();
+  const loadedDropSystem = new DropSystem(() => 0.5);
+  loadedDropSystem.load(save, dropMap);
+  assert.equal(loadedDropSystem.drops[0].x, save[0].x, 'drop save/load preserves x offset');
+  assert.equal(loadedDropSystem.drops[0].y, save[0].y, 'drop save/load preserves y offset');
+
+  const inventory = new ResourceInventory();
+  const player = new Player(first.x - PLAYER_SIZE / 2, first.y - PLAYER_SIZE + PLAYER_FOOT_OFFSET);
+  const collections = dropSystem.update(0.1, player, inventory, dropMap);
+  assert.equal(collections.length >= 1, true, 'drop pickup still works with offset positions');
+}
+
+{
+  const terrain = new TerrainRenderer();
+  const terrainMap = new TileMap();
+  terrainMap.setGrass(0, 0);
+  terrainMap.setGrass(1, 0);
+  terrainMap.setGrass(-1, 0);
+  terrainMap.setGrass(0, 1);
+  terrainMap.setGrass(0, -1);
+  const profile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
+  assert.equal(profile.interior, true, 'ground rendering detects same-type interior surfaces');
+  assert.equal(profile.outerEdge, false, 'interior ground surface does not render as outer edge');
+  terrainMap.setEarth(1, 0);
+  const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
+  assert.equal(edgeProfile.outerEdge, true, 'ground rendering detects outer/different-type edges');
+  assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
 }
 
 console.log('Gameplay-Basics OK.');

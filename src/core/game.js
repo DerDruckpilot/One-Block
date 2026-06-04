@@ -48,6 +48,7 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
   OBJECT_TYPES.torch,
   OBJECT_TYPES.campfire,
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.door,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.table,
@@ -308,7 +309,7 @@ export class Game {
   tryContextAction() {
     if (this.isGamePaused()) return false;
 
-    if (this.tryToggleGate()) {
+    if (this.tryToggleOpenableBarrier()) {
       return true;
     }
 
@@ -1039,6 +1040,43 @@ export class Game {
     if (result.changed) {
       this.saveGame();
     }
+    return true;
+  }
+
+  tryToggleDoor() {
+    return this.tryToggleOpenableBarrier([OBJECT_TYPES.door]);
+  }
+
+  tryToggleOpenableBarrier(types = [OBJECT_TYPES.gate, OBJECT_TYPES.door]) {
+    const openableTypes = new Set(types);
+    const target = this.player.getFacingTile();
+    const targetObject = this.tileMap.getObject(target.x, target.y);
+    if (!openableTypes.has(targetObject)) {
+      const foot = this.player.getFootPosition();
+      let nearest = null;
+      let nearestDistance = Infinity;
+      this.tileMap.forEachObject((object) => {
+        if (!openableTypes.has(object.type)) return;
+        const center = {
+          x: object.x * TILE_SIZE + TILE_SIZE / 2,
+          y: object.y * TILE_SIZE + TILE_SIZE / 2
+        };
+        const distance = Math.hypot(foot.x - center.x, foot.y - center.y);
+        if (distance <= GATE_INTERACTION_DISTANCE && distance < nearestDistance) {
+          nearest = object;
+          nearestDistance = distance;
+        }
+      });
+      if (!nearest) return false;
+      const open = this.tileMap.toggleOpenable(nearest.x, nearest.y);
+      this.setLog(open ? `${RESOURCE_LABELS[nearest.type]} geoeffnet.` : `${RESOURCE_LABELS[nearest.type]} geschlossen.`);
+      this.saveGame();
+      return true;
+    }
+
+    const open = this.tileMap.toggleOpenable(target.x, target.y);
+    this.setLog(open ? `${RESOURCE_LABELS[targetObject]} geoeffnet.` : `${RESOURCE_LABELS[targetObject]} geschlossen.`);
+    this.saveGame();
     return true;
   }
 
