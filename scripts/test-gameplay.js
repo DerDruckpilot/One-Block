@@ -3033,7 +3033,7 @@ const map = new TileMap();
   assert.deepEqual(barrierMap.getConnectableConnections(0, 0), { up: true, down: true, left: true, right: true }, 'wall detects all four neighbors');
   assert.equal(barrierMap.getConnectableVariant(0, 0), 'cross', 'cross variant is computed');
   barrierMap.removeObject(0, -1);
-  assert.equal(barrierMap.getConnectableVariant(0, 0), 't-up', 'neighbor removal updates connectable variant');
+  assert.equal(barrierMap.getConnectableVariant(0, 0), 'tee-up', 'neighbor removal updates connectable variant');
 
   const fenceMap = new TileMap();
   fenceMap.setObject(0, 0, OBJECT_TYPES.fence);
@@ -3487,11 +3487,14 @@ const map = new TileMap();
     renderer.getBarrierVisualVariant(OBJECT_TYPES.door, horizontalShape, false),
     'door variant depends on type, neighbors, and open state rather than player movement'
   );
-  const cornerShape = { horizontal: true, vertical: true, variant: 'corner-right-down', connections: { left: false, right: true, up: false, down: true } };
-  const tShape = { horizontal: true, vertical: true, variant: 't-up', connections: { left: true, right: true, up: false, down: true } };
+  const cornerShape = { horizontal: true, vertical: true, variant: 'corner-down-right', connections: { left: false, right: true, up: false, down: true } };
+  const tShape = { horizontal: true, vertical: true, variant: 'tee-up', connections: { left: true, right: true, up: false, down: true } };
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).splitSegments, true, 'wood wall corners use a real segmented joint variant');
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.fence, cornerShape, false).splitSegments, true, 'fence corners use a real segmented joint variant');
   assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, tShape, false).splitSegments, true, 'wood wall T-junctions use a real segmented joint variant');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.woodWall, cornerShape, false).variant, 'corner-down-right', 'wood wall corner uses one canonical final corner variant');
+  assert.equal(renderer.getBarrierVisualVariant(OBJECT_TYPES.door, tShape, false).variant, 'tee-up', 'door/wall junction uses one canonical final tee variant');
+  assert.equal(renderer.getCanonicalBarrierVariant(cornerShape.connections), 'corner-down-right', 'corner variant is computed from stable neighbor data');
   renderer.drawWoodWall(0, 0, horizontalShape);
   const wallCalls = [...context.calls];
   assert.equal(wallCalls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wood wall is rendered upward onto the barrier line instead of flat on the tile');
@@ -3540,6 +3543,8 @@ const map = new TileMap();
 
   context.calls.length = 0;
   renderer.drawWoodWall(0, 0, cornerShape);
+  const cornerMainCalls = context.calls.filter((call) => call.fn === 'fillRect' && call.fillStyle === '#7a4a2c');
+  assert.ok(cornerMainCalls.length <= 3, 'wood wall corner renders as one final clipped plan instead of stacked standard pieces');
   assert.equal(
     context.calls.some((call) => call.fn === 'fillRect' && (call.args[2] <= 0 || call.args[3] <= 0)),
     false,
@@ -3563,6 +3568,8 @@ const map = new TileMap();
   ), false, 'wood wall corners do not draw a full-height vertical overlay segment');
   context.calls.length = 0;
   renderer.drawDoor(0, 0, false, tShape);
+  const doorMainCalls = context.calls.filter((call) => call.fn === 'fillRect' && call.fillStyle === '#6f4328');
+  assert.ok(doorMainCalls.length <= 4, 'door tee renders as one final clipped plan instead of stacked standard pieces');
   assert.equal(
     context.calls.some((call) => call.fn === 'fillRect' && (call.args[2] <= 0 || call.args[3] <= 0)),
     false,
@@ -3681,6 +3688,26 @@ const map = new TileMap();
   assert.equal(profile.connectedSurfaceVertical, true, 'ground rendering connects same-type tiles vertically');
   assert.equal(profile.seamlessHorizontal, true, 'same-type horizontal surfaces overlap to close internal seams');
   assert.equal(profile.seamlessVertical, true, 'same-type vertical surfaces overlap to close internal seams');
+  assert.equal(profile.internalSeamsSuppressed, true, 'same-type interior surfaces suppress internal seam rendering');
+  const interiorContext = createDrawContext();
+  terrain.drawTile(interiorContext, { x: 0, y: 0, type: 'grass' }, terrainMap, 0, 0);
+  assert.equal(
+    interiorContext.calls.some((call) =>
+      call.fn === 'fillRect' &&
+      call.fillStyle === '#385a2e' &&
+      call.args[1] >= 23
+    ),
+    false,
+    'same-type interior surfaces do not draw a separate internal bottom edge'
+  );
+  assert.equal(
+    interiorContext.calls.some((call) =>
+      call.fn === 'fillRect' &&
+      call.fillStyle === 'rgba(255, 238, 190, 0.12)'
+    ),
+    false,
+    'same-type interior surfaces do not draw a bright internal top seam'
+  );
   assert.equal(terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), 'tile detail variants are deterministic by position and type');
   assert.deepEqual(
     terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap),

@@ -44,22 +44,23 @@ export class TerrainRenderer {
     if (!edges.hasUp) {
       context.fillRect(x + 4, y + 4, TILE_SIZE - 8, 3);
     } else if (!same.up) {
-      context.fillRect(x + 6, y + 5, TILE_SIZE - 12, 2);
+      context.fillStyle = palette.top;
+      context.fillRect(x + 2, y + 3, TILE_SIZE - 4, 3);
     }
     context.fillStyle = palette.dark;
     if (!edges.hasLeft) context.fillRect(x, y + 2, 2, 26);
     if (!edges.hasRight) context.fillRect(x + TILE_SIZE - 2, y + 2, 2, 26);
     if (edges.hasLeft && !same.left) {
       context.fillStyle = palette.mid;
-      context.fillRect(x, y + 4, 1, 20);
+      context.fillRect(x - 1, y + 3, 3, 23);
     }
     if (edges.hasRight && !same.right) {
       context.fillStyle = palette.mid;
-      context.fillRect(x + TILE_SIZE - 1, y + 4, 1, 20);
+      context.fillRect(x + TILE_SIZE - 2, y + 3, 3, 23);
     }
     if (edges.hasUp && !same.up) {
-      context.fillStyle = 'rgba(255, 238, 190, 0.12)';
-      context.fillRect(x + 3, y + 2, TILE_SIZE - 6, 1);
+      context.fillStyle = palette.top;
+      context.fillRect(x + 2, y, TILE_SIZE - 4, 3);
     }
 
     if (edges.bottomOuter) {
@@ -119,11 +120,11 @@ export class TerrainRenderer {
   }
 
   getSurfaceBounds(same, edges) {
-    const left = same.left ? -1 : edges.hasLeft ? 0 : 2;
-    const right = same.right ? -1 : edges.hasRight ? 0 : 2;
-    const top = same.up ? -1 : edges.hasUp ? 0 : 2;
-    const midBottom = same.down ? 7 : edges.hasDown ? 3 : 0;
-    const topBottom = same.down ? 6 : edges.hasDown ? 2 : 0;
+    const left = same.left ? -2 : edges.hasLeft ? -1 : 2;
+    const right = same.right ? -2 : edges.hasRight ? -1 : 2;
+    const top = same.up ? -2 : edges.hasUp ? -1 : 2;
+    const midBottom = same.down ? 10 : edges.hasDown ? 5 : 0;
+    const topBottom = same.down ? 9 : edges.hasDown ? 4 : 0;
 
     return {
       mid: {
@@ -172,6 +173,7 @@ export class TerrainRenderer {
       horizontalTransitionSealed: (edges.hasLeft && !same.left) || (edges.hasRight && !same.right),
       horizontalTransitionFill: palette.mid,
       verticalTransitionSealed: (edges.hasUp && !same.up) || (edges.hasDown && !same.down),
+      internalSeamsSuppressed: (same.left || same.right || same.up || same.down) && !edges.bottomOuter,
       connectedSurfaceHorizontal: same.left || same.right,
       connectedSurfaceVertical: same.up || same.down,
       seamlessHorizontal: same.left || same.right ? surface.top.left < 0 || surface.top.width > TILE_SIZE : false,
