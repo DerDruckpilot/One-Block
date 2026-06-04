@@ -88,7 +88,7 @@ export class RenderSystem {
         this.drawCampfire(screenX, screenY);
       }
       if (object.type === OBJECT_TYPES.woodWall) {
-        this.drawWoodWall(screenX, screenY);
+        this.drawWoodWall(screenX, screenY, tileMap.getBarrierCollisionShape(object.x, object.y));
       }
       if (object.type === OBJECT_TYPES.table) {
         this.drawTable(screenX, screenY);
@@ -97,20 +97,29 @@ export class RenderSystem {
         this.drawChair(screenX, screenY);
       }
       if (object.type === OBJECT_TYPES.fence) {
-        this.drawFence(screenX, screenY);
+        this.drawFence(screenX, screenY, tileMap.getBarrierCollisionShape(object.x, object.y));
       }
       if (object.type === OBJECT_TYPES.gate) {
-        this.drawGate(screenX, screenY, object.open);
+        this.drawGate(screenX, screenY, object.open, tileMap.getBarrierCollisionShape(object.x, object.y));
       }
       if (object.type === OBJECT_TYPES.sapling) {
         this.drawSapling(screenX, screenY, object.growthStage || 1);
       }
       if (object.type === OBJECT_TYPES.tree) {
-        this.drawTree(screenX, screenY, object.growthStage || 3);
+        return;
       }
       if (object.type === OBJECT_TYPES.berryBush) {
         this.drawBerryBush(screenX, screenY, object.growthStage || (object.ready ? 3 : 1), object.ready === true);
       }
+    });
+  }
+
+  renderForegroundObjects(tileMap, camera) {
+    tileMap.forEachObject((object) => {
+      if (object.type !== OBJECT_TYPES.tree) return;
+      const screenX = Math.round(object.x * TILE_SIZE - camera.x);
+      const screenY = Math.round(object.y * TILE_SIZE - camera.y);
+      this.drawTree(screenX, screenY, object.growthStage || 3);
     });
   }
 
@@ -365,16 +374,16 @@ export class RenderSystem {
     this.context.restore();
   }
 
-  drawWoodWall(x, y) {
+  drawWoodWall(x, y, shape = null) {
     this.context.save();
-    this.context.fillStyle = '#3a2418';
-    this.context.fillRect(x + 5, y + 6, 22, 23);
-    this.context.fillStyle = '#8a5a35';
-    this.context.fillRect(x + 7, y + 8, 5, 19);
-    this.context.fillRect(x + 14, y + 8, 5, 19);
-    this.context.fillRect(x + 21, y + 8, 4, 19);
-    this.context.fillStyle = '#c08a53';
-    this.context.fillRect(x + 7, y + 12, 18, 2);
+    this.drawBarrierShape(x, y, shape, {
+      post: '#3a2418',
+      main: '#8a5a35',
+      highlight: '#c08a53',
+      accent: '#5b331c',
+      thickness: 8,
+      capHeight: 18
+    });
     this.context.restore();
   }
 
@@ -402,34 +411,80 @@ export class RenderSystem {
     this.context.restore();
   }
 
-  drawFence(x, y) {
+  drawFence(x, y, shape = null) {
     this.context.save();
-    this.context.fillStyle = '#3a2418';
-    this.context.fillRect(x + 5, y + 13, 5, 17);
-    this.context.fillRect(x + 22, y + 13, 5, 17);
-    this.context.fillStyle = '#9a6238';
-    this.context.fillRect(x + 4, y + 11, 6, 17);
-    this.context.fillRect(x + 21, y + 11, 6, 17);
-    this.context.fillStyle = '#b77a43';
-    this.context.fillRect(x + 7, y + 15, 18, 5);
-    this.context.fillRect(x + 7, y + 23, 18, 4);
+    this.drawBarrierShape(x, y, shape, {
+      post: '#3a2418',
+      main: '#9a6238',
+      highlight: '#b77a43',
+      accent: '#6a4126',
+      thickness: 6,
+      capHeight: 14
+    });
     this.context.restore();
   }
 
-  drawGate(x, y, open = false) {
+  drawGate(x, y, open = false, shape = null) {
     this.context.save();
-    this.context.fillStyle = open ? '#4f8f3f' : '#3a2418';
-    this.context.fillRect(x + 5, y + 11, 5, 18);
-    this.context.fillRect(x + 22, y + 11, 5, 18);
-    this.context.fillStyle = open ? '#7bc66a' : '#a86d3f';
     if (open) {
-      this.context.fillRect(x + 11, y + 14, 5, 13);
-      this.context.fillRect(x + 15, y + 12, 4, 4);
+      this.drawBarrierShape(x, y, shape, {
+        post: '#3a2418',
+        main: '#75b861',
+        highlight: '#9ee482',
+        accent: '#4f8f3f',
+        thickness: 5,
+        capHeight: 12,
+        open
+      });
     } else {
-      this.context.fillRect(x + 9, y + 14, 14, 5);
-      this.context.fillRect(x + 9, y + 23, 14, 4);
+      this.drawBarrierShape(x, y, shape, {
+        post: '#3a2418',
+        main: '#a86d3f',
+        highlight: '#d49458',
+        accent: '#6a4126',
+        thickness: 6,
+        capHeight: 14
+      });
     }
     this.context.restore();
+  }
+
+  drawBarrierShape(x, y, shape = null, palette) {
+    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const hasHorizontal = shape?.horizontal || connections.left || connections.right;
+    const hasVertical = shape?.vertical || connections.up || connections.down;
+    const single = !hasHorizontal && !hasVertical;
+    const thickness = palette.thickness;
+    const half = Math.floor(thickness / 2);
+    const centerX = x + TILE_SIZE / 2;
+    const centerY = y + TILE_SIZE / 2;
+
+    this.context.fillStyle = palette.post;
+    this.context.fillRect(centerX - half - 1, centerY - half - 1, thickness + 2, thickness + 2);
+
+    if (single || hasVertical) {
+      this.context.fillStyle = palette.main;
+      const top = connections.up ? y : centerY - palette.capHeight / 2;
+      const bottom = connections.down ? y + TILE_SIZE : centerY + palette.capHeight / 2;
+      this.context.fillRect(centerX - half, top, thickness, bottom - top);
+      this.context.fillStyle = palette.highlight;
+      this.context.fillRect(centerX - half + 1, top + 2, 2, Math.max(3, bottom - top - 4));
+    }
+
+    if (single || hasHorizontal) {
+      this.context.fillStyle = palette.main;
+      const left = connections.left ? x : centerX - palette.capHeight / 2;
+      const right = connections.right ? x + TILE_SIZE : centerX + palette.capHeight / 2;
+      this.context.fillRect(left, centerY - half, right - left, thickness);
+      this.context.fillStyle = palette.highlight;
+      this.context.fillRect(left + 2, centerY - half + 1, Math.max(3, right - left - 4), 2);
+    }
+
+    this.context.fillStyle = palette.accent;
+    this.context.fillRect(centerX - 3, centerY - 3, 6, 6);
+    if (palette.open) {
+      this.context.fillRect(centerX + 5, centerY - 8, 4, 14);
+    }
   }
 
   drawSapling(x, y, stage = 1) {
@@ -457,6 +512,7 @@ export class RenderSystem {
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
     this.context.fillRect(x + 6, y + 25, 20, 5);
+    this.context.globalAlpha = 1;
     this.context.fillStyle = '#6b3f22';
     this.context.fillRect(x + 11, y - 24, 10, 53);
     this.context.fillStyle = '#8a5a35';
@@ -475,6 +531,14 @@ export class RenderSystem {
     this.context.fillRect(x + 23, y - 48, 5, 3);
     this.context.fillRect(x + 39, y - 39, 5, 3);
     this.context.restore();
+  }
+
+  getTreeRenderProfile() {
+    return {
+      trunkOpaque: true,
+      crownOpaqueLeaves: true,
+      crownHasLeafGaps: true
+    };
   }
 
   drawBerryBush(x, y, stage = 3, ready = true) {

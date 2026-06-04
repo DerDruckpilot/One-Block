@@ -34,6 +34,7 @@ import { ResourceInventory } from '../src/systems/resource-inventory.js';
 import { chooseWeightedDrop, CrystalSystem } from '../src/systems/crystal-system.js';
 import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { EnemySystem } from '../src/systems/enemy-system.js';
+import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
 import { TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { Hud } from '../src/ui/hud.js';
@@ -156,7 +157,7 @@ const createDrawContext = () => {
     lineWidth: 1,
     strokeStyle: '',
     fillRect(...args) {
-      calls.push({ fn: 'fillRect', args, fillStyle: this.fillStyle });
+      calls.push({ fn: 'fillRect', args, fillStyle: this.fillStyle, globalAlpha: this.globalAlpha });
     },
     arc(...args) {
       calls.push({ fn: 'arc', args, fillStyle: this.fillStyle });
@@ -2749,9 +2750,13 @@ const map = new TileMap();
 
   game.inventory.add('axe', 1);
   game.hotbarSlots[0] = 'earth';
+  game.crystalSystem.random = () => 0.5;
   assert.equal(game.tryContextAction(), true, 'axe enables tree felling as a passive ability');
   assert.equal(game.tileMap.getObject(1, 1), null, 'tree is removed after axe felling');
-  assert.ok(game.dropSystem.drops.filter((drop) => drop.resource === 'rawWood').length >= 2, 'felled tree creates raw wood drops');
+  const rawWoodDrop = game.dropSystem.drops.find((drop) => drop.resource === 'rawWood');
+  const treeSeedDrop = game.dropSystem.drops.find((drop) => drop.resource === 'treeSeed');
+  assert.ok(rawWoodDrop.amount >= 4 && rawWoodDrop.amount <= 8, 'felled tree creates 4-8 raw wood');
+  assert.ok(treeSeedDrop.amount >= 1 && treeSeedDrop.amount <= 3, 'felled tree creates 1-3 tree seeds');
 }
 
 {
@@ -2767,7 +2772,7 @@ const map = new TileMap();
 
   game.plantSystem.update(BERRY_BUSH_GROW_SECONDS + 0.1, game.tileMap);
   assert.equal(game.tryContextAction(), true, 'ripe berry bush can be harvested');
-  assert.equal(game.inventory.get('berry'), 1, 'berry bush harvest adds berries');
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'berry'), true, 'berry bush harvest creates a berry drop');
   assert.equal(game.crystalSystem.lastMessage, 'Beeren geerntet.', 'berry harvest writes the requested log');
 }
 
@@ -2996,6 +3001,86 @@ const map = new TileMap();
 }
 
 {
+  const context = createDrawContext();
+  const { RenderSystem } = await import('../src/systems/render-system.js');
+  const renderer = new RenderSystem(context);
+  assert.deepEqual(renderer.getTreeRenderProfile(), {
+    trunkOpaque: true,
+    crownOpaqueLeaves: true,
+    crownHasLeafGaps: true
+  }, 'tree render profile marks opaque trunk and leaf gaps');
+  renderer.drawTree(64, 64, 3);
+  const trunkCall = context.calls.find((call) => call.fn === 'fillRect' && call.fillStyle === '#6b3f22');
+  const leafCalls = context.calls.filter((call) => call.fn === 'fillRect' && ['#2f6f35', '#4f9e42', '#83c85e'].includes(call.fillStyle));
+  assert.equal(trunkCall?.globalAlpha, 1, 'tree trunk is rendered fully opaque');
+  assert.ok(leafCalls.length >= 6, 'tree crown is rendered as separate leaf blocks with real gaps');
+  assert.equal(leafCalls.every((call) => call.globalAlpha === 1), true, 'tree crown leaves are not globally transparent');
+}
+
+{
+  const barrierMap = new TileMap();
+  barrierMap.setObject(0, 0, OBJECT_TYPES.woodWall);
+  barrierMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  barrierMap.setObject(-1, 0, OBJECT_TYPES.woodWall);
+  assert.deepEqual(barrierMap.getConnectableConnections(0, 0), { up: false, down: false, left: true, right: true }, 'wood wall detects horizontal neighbors');
+  assert.equal(barrierMap.getConnectableVariant(0, 0), 'horizontal', 'horizontal wall variant is computed');
+
+  barrierMap.setObject(0, -1, OBJECT_TYPES.woodWall);
+  barrierMap.setObject(0, 1, OBJECT_TYPES.woodWall);
+  assert.deepEqual(barrierMap.getConnectableConnections(0, 0), { up: true, down: true, left: true, right: true }, 'wall detects all four neighbors');
+  assert.equal(barrierMap.getConnectableVariant(0, 0), 'cross', 'cross variant is computed');
+  barrierMap.removeObject(0, -1);
+  assert.equal(barrierMap.getConnectableVariant(0, 0), 't-up', 'neighbor removal updates connectable variant');
+
+  const fenceMap = new TileMap();
+  fenceMap.setObject(0, 0, OBJECT_TYPES.fence);
+  fenceMap.setObject(0, 1, OBJECT_TYPES.gate);
+  assert.equal(fenceMap.getConnectableConnections(0, 0).down, true, 'fence connects to gate');
+  assert.equal(fenceMap.getConnectableVariant(0, 0), 'end-down', 'single fence-gate connection becomes an end variant');
+
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setObject(0, 1, OBJECT_TYPES.fence);
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.gate);
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getConnectableConnections(0, 1).right, true, 'connectable state recomputes after save/load');
+}
+
+{
+  const verticalMap = new TileMap();
+  verticalMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  verticalMap.setObject(1, -1, OBJECT_TYPES.woodWall);
+  verticalMap.setObject(1, 1, OBJECT_TYPES.woodWall);
+  assert.equal(verticalMap.getConnectableVariant(1, 0), 'vertical', 'vertical wall variant is computed');
+  assert.equal(verticalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + 3, TILE_SIZE / 2), false, 'vertical barrier is not a full-tile blocker at the left edge');
+  assert.equal(verticalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2), true, 'vertical barrier blocks at its center stripe');
+
+  const horizontalMap = new TileMap();
+  horizontalMap.setObject(1, 0, OBJECT_TYPES.fence);
+  horizontalMap.setObject(0, 0, OBJECT_TYPES.fence);
+  horizontalMap.setObject(2, 0, OBJECT_TYPES.gate);
+  assert.equal(horizontalMap.getConnectableVariant(1, 0), 'horizontal', 'horizontal fence/gate variant is computed');
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, 0 * TILE_SIZE + 3), false, 'horizontal barrier allows standing in front of the line');
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, 0 * TILE_SIZE + TILE_SIZE - 3), false, 'horizontal barrier allows standing behind the line');
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(1 * TILE_SIZE + TILE_SIZE / 2, 0 * TILE_SIZE + TILE_SIZE / 2), true, 'horizontal barrier blocks on its center line');
+  horizontalMap.toggleGate(2, 0);
+  assert.equal(horizontalMap.isBlockedForPlayerAtWorld(2 * TILE_SIZE + TILE_SIZE / 2, TILE_SIZE / 2), false, 'open gate is passable at the barrier line');
+
+  const playerNearBarrier = new Player(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  assert.equal(playerNearBarrier.canMoveTo(1 * TILE_SIZE + 3 - PLAYER_SIZE / 2, playerNearBarrier.y, verticalMap), true, 'player can step into the side of a vertical barrier tile');
+  assert.equal(playerNearBarrier.canMoveTo(1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2, playerNearBarrier.y, verticalMap), false, 'player cannot pass through the vertical barrier stripe');
+
+  const groundEnemy = Enemy.fromTile({ x: 0, y: 0 });
+  assert.equal(groundEnemy.canStandAt(1 * TILE_SIZE + 3 - groundEnemy.width / 2, groundEnemy.y, verticalMap), true, 'ground enemy can move along a barrier side');
+  assert.equal(groundEnemy.canStandAt(1 * TILE_SIZE + TILE_SIZE / 2 - groundEnemy.width / 2, groundEnemy.y, verticalMap), false, 'ground enemy respects orientated barrier stripe');
+}
+
+{
   assert.equal(chooseWeightedDrop(CRYSTAL_ENCOUNTER_DROPS, 0.79).encounter, 'ground', 'crystal encounter weighting keeps 80 percent ground enemies');
   assert.equal(chooseWeightedDrop(CRYSTAL_ENCOUNTER_DROPS, 0.80).encounter, 'flying', 'crystal encounter weighting assigns the final 20 percent to flying enemies');
 }
@@ -3017,7 +3102,11 @@ const map = new TileMap();
   spawn.animal.setTilePosition({ x: 1, y: 1 });
   setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
 
-  assert.equal(game.tryContextAction(), true, 'lasso can catch a nearby chicken through context action');
+  game.tryContextAction();
+  assert.equal(spawn.animal.tethered, false, 'chicken stays free while lasso is not active');
+  game.hotbarSlots[0] = 'lasso';
+  game.activeHotbarSlot = 0;
+  assert.equal(game.tryContextAction(), true, 'active lasso can catch a nearby chicken through context action');
   assert.equal(spawn.animal.tethered, true, 'caught chicken becomes tethered');
   assert.equal(game.crystalSystem.lastMessage, 'Huhn eingefangen.', 'catching chicken writes a clear log');
 
@@ -3025,8 +3114,6 @@ const map = new TileMap();
   game.animalSystem.update(0.5, game.tileMap, game.player);
   assert.ok(Math.hypot(spawn.animal.getFootPosition().x - game.player.getFootPosition().x, spawn.animal.getFootPosition().y - game.player.getFootPosition().y) < TILE_SIZE * 4, 'tethered chicken follows the player or recovers nearby');
 
-  game.hotbarSlots[0] = 'lasso';
-  game.activeHotbarSlot = 0;
   assert.equal(game.tryContextAction(), true, 'active lasso releases a tethered chicken');
   assert.equal(spawn.animal.tethered, false, 'released chicken returns to normal movement');
   assert.equal(game.crystalSystem.lastMessage, 'Huhn losgelassen.', 'release writes a clear log');
@@ -3083,12 +3170,76 @@ const map = new TileMap();
 }
 
 {
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  const chicken = game.animalSystem.spawn(game.tileMap).animal;
+  chicken.setTilePosition({ x: -1, y: 1 });
+  game.inventory.add('lasso', 1);
+  game.hotbarSlots[0] = 'lasso';
+  game.activeHotbarSlot = 0;
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.gate);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryContextAction(), true, 'action prioritizes gate toggling before lasso');
+  assert.equal(game.tileMap.isGateOpen(1, 1), true, 'gate toggles through context action first');
+  assert.equal(chicken.tethered, false, 'chicken is not caught when gate action wins priority');
+}
+
+{
+  const randomValues = [0, 0.98];
+  const dropMap = new TileMap();
+  const firstDropSystem = new DropSystem(() => randomValues.shift() ?? 0);
+  const first = firstDropSystem.spawnFromCrystal({ resource: 'earth', amount: 1 }, dropMap);
+  const second = firstDropSystem.spawnFromCrystal({ resource: 'rawWood', amount: 1 }, dropMap);
+  assert.notDeepEqual(first.tile, second.tile, 'crystal drops choose random valid landing tiles instead of always the first tile');
+  assert.equal(dropMap.isGround(first.tile.x, first.tile.y), true, 'crystal drop lands on a ground tile');
+  assert.equal(dropMap.isCrystal(first.tile.x, first.tile.y), false, 'crystal drop avoids the crystal');
+
+  dropMap.setObject(first.tile.x, first.tile.y, OBJECT_TYPES.workbench);
+  const blockedDrop = firstDropSystem.spawnNearWorld({ resource: 'fiber', amount: 1 }, dropMap, first.x, first.y);
+  assert.equal(dropMap.getObject(blockedDrop.tile.x, blockedDrop.tile.y), null, 'drop relocation avoids blocked object tiles');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.dropSystem.random = () => 0.75;
+  game.crystalSystem.random = () => 0;
+  setGamePlayerOnTile(game, 0, 1, { x: 0, y: -1 });
+  assert.equal(game.tryUseCrystal(), true, 'crystal interaction uses visible drop logic');
+  const crystalDrop = game.dropSystem.drops[0];
+  assert.equal(game.tileMap.isGroundAtWorld(crystalDrop.x, crystalDrop.y), true, 'crystal drop uses valid random world landing');
+  assert.equal(game.tileMap.isCrystalAtWorld(crystalDrop.x, crystalDrop.y), false, 'crystal drop never lands on crystal');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.dropSystem.random = () => 0.9;
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.tree);
+  game.plantSystem.plants.set('1,1', { type: OBJECT_TYPES.tree, x: 1, y: 1, growthSeconds: 0, ready: true });
+  game.inventory.add('axe', 1);
+  game.crystalSystem.random = () => 0.99;
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryHarvestTree(), true, 'tree can be felled for drop landing tests');
+  const rawWoodDrop = game.dropSystem.drops.find((drop) => drop.resource === 'rawWood');
+  const treeSeedDrop = game.dropSystem.drops.find((drop) => drop.resource === 'treeSeed');
+  assert.ok(rawWoodDrop.amount >= 4 && rawWoodDrop.amount <= 8, 'tree felling produces 4-8 raw wood');
+  assert.ok(treeSeedDrop.amount >= 1 && treeSeedDrop.amount <= 3, 'tree felling produces 1-3 tree seeds');
+  assert.equal(game.tileMap.isGroundAtWorld(rawWoodDrop.x, rawWoodDrop.y), true, 'tree raw wood drop lands on ground');
+  assert.equal(game.tileMap.isGroundAtWorld(treeSeedDrop.x, treeSeedDrop.y), true, 'tree seed drop lands on ground');
+}
+
+{
   const mapWithFence = new TileMap();
+  mapWithFence.setObject(1, 0, OBJECT_TYPES.fence);
   mapWithFence.setObject(1, 1, OBJECT_TYPES.fence);
+  mapWithFence.setObject(1, 2, OBJECT_TYPES.fence);
   const chicken = Animal.fromTile({ x: 0, y: 1 });
   chicken.direction = { x: 1, y: 0 };
-  chicken.update(1, mapWithFence, () => 0);
-  assert.equal(chicken.getFootPosition().x < TILE_SIZE, true, 'chickens respect fence collision and stay inside simple pens');
+  chicken.update(2, mapWithFence, () => 0);
+  assert.equal(chicken.getFootPosition().x < TILE_SIZE + TILE_SIZE / 2, true, 'chickens respect fence collision while still entering the half-tile approach area');
 }
 
 {
