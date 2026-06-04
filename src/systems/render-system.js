@@ -128,7 +128,7 @@ export class RenderSystem {
 
   renderForegroundBarriers(tileMap, camera, subjects = []) {
     tileMap.forEachObject((object) => {
-      if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.fence, OBJECT_TYPES.gate].includes(object.type)) return;
+      if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door].includes(object.type)) return;
       const shape = tileMap.getBarrierCollisionShape(object.x, object.y);
       if (!shape.horizontal) return;
       if (!this.shouldRenderBarrierForeground(object, shape, subjects)) return;
@@ -505,6 +505,13 @@ export class RenderSystem {
     const centerY = y + TILE_SIZE / 2;
     const topY = centerY - visualHeight / 2;
     const skipCenterPost = hasHorizontal && (palette.kind === 'wall' || palette.kind === 'door');
+    const joint = this.getBarrierJointProfile(shape, palette);
+    const horizontalTop = palette.kind === 'wall' || palette.kind === 'door'
+      ? centerY - visualHeight + 4
+      : centerY - half - 5;
+    const horizontalHeight = palette.kind === 'wall' || palette.kind === 'door'
+      ? visualHeight
+      : thickness;
 
     this.context.fillStyle = palette.post;
     if (!skipCenterPost) {
@@ -513,14 +520,25 @@ export class RenderSystem {
 
     if (single || hasVertical) {
       this.context.fillStyle = palette.main;
-      const top = connections.up ? y : centerY - palette.capHeight / 2;
-      const bottom = connections.down ? y + TILE_SIZE : centerY + palette.capHeight / 2;
-      this.context.fillRect(centerX - half, top, thickness, bottom - top);
-      this.context.fillStyle = palette.highlight;
-      this.context.fillRect(centerX - half + 1, top + 2, 2, Math.max(3, bottom - top - 4));
-      if (palette.kind === 'wall' || palette.kind === 'door') {
-        this.context.fillStyle = palette.accent;
-        this.context.fillRect(centerX + half - 2, top + 3, 2, Math.max(3, bottom - top - 6));
+      const verticalSegments = joint.splitSegments
+        ? [
+            connections.up ? { top: y, bottom: horizontalTop + 2 } : null,
+            connections.down ? { top: horizontalTop + horizontalHeight - 2, bottom: y + TILE_SIZE } : null
+          ].filter(Boolean)
+        : [{
+            top: connections.up ? y : centerY - palette.capHeight / 2,
+            bottom: connections.down ? y + TILE_SIZE : centerY + palette.capHeight / 2
+          }];
+
+      for (const segment of verticalSegments) {
+        this.context.fillStyle = palette.main;
+        this.context.fillRect(centerX - half, segment.top, thickness, segment.bottom - segment.top);
+        this.context.fillStyle = palette.highlight;
+        this.context.fillRect(centerX - half + 1, segment.top + 2, 2, Math.max(3, segment.bottom - segment.top - 4));
+        if (palette.kind === 'wall' || palette.kind === 'door') {
+          this.context.fillStyle = palette.accent;
+          this.context.fillRect(centerX + half - 2, segment.top + 3, 2, Math.max(3, segment.bottom - segment.top - 6));
+        }
       }
     }
 
@@ -528,21 +546,36 @@ export class RenderSystem {
       this.context.fillStyle = palette.main;
       const left = connections.left ? x : centerX - palette.capHeight / 2;
       const right = connections.right ? x + TILE_SIZE : centerX + palette.capHeight / 2;
-      const horizontalTop = palette.kind === 'wall' || palette.kind === 'door'
-        ? centerY - visualHeight + 4
-        : centerY - half - 5;
-      const horizontalHeight = palette.kind === 'wall' || palette.kind === 'door'
-        ? visualHeight
-        : thickness;
-      this.context.fillRect(left, horizontalTop, right - left, horizontalHeight);
+      const horizontalSegments = joint.splitSegments
+        ? [
+            connections.left ? { left, right: centerX + half } : null,
+            connections.right ? { left: centerX - half, right } : null
+          ].filter(Boolean)
+        : [{ left, right }];
+
+      for (const segment of horizontalSegments) {
+        this.context.fillStyle = palette.main;
+        this.context.fillRect(segment.left, horizontalTop, segment.right - segment.left, horizontalHeight);
+        this.context.fillStyle = palette.highlight;
+        this.context.fillRect(segment.left + 2, horizontalTop + 3, Math.max(3, segment.right - segment.left - 4), 2);
+        if (palette.kind === 'fence' || palette.kind === 'gate') {
+          this.context.fillRect(segment.left + 2, horizontalTop + 9, Math.max(3, segment.right - segment.left - 4), 2);
+        } else {
+          this.context.fillStyle = palette.accent;
+          this.context.fillRect(segment.left + 3, horizontalTop + 12, Math.max(3, segment.right - segment.left - 6), 2);
+          this.context.fillRect(segment.left + 3, horizontalTop + 20, Math.max(3, segment.right - segment.left - 6), 2);
+        }
+      }
+    }
+
+    if (joint.splitSegments) {
+      this.context.fillStyle = palette.main;
+      this.context.fillRect(centerX - half, horizontalTop, thickness, horizontalHeight);
       this.context.fillStyle = palette.highlight;
-      this.context.fillRect(left + 2, horizontalTop + 3, Math.max(3, right - left - 4), 2);
-      if (palette.kind === 'fence' || palette.kind === 'gate') {
-        this.context.fillRect(left + 2, horizontalTop + 9, Math.max(3, right - left - 4), 2);
-      } else {
+      this.context.fillRect(centerX - half + 1, horizontalTop + 3, 2, Math.max(3, horizontalHeight - 6));
+      if (palette.kind === 'wall' || palette.kind === 'door') {
         this.context.fillStyle = palette.accent;
-        this.context.fillRect(left + 3, horizontalTop + 12, Math.max(3, right - left - 6), 2);
-        this.context.fillRect(left + 3, horizontalTop + 20, Math.max(3, right - left - 6), 2);
+        this.context.fillRect(centerX + half - 2, horizontalTop + 4, 2, Math.max(3, horizontalHeight - 8));
       }
     }
 
@@ -570,6 +603,21 @@ export class RenderSystem {
       this.context.fillStyle = palette.accent;
       this.context.fillRect(centerX + 4, centerY - 1, 3, 3);
     }
+  }
+
+  getBarrierJointProfile(shape = null, palette) {
+    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const hasHorizontal = shape?.horizontal || connections.left || connections.right;
+    const hasVertical = shape?.vertical || connections.up || connections.down;
+    const connectedCount = Object.values(connections).filter(Boolean).length;
+    const usesSolidJoin = palette.kind === 'wall' || palette.kind === 'door' || palette.kind === 'fence';
+
+    return {
+      splitSegments: usesSolidJoin && hasHorizontal && hasVertical,
+      joint: hasHorizontal && hasVertical,
+      connectedCount,
+      variant: shape?.variant || 'single'
+    };
   }
 
   drawGateShape(x, y, shape = null, palette) {
@@ -703,6 +751,8 @@ export class RenderSystem {
 
   getBarrierVisualVariant(type, shape = null, open = false) {
     const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const palette = this.getBarrierPalette(type, open);
+    const joint = this.getBarrierJointProfile(shape, palette);
     const connected = Object.entries(connections)
       .filter(([, value]) => value)
       .map(([name]) => name)
@@ -719,7 +769,8 @@ export class RenderSystem {
             ? 'vertical'
             : 'single',
       connections: connected.join('|'),
-      variant: shape?.variant || 'single'
+      variant: shape?.variant || 'single',
+      splitSegments: joint.splitSegments
     };
   }
 
