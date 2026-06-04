@@ -103,8 +103,10 @@ export class Enemy {
 
   canStandAt(x, y, tileMap) {
     const foot = this.getFootPositionAt(x, y);
+    const tile = tileMap.getTileAtWorldPosition(foot.x, foot.y);
     return tileMap.isPositionSupportedByTile(foot.x, foot.y) &&
-      !tileMap.isCrystalAtWorld(foot.x, foot.y);
+      !tileMap.isCrystal(tile.x, tile.y) &&
+      !tileMap.getObject(tile.x, tile.y);
   }
 
   setTilePosition(tile) {

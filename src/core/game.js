@@ -28,6 +28,9 @@ import { CraftingSystem } from '../systems/crafting-system.js';
 import { DayNightSystem } from '../systems/day-night-system.js';
 import { DropSystem } from '../systems/drop-system.js';
 import { EnemySystem } from '../systems/enemy-system.js';
+import { AnimalSystem } from '../systems/animal-system.js';
+import { FlyingEnemySystem } from '../systems/flying-enemy-system.js';
+import { ProjectileSystem } from '../systems/projectile-system.js';
 import { LogSystem } from '../systems/log-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
@@ -66,6 +69,9 @@ export class Game {
     this.dropSystem = new DropSystem();
     this.dayNightSystem = new DayNightSystem();
     this.enemySystem = new EnemySystem();
+    this.animalSystem = new AnimalSystem();
+    this.flyingEnemySystem = new FlyingEnemySystem();
+    this.projectileSystem = new ProjectileSystem();
     this.logSystem = new LogSystem();
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
@@ -166,12 +172,15 @@ export class Game {
       this.camera.centerOn(this.player.getCenterPosition());
       this.backgroundSystem.update(deltaSeconds);
       this.handleEnemyEvents(this.enemySystem.update(deltaSeconds, this.tileMap, this.player));
+      this.handleAnimalEvents(this.animalSystem.update(deltaSeconds, this.tileMap));
+      this.flyingEnemySystem.update(deltaSeconds, this.tileMap, this.player);
+      this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem));
       this.handleDropCollections(this.dropSystem.update(deltaSeconds, this.player, this.inventory, this.tileMap));
       this.dayNightSystem.update(deltaSeconds);
       this.updateAttackFeedback(deltaSeconds);
 
       if (this.input.wasPressed(' ', 'e', 'Enter')) {
-        this.tryUseCrystal();
+        this.tryContextAction();
       }
 
       this.handleHotbarSelection();
@@ -238,6 +247,13 @@ export class Game {
     if (isCloseToCrystal) {
       const drop = this.rollCrystalDrop();
       this.spawnVisibleDrop(drop, `Kristall wirft ${RESOURCE_LABELS[drop.resource]} aus.`);
+      const animalSpawn = this.animalSystem.maybeSpawn(
+        this.tileMap,
+        this.crystalSystem.hitCounter % 5 === 0 ? 1 : 0
+      );
+      if (animalSpawn.spawned && animalSpawn.message) {
+        this.setLog(animalSpawn.message);
+      }
       this.saveGame();
       return true;
     }
@@ -288,6 +304,24 @@ export class Game {
       return this.useSpearAttack();
     }
 
+    if (activeItem === 'slingshot' && this.inventory.get('slingshot') > 0) {
+      return this.useRangedAttack({
+        ammo: 'stoneBall',
+        projectileType: 'stoneBall',
+        noAmmoMessage: 'Keine Steinkugeln.',
+        shotMessage: 'Steinkugel geschossen.'
+      });
+    }
+
+    if (activeItem === 'bow' && this.inventory.get('bow') > 0) {
+      return this.useRangedAttack({
+        ammo: 'arrow',
+        projectileType: 'arrow',
+        noAmmoMessage: 'Keine Pfeile.',
+        shotMessage: 'Pfeil geschossen.'
+      });
+    }
+
     this.setLog('Keine Waffe ausgewählt.');
     return false;
   }
@@ -326,6 +360,34 @@ export class Game {
 
     this.setLog('Kein Ziel.');
     return false;
+  }
+
+  useRangedAttack({ ammo, projectileType, noAmmoMessage, shotMessage }) {
+    if (this.inventory.get(ammo) <= 0) {
+      this.setLog(noAmmoMessage);
+      return false;
+    }
+
+    if (this.isNearCrystal()) {
+      const spawn = this.flyingEnemySystem.spawnNearCrystal(this.tileMap);
+      this.setLog(spawn.message);
+      if (spawn.spawned) {
+        this.saveGame();
+      }
+      return spawn.spawned;
+    }
+
+    const origin = this.player.getFootPosition();
+    this.projectileSystem.spawn({
+      type: projectileType,
+      x: origin.x,
+      y: origin.y - 10,
+      direction: this.player.facing || { x: 0, y: -1 }
+    });
+    this.inventory.remove(ammo, 1);
+    this.setLog(shotMessage);
+    this.saveGame();
+    return true;
   }
 
   handleTouchActions() {
@@ -371,10 +433,52 @@ export class Game {
   handleEnemyEvents(events) {
     for (const event of events) {
       if (event.type === 'void') {
+        this.spawnEnemyLoot(event.tile, event.enemy);
         this.setLog('Kreatur verschwindet im Void.');
         this.saveGame();
       }
     }
+  }
+
+  handleAnimalEvents(events) {
+    for (const event of events) {
+      if (event.type === 'void') {
+        this.setLog('Ein Huhn verschwindet im Void.');
+        this.saveGame();
+      }
+    }
+  }
+
+  handleProjectileEvents(events) {
+    for (const event of events) {
+      const source = { x: event.projectile.x, y: event.projectile.y };
+      if (event.targetType === 'ground') {
+        const hit = this.enemySystem.applyDamage(event.target, event.projectile.damage, source);
+        if (hit.defeated) {
+          this.spawnEnemyLoot(event.target.lastGroundTile, event.target);
+        }
+        this.setLog(hit.message);
+        this.saveGame();
+      }
+
+      if (event.targetType === 'flying') {
+        const hit = this.flyingEnemySystem.applyDamage(event.target, event.projectile.damage, source);
+        if (hit.defeated) {
+          this.dropSystem.spawnNearWorld({ resource: 'fiber', amount: 1 }, this.tileMap, event.target.x, event.target.y);
+        }
+        this.setLog(hit.message);
+        this.saveGame();
+      }
+    }
+  }
+
+  spawnEnemyLoot(tile, enemy) {
+    const center = enemy?.getCenterPosition?.() || this.tileMap.getCrystalCenter();
+    if (tile) {
+      this.dropSystem.spawnAtTile({ resource: 'stone', amount: 1 }, tile);
+      return;
+    }
+    this.dropSystem.spawnNearWorld({ resource: 'stone', amount: 1 }, this.tileMap, center.x, center.y);
   }
 
   setSpearAttackFeedback() {
@@ -815,6 +919,9 @@ export class Game {
     this.craftingSystem = new CraftingSystem(this.inventory);
     this.dropSystem = new DropSystem();
     this.dayNightSystem = new DayNightSystem();
+    this.animalSystem = new AnimalSystem();
+    this.flyingEnemySystem = new FlyingEnemySystem();
+    this.projectileSystem = new ProjectileSystem();
     this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
     this.activeHotbarSlot = 0;
     this.selectedInventoryResource = null;
@@ -826,6 +933,9 @@ export class Game {
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
     this.enemySystem.clear();
+    this.animalSystem.clear();
+    this.flyingEnemySystem.clear();
+    this.projectileSystem.clear();
     this.dropSystem.clear();
     this.dayNightSystem.reset();
     this.attackFeedback = null;
@@ -868,6 +978,9 @@ export class Game {
     this.loadHotbarState(save);
     this.logSystem.load(save.logs);
     this.enemySystem.load(save.enemies, this.tileMap);
+    this.animalSystem.load(save.animals, this.tileMap);
+    this.flyingEnemySystem.load(save.flyingEnemies, this.tileMap);
+    this.projectileSystem.clear();
     this.dropSystem.load(save.drops, this.tileMap);
     this.dayNightSystem.load(save.dayNightTime);
 
@@ -892,6 +1005,8 @@ export class Game {
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
       enemies: this.enemySystem.toJSON(),
+      animals: this.animalSystem.toJSON(),
+      flyingEnemies: this.flyingEnemySystem.toJSON(),
       drops: this.dropSystem.toJSON(),
       dayNightTime: this.dayNightSystem.toJSON(),
       logs: this.logSystem.toJSON(),
@@ -913,7 +1028,10 @@ export class Game {
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderObjects(this.tileMap, this.camera);
     this.renderSystem.renderDrops(this.dropSystem.drops, this.camera);
+    this.renderSystem.renderAnimals(this.animalSystem.animals, this.camera);
     this.renderSystem.renderEnemies(this.enemySystem.enemies, this.camera);
+    this.renderSystem.renderFlyingEnemies(this.flyingEnemySystem.enemies, this.camera);
+    this.renderSystem.renderProjectiles(this.projectileSystem.projectiles, this.camera);
     if (!this.isGamePaused()) {
       this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
     }
@@ -963,6 +1081,9 @@ export class Game {
       activeHotbarItem: this.getActiveHotbarItem(),
       attackState: this.attackFeedback?.type || 'none',
       activeEnemies: this.enemySystem.activeCount(),
+      activeAnimals: this.animalSystem.activeCount(),
+      activeFlyingEnemies: this.flyingEnemySystem.activeCount(),
+      activeProjectiles: this.projectileSystem.activeCount(),
       dayNightTime: this.dayNightSystem.time,
       dayNightPhase: this.dayNightSystem.getPhase(),
       activeDrops: this.dropSystem.drops.length

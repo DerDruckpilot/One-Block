@@ -153,6 +153,80 @@ export class RenderSystem {
     }
   }
 
+  renderFlyingEnemies(enemies, camera) {
+    for (const enemy of enemies) {
+      const x = Math.round(enemy.x - camera.x);
+      const y = Math.round(enemy.y - camera.y);
+      const flash = enemy.hitFlashSeconds > 0;
+
+      this.context.save();
+      this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+      this.context.fillRect(x + 5, y + 29, 20, 4);
+      this.context.fillStyle = flash ? '#f0d8ff' : '#49306f';
+      this.context.fillRect(x + 9, y + 10, 10, 12);
+      this.context.fillStyle = flash ? '#ffffff' : '#6d45a8';
+      this.context.fillRect(x + 2, y + 13, 8, 5);
+      this.context.fillRect(x + 18, y + 13, 8, 5);
+      this.context.fillStyle = '#f7e6ff';
+      this.context.fillRect(x + 11, y + 13, 2, 2);
+      this.context.fillRect(x + 16, y + 13, 2, 2);
+
+      if (enemy.healthVisible) {
+        const width = 28;
+        const fill = Math.max(0, Math.min(1, enemy.hp / enemy.maxHp));
+        this.context.fillStyle = '#2a1419';
+        this.context.fillRect(x, y - 7, width, 5);
+        this.context.fillStyle = '#64d65f';
+        this.context.fillRect(x + 1, y - 6, Math.round((width - 2) * fill), 3);
+      }
+      this.context.restore();
+    }
+  }
+
+  renderAnimals(animals, camera) {
+    for (const animal of animals) {
+      const x = Math.round(animal.x - camera.x);
+      const y = Math.round(animal.y - camera.y);
+
+      this.context.save();
+      this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+      this.context.fillRect(x + 5, y + 20, 15, 4);
+      this.context.fillStyle = '#f5e6ba';
+      this.context.fillRect(x + 6, y + 8, 13, 11);
+      this.context.fillStyle = '#fff7d6';
+      this.context.fillRect(x + 10, y + 4, 9, 8);
+      this.context.fillStyle = '#d8792b';
+      this.context.fillRect(x + 18, y + 8, 4, 3);
+      this.context.fillStyle = '#3b2a1d';
+      this.context.fillRect(x + 14, y + 7, 2, 2);
+      this.context.fillStyle = '#d8792b';
+      this.context.fillRect(x + 9, y + 19, 2, 4);
+      this.context.fillRect(x + 16, y + 19, 2, 4);
+      this.context.restore();
+    }
+  }
+
+  renderProjectiles(projectiles, camera) {
+    for (const projectile of projectiles) {
+      const x = Math.round(projectile.x - camera.x);
+      const y = Math.round(projectile.y - camera.y + Math.sin(projectile.distance / 16) * 2);
+
+      this.context.save();
+      if (projectile.type === 'arrow') {
+        this.context.fillStyle = '#e6d4a8';
+        this.context.fillRect(x - 6, y - 1, 12, 2);
+        this.context.fillStyle = '#f5f5f5';
+        this.context.fillRect(x - 8, y - 3, 3, 6);
+      } else {
+        this.context.fillStyle = '#6d6f73';
+        this.context.fillRect(x - 3, y - 3, 6, 6);
+        this.context.fillStyle = '#b5b8bc';
+        this.context.fillRect(x - 1, y - 3, 2, 2);
+      }
+      this.context.restore();
+    }
+  }
+
   renderAttackFeedback(feedback, camera) {
     if (!feedback || feedback.seconds <= 0) return;
 
