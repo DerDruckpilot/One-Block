@@ -7,6 +7,18 @@ import {
 
 const keyOf = (x, y) => `${x},${y}`;
 
+const getTreeStage = (growthSeconds) => {
+  if (growthSeconds <= 0) return 3;
+  if (growthSeconds <= SAPLING_GROW_SECONDS * 0.45) return 2;
+  return 1;
+};
+
+const getBerryStage = (growthSeconds, ready) => {
+  if (ready || growthSeconds <= 0) return 3;
+  if (growthSeconds <= BERRY_BUSH_GROW_SECONDS * 0.5) return 2;
+  return 1;
+};
+
 export class PlantSystem {
   constructor() {
     this.plants = new Map();
@@ -21,11 +33,13 @@ export class PlantSystem {
           plant.type = OBJECT_TYPES.tree;
           tileMap.setObject(plant.x, plant.y, OBJECT_TYPES.tree);
         }
+        this.syncPlantObjectState(tileMap, plant);
       }
 
       if (plant.type === OBJECT_TYPES.berryBush) {
         plant.growthSeconds = Math.max(0, plant.growthSeconds - deltaSeconds);
         plant.ready = plant.growthSeconds <= 0;
+        this.syncPlantObjectState(tileMap, plant);
       }
 
       if (!tileMap.getObject(plant.x, plant.y)) {
@@ -45,6 +59,7 @@ export class PlantSystem {
     const plant = { type: OBJECT_TYPES.sapling, x, y, growthSeconds: SAPLING_GROW_SECONDS, ready: false };
     this.plants.set(keyOf(x, y), plant);
     tileMap.setObject(x, y, OBJECT_TYPES.sapling);
+    this.syncPlantObjectState(tileMap, plant);
     return true;
   }
 
@@ -53,6 +68,7 @@ export class PlantSystem {
     const plant = { type: OBJECT_TYPES.berryBush, x, y, growthSeconds: BERRY_BUSH_GROW_SECONDS, ready: false };
     this.plants.set(keyOf(x, y), plant);
     tileMap.setObject(x, y, OBJECT_TYPES.berryBush);
+    this.syncPlantObjectState(tileMap, plant);
     return true;
   }
 
@@ -80,12 +96,13 @@ export class PlantSystem {
     return { harvested: true, message: 'Baum gefällt.' };
   }
 
-  harvestBerryBush(x, y) {
+  harvestBerryBush(x, y, tileMap = null) {
     const plant = this.plants.get(keyOf(x, y));
     if (!plant || plant.type !== OBJECT_TYPES.berryBush) return { harvested: false, message: 'Kein Beerenbusch in Reichweite.' };
     if (!plant.ready) return { harvested: false, message: 'Die Beeren sind noch nicht reif.' };
     plant.ready = false;
     plant.growthSeconds = BERRY_BUSH_GROW_SECONDS;
+    if (tileMap) this.syncPlantObjectState(tileMap, plant);
     return { harvested: true, message: 'Beeren geerntet.' };
   }
 
@@ -111,6 +128,7 @@ export class PlantSystem {
         if (this.canLoadPlant(tileMap, plant)) {
           this.plants.set(keyOf(plant.x, plant.y), plant);
           tileMap.setObject(plant.x, plant.y, plant.type);
+          this.syncPlantObjectState(tileMap, plant);
         }
       }
     }
@@ -133,6 +151,24 @@ export class PlantSystem {
   clear() {
     this.plants.clear();
     this.grassCooldowns.clear();
+  }
+
+  syncPlantObjectState(tileMap, plant) {
+    if (plant.type === OBJECT_TYPES.sapling || plant.type === OBJECT_TYPES.tree) {
+      tileMap.setObjectState(plant.x, plant.y, {
+        growthStage: getTreeStage(plant.growthSeconds),
+        growthSeconds: plant.growthSeconds
+      });
+      return;
+    }
+
+    if (plant.type === OBJECT_TYPES.berryBush) {
+      tileMap.setObjectState(plant.x, plant.y, {
+        growthStage: getBerryStage(plant.growthSeconds, plant.ready),
+        ready: plant.ready,
+        growthSeconds: plant.growthSeconds
+      });
+    }
   }
 
   toJSON() {

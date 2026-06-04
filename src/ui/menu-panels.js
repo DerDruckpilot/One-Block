@@ -1,4 +1,5 @@
 import {
+  BUILD_MENU_CATEGORIES,
   HOTBAR_SLOT_COUNT,
   INVENTORY_RESOURCES,
   INVENTORY_TABS,
@@ -9,14 +10,20 @@ import {
 } from '../config/constants.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel }) {
+  constructor({ inventoryPanel, craftingPanel, buildPanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
+    this.buildPanel = buildPanel;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
+    this.lastBuildHtml = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
+    this.craftingScrollTop = {
+      normal: 0,
+      workbench: 0
+    };
 
     this.inventoryPanel?.addEventListener?.('input', (event) => {
       if (event.target?.dataset?.inventoryFilter === 'true') {
@@ -27,6 +34,9 @@ export class MenuPanels {
   }
 
   update({
+    buildOpen = false,
+    buildRemoveMode = false,
+    buildSelectedResource = null,
     craftingContext = 'normal',
     craftingOpen,
     hotbarSlots = [],
@@ -38,6 +48,7 @@ export class MenuPanels {
   }) {
     this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
+    this.renderBuildMenu(inventory, buildOpen, buildSelectedResource, buildRemoveMode);
   }
 
   selectInventoryTab(tabId) {
@@ -169,10 +180,10 @@ export class MenuPanels {
     this.setCraftingHtml(`
       <div class="menu-frame-title">${title}</div>
       <div class="crafting-layout">
-        <div class="recipe-list">${recipes}</div>
+        <div class="recipe-list" data-craft-scroll="${craftingContext}">${recipes}</div>
         <div class="recipe-detail">${detail}</div>
       </div>
-    `);
+    `, craftingContext);
   }
 
   getSelectedRecipeState(recipeStates) {
@@ -229,6 +240,53 @@ export class MenuPanels {
     `;
   }
 
+  renderBuildMenu(inventory, isOpen, selectedResource = null, removeMode = false) {
+    if (!this.buildPanel) return;
+    this.buildPanel.hidden = !isOpen;
+
+    if (!isOpen) {
+      this.setBuildHtml('');
+      return;
+    }
+
+    const categories = BUILD_MENU_CATEGORIES.map((category) => {
+      const rows = category.resources.map((resource) => {
+        const amount = inventory.get(resource);
+        const isSelected = selectedResource === resource && !removeMode;
+        return `
+          <button
+            class="build-menu-item${isSelected ? ' is-selected' : ''}${amount <= 0 ? ' is-empty' : ''}"
+            type="button"
+            data-build-resource="${resource}"
+            aria-pressed="${isSelected ? 'true' : 'false'}"
+          >
+            <span class="menu-icon">${RESOURCE_ICONS[resource]}</span>
+            <span>${RESOURCE_LABELS[resource]}</span>
+            <strong>${amount}</strong>
+          </button>
+        `;
+      }).join('');
+      return `
+        <section class="build-menu-category">
+          <h3>${category.label}</h3>
+          <div class="build-menu-grid">${rows}</div>
+        </section>
+      `;
+    }).join('');
+
+    this.setBuildHtml(`
+      <div class="menu-frame-title">Bauen</div>
+      <button
+        class="build-remove-toggle${removeMode ? ' is-selected' : ''}"
+        type="button"
+        data-build-remove="true"
+        aria-pressed="${removeMode ? 'true' : 'false'}"
+      >Entfernen</button>
+      <div class="menu-note">${removeMode ? 'Entfernen aktiv: Ziel markieren und Aktion drücken.' : 'Item wählen, dann mit B oder Aktion platzieren.'}</div>
+      <div class="build-menu-scroll">${categories}</div>
+    `);
+  }
+
   escapeAttribute(value) {
     return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
   }
@@ -242,8 +300,23 @@ export class MenuPanels {
 
   setCraftingHtml(html) {
     if (html !== this.lastCraftingHtml) {
+      const currentList = this.craftingPanel?.querySelector?.('[data-craft-scroll]');
+      if (currentList?.dataset?.craftScroll) {
+        this.craftingScrollTop[currentList.dataset.craftScroll] = currentList.scrollTop;
+      }
       this.craftingPanel.innerHTML = html;
       this.lastCraftingHtml = html;
+      const nextList = this.craftingPanel?.querySelector?.('[data-craft-scroll]');
+      if (nextList?.dataset?.craftScroll) {
+        nextList.scrollTop = this.craftingScrollTop[nextList.dataset.craftScroll] || 0;
+      }
+    }
+  }
+
+  setBuildHtml(html) {
+    if (html !== this.lastBuildHtml) {
+      this.buildPanel.innerHTML = html;
+      this.lastBuildHtml = html;
     }
   }
 }

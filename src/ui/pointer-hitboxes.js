@@ -1,14 +1,20 @@
 export class PointerHitboxSystem {
   constructor({
+    buildButton,
+    buildPanel,
     canvas,
     craftingButton,
     craftingPanel,
     getCraftingOpen = () => false,
     getInventoryOpen = () => false,
+    getBuildOpen = () => false,
     hotbarElement,
     inventoryButton,
     inventoryPanel,
     onBlockedCraft = () => {},
+    onBuildItemSelect = () => {},
+    onBuildRemoveToggle = () => {},
+    onBuildToggle = () => {},
     onCraft = () => {},
     onCraftSelect = () => {},
     onCraftingToggle = () => {},
@@ -19,14 +25,20 @@ export class PointerHitboxSystem {
     pointerTarget = globalThis.window
   }) {
     this.canvas = canvas;
+    this.buildButton = buildButton;
+    this.buildPanel = buildPanel;
     this.craftingButton = craftingButton;
     this.craftingPanel = craftingPanel;
     this.getCraftingOpen = getCraftingOpen;
     this.getInventoryOpen = getInventoryOpen;
+    this.getBuildOpen = getBuildOpen;
     this.hotbarElement = hotbarElement;
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
     this.onBlockedCraft = onBlockedCraft;
+    this.onBuildItemSelect = onBuildItemSelect;
+    this.onBuildRemoveToggle = onBuildRemoveToggle;
+    this.onBuildToggle = onBuildToggle;
     this.onCraft = onCraft;
     this.onCraftSelect = onCraftSelect;
     this.onCraftingToggle = onCraftingToggle;
@@ -62,7 +74,9 @@ export class PointerHitboxSystem {
       return false;
     }
 
-    this.consumeEvent(event);
+    if (hitbox.consume !== false) {
+      this.consumeEvent(event);
+    }
     hitbox.action(point);
     return true;
   }
@@ -99,6 +113,7 @@ export class PointerHitboxSystem {
 
   getTopMenuHitboxes() {
     return [
+      this.createElementHitbox(this.buildButton, 'top-build', () => this.onBuildToggle()),
       this.createElementHitbox(this.inventoryButton, 'top-inventory', () => this.onInventoryToggle()),
       this.createElementHitbox(this.craftingButton, 'top-crafting', () => this.onCraftingToggle())
     ].filter(Boolean);
@@ -128,7 +143,7 @@ export class PointerHitboxSystem {
         if (recipeHitbox) hitboxes.push(recipeHitbox);
       }
 
-      const panelHitbox = this.createElementHitbox(this.craftingPanel, 'crafting-panel', () => {});
+      const panelHitbox = this.createElementHitbox(this.craftingPanel, 'crafting-panel', () => {}, { consume: false });
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
@@ -157,7 +172,27 @@ export class PointerHitboxSystem {
         if (hotbarHitbox) hitboxes.push(hotbarHitbox);
       }
 
-      const panelHitbox = this.createElementHitbox(this.inventoryPanel, 'inventory-panel', () => {});
+      const panelHitbox = this.createElementHitbox(this.inventoryPanel, 'inventory-panel', () => {}, { consume: false });
+      if (panelHitbox) hitboxes.push(panelHitbox);
+    }
+
+    if (this.getBuildOpen()) {
+      for (const buildButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-resource]') || [])) {
+        if (!buildButton.dataset.buildResource) continue;
+        const buildHitbox = this.createElementHitbox(buildButton, `build-${buildButton.dataset.buildResource}`, () => {
+          this.onBuildItemSelect(buildButton.dataset.buildResource);
+        });
+        if (buildHitbox) hitboxes.push(buildHitbox);
+      }
+
+      for (const removeButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-remove]') || [])) {
+        const removeHitbox = this.createElementHitbox(removeButton, 'build-remove', () => {
+          this.onBuildRemoveToggle();
+        });
+        if (removeHitbox) hitboxes.push(removeHitbox);
+      }
+
+      const panelHitbox = this.createElementHitbox(this.buildPanel, 'build-panel', () => {}, { consume: false });
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
@@ -165,7 +200,7 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
-    if (this.getInventoryOpen() || this.getCraftingOpen()) return [];
+    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen()) return [];
 
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(
@@ -176,7 +211,7 @@ export class PointerHitboxSystem {
       .filter(Boolean);
   }
 
-  createElementHitbox(element, id, action) {
+  createElementHitbox(element, id, action, options = {}) {
     if (!element || element.hidden) return null;
 
     const rect = element.getBoundingClientRect?.();
@@ -191,7 +226,8 @@ export class PointerHitboxSystem {
         top: rect.top,
         bottom: rect.bottom
       },
-      action
+      action,
+      consume: options.consume
     };
   }
 

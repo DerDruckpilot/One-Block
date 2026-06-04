@@ -1,15 +1,19 @@
 import {
   ATTACK_FEEDBACK_SECONDS,
+  CRYSTAL_ENCOUNTER_DROPS,
   CRYSTAL_INTERACTION_DISTANCE,
   DEFAULT_HOTBAR_SLOTS,
+  GATE_INTERACTION_DISTANCE,
   GAME_VIEW,
   HOTBAR_SLOT_COUNT,
   INVENTORY_RESOURCES,
+  LASSO_INTERACTION_DISTANCE,
   OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
+  REMOVABLE_OBJECT_TYPES,
   RESOURCE_LABELS,
   TILE_TYPES,
   TILE_SIZE,
@@ -44,9 +48,13 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
   OBJECT_TYPES.torch,
   OBJECT_TYPES.campfire,
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.fence,
+  OBJECT_TYPES.gate,
   OBJECT_TYPES.table,
   OBJECT_TYPES.chair
 ]);
+
+const REMOVABLE_OBJECT_ITEMS = new Set(REMOVABLE_OBJECT_TYPES);
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -83,15 +91,20 @@ export class Game {
     this.hotbar = new Hotbar(options.hotbarElement);
     this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({
+      buildPanel: options.buildPanel,
       craftingPanel: options.craftingPanel,
       inventoryPanel: options.inventoryPanel
     });
+    this.buildButton = options.buildButton;
     this.inventoryButton = options.inventoryButton;
     this.craftingButton = options.craftingButton;
     this.pointerHitboxes = new PointerHitboxSystem({
+      buildButton: options.buildButton,
+      buildPanel: options.buildPanel,
       canvas,
       craftingButton: options.craftingButton,
       craftingPanel: options.craftingPanel,
+      getBuildOpen: () => this.buildOpen,
       getCraftingOpen: () => this.craftingOpen,
       getInventoryOpen: () => this.inventoryOpen,
       hotbarElement: options.hotbarElement,
@@ -100,6 +113,9 @@ export class Game {
       onBlockedCraft: () => {
         this.setLog('Nicht genug Material.');
       },
+      onBuildItemSelect: (resource) => this.selectBuildResource(resource),
+      onBuildRemoveToggle: () => this.toggleRemoveMode(),
+      onBuildToggle: () => this.toggleBuildMenu(),
       onCraft: (recipeId) => this.tryCraft(recipeId),
       onCraftSelect: (recipeId) => this.menuPanels.selectCraftingRecipe(recipeId),
       onCraftingToggle: () => this.toggleCraftingMenu(),
@@ -118,7 +134,10 @@ export class Game {
     this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
+    this.buildOpen = false;
     this.craftingContext = 'normal';
+    this.buildSelectedResource = null;
+    this.removeMode = false;
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
@@ -175,7 +194,7 @@ export class Game {
       this.camera.centerOn(this.player.getCenterPosition());
       this.backgroundSystem.update(deltaSeconds);
       this.handleEnemyEvents(this.enemySystem.update(deltaSeconds, this.tileMap, this.player));
-      this.handleAnimalEvents(this.animalSystem.update(deltaSeconds, this.tileMap));
+      this.handleAnimalEvents(this.animalSystem.update(deltaSeconds, this.tileMap, this.player));
       this.flyingEnemySystem.update(deltaSeconds, this.tileMap, this.player);
       this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem));
       this.plantSystem.update(deltaSeconds, this.tileMap);
@@ -195,6 +214,10 @@ export class Game {
 
       if (this.input.wasPressed('f')) {
         this.tryAttackAction();
+      }
+
+      if (this.input.wasPressed('x')) {
+        this.toggleRemoveMode();
       }
 
       this.handleTouchActions();
@@ -220,6 +243,9 @@ export class Game {
       slots: this.hotbarSlots
     });
     this.menuPanels.update({
+      buildOpen: this.buildOpen,
+      buildRemoveMode: this.removeMode,
+      buildSelectedResource: this.buildSelectedResource,
       craftingOpen: this.craftingOpen,
       craftingContext: this.craftingContext,
       activeHotbarSlot: this.activeHotbarSlot,
@@ -282,9 +308,21 @@ export class Game {
   tryContextAction() {
     if (this.isGamePaused()) return false;
 
+    if (this.removeMode) {
+      return this.tryRemoveTarget();
+    }
+
     const placement = this.getPlacementPreview();
     if (placement.canPlace) {
       return this.tryPlaceSelectedItem();
+    }
+
+    if (this.tryUseLasso()) {
+      return true;
+    }
+
+    if (this.tryToggleGate()) {
+      return true;
     }
 
     if (this.hasWorkbenchAccess()) {
@@ -343,6 +381,10 @@ export class Game {
       return this.tryHarvestGrass();
     }
 
+    if (activeItem === 'lasso' && this.inventory.get('lasso') > 0) {
+      return this.tryUseLasso({ requireActive: true });
+    }
+
     this.setLog('Keine Waffe ausgewählt.');
     return false;
   }
@@ -376,12 +418,7 @@ export class Game {
     }
 
     if (this.isNearCrystal()) {
-      const spawn = this.enemySystem.spawnNearCrystal(this.tileMap);
-      this.setLog(spawn.message);
-      if (spawn.spawned) {
-        this.saveGame();
-      }
-      return spawn.spawned;
+      return this.trySpawnCrystalEncounter();
     }
 
     this.setLog('Kein Ziel.');
@@ -395,12 +432,7 @@ export class Game {
     }
 
     if (this.isNearCrystal()) {
-      const spawn = this.flyingEnemySystem.spawnNearCrystal(this.tileMap);
-      this.setLog(spawn.message);
-      if (spawn.spawned) {
-        this.saveGame();
-      }
-      return spawn.spawned;
+      return this.trySpawnCrystalEncounter();
     }
 
     const origin = this.player.getFootPosition();
@@ -646,6 +678,14 @@ export class Game {
       return this.getPlantingPlacementPreview(activeItem, target, playerTile);
     }
 
+    if (activeItem === 'lasso') {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Kein Tier in Reichweite.'
+      };
+    }
+
     if (activeItem === 'earth' || activeItem === 'stone' || activeItem === 'clay') {
       return this.getFloorTilePlacementPreview(activeItem, target, playerTile);
     }
@@ -750,6 +790,33 @@ export class Game {
       canPlace: true,
       message: `${RESOURCE_LABELS[resource]} kann platziert werden.`
     };
+  }
+
+  getRemovalPreview() {
+    const target = this.player.getFacingTile();
+    const object = this.tileMap.getObject(target.x, target.y);
+    return {
+      ...target,
+      canPlace: Boolean(object && REMOVABLE_OBJECT_ITEMS.has(object)),
+      message: object && REMOVABLE_OBJECT_ITEMS.has(object)
+        ? `${RESOURCE_LABELS[object]} kann entfernt werden.`
+        : 'Kein entfernbares Objekt.'
+    };
+  }
+
+  tryRemoveTarget() {
+    const preview = this.getRemovalPreview();
+    if (!preview.canPlace) {
+      this.setLog(preview.message);
+      return false;
+    }
+
+    const object = this.tileMap.getObject(preview.x, preview.y);
+    this.tileMap.removeObject(preview.x, preview.y);
+    this.inventory.add(object, 1);
+    this.setLog('Objekt entfernt.');
+    this.saveGame();
+    return true;
   }
 
   getGrassSeedPlacementPreview(target = this.player.getFacingTile()) {
@@ -921,13 +988,78 @@ export class Game {
     const target = this.player.getFacingTile();
     if (this.tileMap.getObject(target.x, target.y) !== OBJECT_TYPES.berryBush) return false;
 
-    const result = this.plantSystem.harvestBerryBush(target.x, target.y);
+    const result = this.plantSystem.harvestBerryBush(target.x, target.y, this.tileMap);
     this.setLog(result.message);
     if (result.harvested) {
       this.inventory.add('berry', 1);
       this.saveGame();
     }
     return true;
+  }
+
+  tryUseLasso({ requireActive = false } = {}) {
+    if (this.inventory.get('lasso') <= 0) return false;
+    const activeItem = this.getActiveHotbarItem();
+    const hasTethered = Boolean(this.animalSystem.getTetheredAnimal());
+    const hasNearbyChicken = Boolean(this.animalSystem.findNearestChicken(this.player, LASSO_INTERACTION_DISTANCE));
+    if (!hasTethered && !hasNearbyChicken) {
+      if (activeItem === 'lasso' || requireActive) {
+        this.setLog('Kein Tier in Reichweite.');
+        return true;
+      }
+      return false;
+    }
+    if (hasTethered && activeItem !== 'lasso' && !requireActive) return false;
+
+    const result = this.animalSystem.tetherChicken(this.player, LASSO_INTERACTION_DISTANCE);
+    this.setLog(result.message);
+    if (result.changed) {
+      this.saveGame();
+    }
+    return true;
+  }
+
+  tryToggleGate() {
+    const target = this.player.getFacingTile();
+    if (this.tileMap.getObject(target.x, target.y) !== OBJECT_TYPES.gate) {
+      const foot = this.player.getFootPosition();
+      let nearest = null;
+      let nearestDistance = Infinity;
+      this.tileMap.forEachObject((object) => {
+        if (object.type !== OBJECT_TYPES.gate) return;
+        const center = {
+          x: object.x * TILE_SIZE + TILE_SIZE / 2,
+          y: object.y * TILE_SIZE + TILE_SIZE / 2
+        };
+        const distance = Math.hypot(foot.x - center.x, foot.y - center.y);
+        if (distance <= GATE_INTERACTION_DISTANCE && distance < nearestDistance) {
+          nearest = object;
+          nearestDistance = distance;
+        }
+      });
+      if (!nearest) return false;
+      const open = this.tileMap.toggleGate(nearest.x, nearest.y);
+      this.setLog(open ? 'Tor geöffnet.' : 'Tor geschlossen.');
+      this.saveGame();
+      return true;
+    }
+
+    const open = this.tileMap.toggleGate(target.x, target.y);
+    this.setLog(open ? 'Tor geöffnet.' : 'Tor geschlossen.');
+    this.saveGame();
+    return true;
+  }
+
+  trySpawnCrystalEncounter() {
+    const choice = chooseWeightedDrop(CRYSTAL_ENCOUNTER_DROPS, this.crystalSystem.random()).encounter;
+    const spawn = choice === 'flying'
+      ? this.flyingEnemySystem.spawnNearCrystal(this.tileMap)
+      : this.enemySystem.spawnNearCrystal(this.tileMap);
+    this.setLog(spawn.message);
+    if (spawn.spawned) {
+      this.saveGame();
+    }
+    return spawn.spawned;
   }
 
   handleVoidFall() {
@@ -972,10 +1104,14 @@ export class Game {
     if (this.input.wasPressed('c')) {
       this.toggleCraftingMenu();
     }
+
+    if (this.input.wasPressed('n')) {
+      this.toggleBuildMenu();
+    }
   }
 
   isMenuOpen() {
-    return this.inventoryOpen || this.craftingOpen;
+    return this.inventoryOpen || this.craftingOpen || this.buildOpen;
   }
 
   isGamePaused() {
@@ -986,6 +1122,7 @@ export class Game {
     this.inventoryOpen = !this.inventoryOpen;
     if (this.inventoryOpen) {
       this.craftingOpen = false;
+      this.buildOpen = false;
     } else {
       this.selectedInventoryResource = null;
     }
@@ -1004,6 +1141,7 @@ export class Game {
     this.craftingContext = 'normal';
     this.craftingOpen = true;
     this.inventoryOpen = false;
+    this.buildOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('workbench');
     return true;
@@ -1018,9 +1156,38 @@ export class Game {
     this.craftingContext = 'workbench';
     this.craftingOpen = true;
     this.inventoryOpen = false;
+    this.buildOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('woodenPickaxe');
     this.setLog('Werkbank geöffnet.');
+    return true;
+  }
+
+  toggleBuildMenu() {
+    this.buildOpen = !this.buildOpen;
+    if (this.buildOpen) {
+      this.inventoryOpen = false;
+      this.craftingOpen = false;
+      this.selectedInventoryResource = null;
+    }
+  }
+
+  selectBuildResource(resource) {
+    if (!this.isKnownInventoryResource(resource)) return false;
+    this.removeMode = false;
+    this.buildSelectedResource = resource;
+    this.selectHotbarResource(resource);
+    this.setLog(`${RESOURCE_LABELS[resource]} zum Bauen ausgewählt.`);
+    this.saveGame();
+    return true;
+  }
+
+  toggleRemoveMode() {
+    this.removeMode = !this.removeMode;
+    if (this.removeMode) {
+      this.buildSelectedResource = null;
+    }
+    this.setLog(this.removeMode ? 'Entfernen aktiv.' : 'Entfernen aus.');
     return true;
   }
 
@@ -1130,7 +1297,10 @@ export class Game {
     this.selectedInventoryResource = null;
     this.inventoryOpen = false;
     this.craftingOpen = false;
+    this.buildOpen = false;
     this.craftingContext = 'normal';
+    this.buildSelectedResource = null;
+    this.removeMode = false;
     this.respawnPlayer();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
@@ -1181,6 +1351,10 @@ export class Game {
     }
 
     this.loadHotbarState(save);
+    if (this.isKnownInventoryResource(save.buildSelectedResource)) {
+      this.buildSelectedResource = save.buildSelectedResource;
+    }
+    this.removeMode = save.removeMode === true;
     this.logSystem.load(save.logs);
     this.enemySystem.load(save.enemies, this.tileMap);
     this.animalSystem.load(save.animals, this.tileMap);
@@ -1219,6 +1393,8 @@ export class Game {
       logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
       activeHotbarSlot: this.activeHotbarSlot,
+      buildSelectedResource: this.buildSelectedResource,
+      removeMode: this.removeMode,
       player: {
         x: this.player.x,
         y: this.player.y,
@@ -1240,7 +1416,7 @@ export class Game {
     this.renderSystem.renderFlyingEnemies(this.flyingEnemySystem.enemies, this.camera);
     this.renderSystem.renderProjectiles(this.projectileSystem.projectiles, this.camera);
     if (!this.isGamePaused()) {
-      this.renderSystem.renderPlacementPreview(this.getPlacementPreview(), this.camera);
+      this.renderSystem.renderPlacementPreview(this.removeMode ? this.getRemovalPreview() : this.getPlacementPreview(), this.camera);
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
@@ -1248,6 +1424,7 @@ export class Game {
   }
 
   updateMenuButtonStates() {
+    this.buildButton?.classList?.toggle('is-active', this.buildOpen);
     this.inventoryButton?.classList?.toggle('is-active', this.inventoryOpen);
     this.craftingButton?.classList?.toggle('is-active', this.craftingOpen);
   }
@@ -1286,6 +1463,9 @@ export class Game {
       saveStatus: this.saveStatus,
       activeHotbarSlot: this.activeHotbarSlot,
       activeHotbarItem: this.getActiveHotbarItem(),
+      buildOpen: this.buildOpen,
+      removeMode: this.removeMode,
+      buildSelectedResource: this.buildSelectedResource || 'none',
       attackState: this.attackFeedback?.type || 'none',
       activeEnemies: this.enemySystem.activeCount(),
       activeAnimals: this.animalSystem.activeCount(),

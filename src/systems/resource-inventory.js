@@ -19,9 +19,12 @@ export class ResourceInventory {
       bow: 0,
       axe: 0,
       scythe: 0,
+      lasso: 0,
       torch: 0,
       campfire: 0,
       woodWall: 0,
+      fence: 0,
+      gate: 0,
       table: 0,
       chair: 0
     };

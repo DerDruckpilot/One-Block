@@ -318,6 +318,9 @@ button.menu-row:hover {
   gap: 10px;
   max-height: 260px;
   overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .crafting-layout {
@@ -397,6 +400,65 @@ button.menu-row:hover {
 .craft-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.build-menu-scroll {
+  display: grid;
+  gap: 12px;
+  max-height: 300px;
+  overflow: auto;
+  padding: 4px;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.build-menu-category h3 {
+  margin: 8px 0 6px;
+  font-size: 15px;
+}
+
+.build-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.build-menu-item,
+.build-remove-toggle {
+  min-height: 42px;
+  border: 2px solid #4d2f1d;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #6b4327, #2d1c13);
+  color: #fff4d2;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.build-menu-item {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.build-menu-item.is-empty {
+  opacity: 0.62;
+}
+
+.build-menu-item.is-selected,
+.build-remove-toggle.is-selected {
+  border-color: #ffe082;
+  background: linear-gradient(180deg, #d3a35e, #7b4b2b);
+  color: #21140d;
+}
+
+.build-remove-toggle {
+  width: 100%;
+  margin-bottom: 6px;
 }
 
 #hotbar {
@@ -726,6 +788,14 @@ button.menu-row:hover {
   .recipe-list,
   .recipe-detail {
     max-height: 220px;
+  }
+
+  .build-menu-scroll {
+    max-height: 220px;
+  }
+
+  .build-menu-grid {
+    grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   }
 
   #hotbar {

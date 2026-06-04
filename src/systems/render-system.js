@@ -96,14 +96,20 @@ export class RenderSystem {
       if (object.type === OBJECT_TYPES.chair) {
         this.drawChair(screenX, screenY);
       }
+      if (object.type === OBJECT_TYPES.fence) {
+        this.drawFence(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.gate) {
+        this.drawGate(screenX, screenY, object.open);
+      }
       if (object.type === OBJECT_TYPES.sapling) {
-        this.drawSapling(screenX, screenY);
+        this.drawSapling(screenX, screenY, object.growthStage || 1);
       }
       if (object.type === OBJECT_TYPES.tree) {
-        this.drawTree(screenX, screenY);
+        this.drawTree(screenX, screenY, object.growthStage || 3);
       }
       if (object.type === OBJECT_TYPES.berryBush) {
-        this.drawBerryBush(screenX, screenY);
+        this.drawBerryBush(screenX, screenY, object.growthStage || (object.ready ? 3 : 1), object.ready === true);
       }
     });
   }
@@ -396,40 +402,93 @@ export class RenderSystem {
     this.context.restore();
   }
 
-  drawSapling(x, y) {
+  drawFence(x, y) {
     this.context.save();
-    this.context.fillStyle = '#5b331c';
-    this.context.fillRect(x + 15, y + 16, 3, 10);
-    this.context.fillStyle = '#4f9e42';
-    this.context.fillRect(x + 10, y + 11, 8, 6);
-    this.context.fillRect(x + 17, y + 9, 7, 6);
+    this.context.fillStyle = '#3a2418';
+    this.context.fillRect(x + 5, y + 13, 5, 17);
+    this.context.fillRect(x + 22, y + 13, 5, 17);
+    this.context.fillStyle = '#9a6238';
+    this.context.fillRect(x + 4, y + 11, 6, 17);
+    this.context.fillRect(x + 21, y + 11, 6, 17);
+    this.context.fillStyle = '#b77a43';
+    this.context.fillRect(x + 7, y + 15, 18, 5);
+    this.context.fillRect(x + 7, y + 23, 18, 4);
     this.context.restore();
   }
 
-  drawTree(x, y) {
+  drawGate(x, y, open = false) {
+    this.context.save();
+    this.context.fillStyle = open ? '#4f8f3f' : '#3a2418';
+    this.context.fillRect(x + 5, y + 11, 5, 18);
+    this.context.fillRect(x + 22, y + 11, 5, 18);
+    this.context.fillStyle = open ? '#7bc66a' : '#a86d3f';
+    if (open) {
+      this.context.fillRect(x + 11, y + 14, 5, 13);
+      this.context.fillRect(x + 15, y + 12, 4, 4);
+    } else {
+      this.context.fillRect(x + 9, y + 14, 14, 5);
+      this.context.fillRect(x + 9, y + 23, 14, 4);
+    }
+    this.context.restore();
+  }
+
+  drawSapling(x, y, stage = 1) {
+    this.context.save();
+    const leafOffset = stage >= 2 ? -4 : 0;
+    this.context.fillStyle = '#5b331c';
+    this.context.fillRect(x + 15, y + 16 + leafOffset, 3, 10 - leafOffset);
+    this.context.fillStyle = '#4f9e42';
+    this.context.fillRect(x + 10, y + 11 + leafOffset, stage >= 2 ? 10 : 8, 6);
+    this.context.fillRect(x + 17, y + 9 + leafOffset, stage >= 2 ? 9 : 7, 6);
+    if (stage >= 2) {
+      this.context.fillStyle = '#83c85e';
+      this.context.fillRect(x + 8, y + 8, 5, 4);
+      this.context.fillRect(x + 21, y + 5, 5, 4);
+    }
+    this.context.restore();
+  }
+
+  drawTree(x, y, stage = 3) {
+    if (stage < 3) {
+      this.drawSapling(x, y, 2);
+      return;
+    }
+
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
     this.context.fillRect(x + 6, y + 25, 20, 5);
     this.context.fillStyle = '#6b3f22';
-    this.context.fillRect(x + 13, y + 13, 7, 16);
+    this.context.fillRect(x + 11, y - 24, 10, 53);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 15, y - 20, 3, 43);
     this.context.fillStyle = '#2f6f35';
-    this.context.fillRect(x + 5, y + 4, 22, 12);
+    this.context.fillRect(x - 23, y - 45, 28, 16);
+    this.context.fillRect(x + 4, y - 56, 30, 18);
+    this.context.fillRect(x + 30, y - 44, 25, 16);
+    this.context.fillRect(x - 10, y - 32, 50, 18);
     this.context.fillStyle = '#4f9e42';
-    this.context.fillRect(x + 8, y, 16, 10);
+    this.context.fillRect(x - 12, y - 50, 20, 10);
+    this.context.fillRect(x + 16, y - 52, 22, 11);
+    this.context.fillRect(x + 3, y - 38, 35, 10);
     this.context.fillStyle = '#83c85e';
-    this.context.fillRect(x + 12, y + 3, 5, 3);
+    this.context.fillRect(x - 5, y - 45, 5, 3);
+    this.context.fillRect(x + 23, y - 48, 5, 3);
+    this.context.fillRect(x + 39, y - 39, 5, 3);
     this.context.restore();
   }
 
-  drawBerryBush(x, y) {
+  drawBerryBush(x, y, stage = 3, ready = true) {
     this.context.save();
     this.context.fillStyle = '#2f6f35';
-    this.context.fillRect(x + 7, y + 12, 18, 13);
+    this.context.fillRect(x + 7, y + (stage >= 2 ? 10 : 15), stage >= 2 ? 18 : 12, stage >= 2 ? 13 : 8);
     this.context.fillStyle = '#4f9e42';
-    this.context.fillRect(x + 10, y + 9, 12, 9);
-    this.context.fillStyle = '#bf3158';
-    this.context.fillRect(x + 11, y + 14, 3, 3);
-    this.context.fillRect(x + 19, y + 17, 3, 3);
+    this.context.fillRect(x + 10, y + (stage >= 2 ? 8 : 13), stage >= 3 ? 14 : 9, stage >= 2 ? 9 : 6);
+    if (stage >= 3 && ready) {
+      this.context.fillStyle = '#bf3158';
+      this.context.fillRect(x + 11, y + 14, 3, 3);
+      this.context.fillRect(x + 19, y + 17, 3, 3);
+      this.context.fillRect(x + 16, y + 11, 3, 3);
+    }
     this.context.restore();
   }
 
