@@ -50,12 +50,12 @@ export class TerrainRenderer {
     if (!edges.hasLeft) context.fillRect(x, y + 2, 2, 26);
     if (!edges.hasRight) context.fillRect(x + TILE_SIZE - 2, y + 2, 2, 26);
     if (edges.hasLeft && !same.left) {
-      context.fillStyle = 'rgba(35, 23, 16, 0.16)';
-      context.fillRect(x, y + 5, 1, 18);
+      context.fillStyle = palette.mid;
+      context.fillRect(x, y + 4, 1, 20);
     }
     if (edges.hasRight && !same.right) {
-      context.fillStyle = 'rgba(35, 23, 16, 0.16)';
-      context.fillRect(x + TILE_SIZE - 1, y + 5, 1, 18);
+      context.fillStyle = palette.mid;
+      context.fillRect(x + TILE_SIZE - 1, y + 4, 1, 20);
     }
     if (edges.hasUp && !same.up) {
       context.fillStyle = 'rgba(255, 238, 190, 0.12)';
@@ -168,6 +168,7 @@ export class TerrainRenderer {
         (edges.hasLeft && !same.left) ||
         (edges.hasRight && !same.right)
       ),
+      horizontalTransitionSealed: (edges.hasLeft && !same.left) || (edges.hasRight && !same.right),
       connectedSurfaceHorizontal: same.left || same.right,
       connectedSurfaceVertical: same.up || same.down,
       seamlessHorizontal: same.left || same.right ? surface.top.left < 0 || surface.top.width > TILE_SIZE : false,
@@ -198,8 +199,8 @@ export class TerrainRenderer {
 
     context.fillStyle = 'rgba(255, 236, 188, 0.08)';
     if (transition.up) context.fillRect(x + 5, y + 3, TILE_SIZE - 10, 1);
-    if (transition.left) context.fillRect(x + 2, y + 6, 1, 15);
-    if (transition.right) context.fillRect(x + TILE_SIZE - 3, y + 6, 1, 15);
+    if (transition.left) context.fillRect(x, y + 6, 2, 15);
+    if (transition.right) context.fillRect(x + TILE_SIZE - 2, y + 6, 2, 15);
     context.fillStyle = 'rgba(35, 23, 16, 0.1)';
     if (transition.down) context.fillRect(x + 4, y + 23, TILE_SIZE - 8, 1);
   }
