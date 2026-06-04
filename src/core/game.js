@@ -1485,6 +1485,7 @@ export class Game {
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
     this.renderSystem.renderPlayer(this.player, this.camera);
+    this.renderSystem.renderForegroundBarriers(this.tileMap, this.camera);
     this.renderSystem.renderForegroundObjects(this.tileMap, this.camera);
     this.renderSystem.renderLighting(this.dayNightSystem, this.tileMap, this.camera, GAME_VIEW);
   }
