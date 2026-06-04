@@ -126,6 +126,17 @@ export class RenderSystem {
     });
   }
 
+  renderForegroundBarriers(tileMap, camera) {
+    tileMap.forEachObject((object) => {
+      if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.fence, OBJECT_TYPES.gate].includes(object.type)) return;
+      const shape = tileMap.getBarrierCollisionShape(object.x, object.y);
+      if (!shape.horizontal) return;
+      const screenX = Math.round(object.x * TILE_SIZE - camera.x);
+      const screenY = Math.round(object.y * TILE_SIZE - camera.y);
+      this.drawBarrierForeground(screenX, screenY, object.type, object.open === true, shape);
+    });
+  }
+
   renderDrops(drops, camera) {
     for (const drop of drops) {
       const progress = Math.min(1, drop.age / (drop.duration || DROP_ANIMATION_SECONDS));
@@ -433,30 +444,17 @@ export class RenderSystem {
 
   drawGate(x, y, open = false, shape = null) {
     this.context.save();
-    if (open) {
-      this.drawBarrierShape(x, y, shape, {
-        kind: 'gate',
-        post: '#3a2418',
-        main: '#8d633f',
-        highlight: '#d19a5b',
-        accent: '#4f8f3f',
-        thickness: 5,
-        capHeight: 18,
-        height: 16,
-        open
-      });
-    } else {
-      this.drawBarrierShape(x, y, shape, {
-        kind: 'gate',
-        post: '#3a2418',
-        main: '#a86d3f',
-        highlight: '#d49458',
-        accent: '#6a4126',
-        thickness: 6,
-        capHeight: 20,
-        height: 17
-      });
-    }
+    this.drawGateShape(x, y, shape, {
+      kind: 'gate',
+      post: '#3a2418',
+      main: open ? '#8d633f' : '#a86d3f',
+      highlight: open ? '#d19a5b' : '#d49458',
+      accent: open ? '#4f8f3f' : '#6a4126',
+      thickness: open ? 5 : 6,
+      capHeight: 20,
+      height: 17,
+      open
+    });
     this.context.restore();
   }
 
@@ -509,7 +507,7 @@ export class RenderSystem {
       const left = connections.left ? x : centerX - palette.capHeight / 2;
       const right = connections.right ? x + TILE_SIZE : centerX + palette.capHeight / 2;
       const horizontalTop = palette.kind === 'wall' || palette.kind === 'door'
-        ? centerY - Math.floor(visualHeight * 0.65)
+        ? centerY - visualHeight + 4
         : centerY - half - 5;
       const horizontalHeight = palette.kind === 'wall' || palette.kind === 'door'
         ? visualHeight
@@ -548,18 +546,114 @@ export class RenderSystem {
     }
   }
 
+  drawGateShape(x, y, shape = null, palette) {
+    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const hasHorizontal = shape?.horizontal || connections.left || connections.right;
+    const hasVertical = shape?.vertical || connections.up || connections.down;
+    const single = !hasHorizontal && !hasVertical;
+    const centerX = x + TILE_SIZE / 2;
+    const centerY = y + TILE_SIZE / 2;
+    const postSize = 6;
+
+    this.context.fillStyle = palette.post;
+
+    if (single || hasHorizontal) {
+      const leftPostX = x + 4;
+      const rightPostX = x + TILE_SIZE - 10;
+      const top = centerY - 11;
+      const railLeft = leftPostX + postSize;
+      const railWidth = rightPostX - railLeft;
+      this.context.fillRect(leftPostX, top - 3, postSize, 24);
+      this.context.fillRect(rightPostX, top - 3, postSize, 24);
+      this.context.fillStyle = palette.main;
+      if (palette.open) {
+        this.context.fillRect(leftPostX + 7, top + 2, 14, 5);
+        this.context.fillRect(leftPostX + 7, top + 12, 14, 5);
+        this.context.fillStyle = palette.highlight;
+        this.context.fillRect(leftPostX + 9, top + 3, 9, 2);
+      } else {
+        this.context.fillRect(railLeft, top + 2, railWidth, 5);
+        this.context.fillRect(railLeft, top + 12, railWidth, 5);
+        this.context.fillStyle = palette.highlight;
+        this.context.fillRect(railLeft + 1, top + 3, Math.max(3, railWidth - 2), 2);
+        this.context.fillRect(railLeft + 3, top + 9, Math.max(3, railWidth - 6), 3);
+      }
+      if (connections.left) this.context.fillRect(x, centerY - 2, leftPostX - x, 4);
+      if (connections.right) this.context.fillRect(rightPostX + postSize, centerY - 2, x + TILE_SIZE - rightPostX - postSize, 4);
+      this.context.fillStyle = '#2e1d14';
+      this.context.fillRect(leftPostX + postSize - 1, top + 1, 2, 5);
+      this.context.fillStyle = palette.accent;
+      this.context.fillRect(rightPostX - 4, centerY - 1, 3, 3);
+    }
+
+    if (single || hasVertical) {
+      const topPostY = y + 4;
+      const bottomPostY = y + TILE_SIZE - 10;
+      const left = centerX - 8;
+      const railTop = topPostY + postSize;
+      const railHeight = bottomPostY - railTop;
+      this.context.fillStyle = palette.post;
+      this.context.fillRect(left, topPostY, 16, postSize);
+      this.context.fillRect(left, bottomPostY, 16, postSize);
+      this.context.fillStyle = palette.main;
+      if (palette.open) {
+        this.context.fillRect(centerX - 4, topPostY + 7, 5, 14);
+        this.context.fillRect(centerX + 4, topPostY + 7, 5, 14);
+      } else {
+        this.context.fillRect(centerX - 7, railTop, 5, railHeight);
+        this.context.fillRect(centerX + 3, railTop, 5, railHeight);
+        this.context.fillStyle = palette.highlight;
+        this.context.fillRect(centerX - 6, railTop + 1, 2, Math.max(3, railHeight - 2));
+      }
+      if (connections.up) this.context.fillRect(centerX - 2, y, 4, topPostY - y);
+      if (connections.down) this.context.fillRect(centerX - 2, bottomPostY + postSize, 4, y + TILE_SIZE - bottomPostY - postSize);
+      this.context.fillStyle = '#2e1d14';
+      this.context.fillRect(centerX - 8, topPostY + postSize - 1, 5, 2);
+      this.context.fillStyle = palette.accent;
+      this.context.fillRect(centerX + 4, bottomPostY - 4, 3, 3);
+    }
+  }
+
+  drawBarrierForeground(x, y, type, open = false, shape = null) {
+    const profile = this.getBarrierRenderProfile(type, open);
+    const connections = shape?.connections || { left: false, right: false };
+    const left = connections.left ? x : x + 4;
+    const right = connections.right ? x + TILE_SIZE : x + TILE_SIZE - 4;
+    const centerY = y + TILE_SIZE / 2;
+
+    this.context.save();
+    if (profile.kind === 'wall' || profile.kind === 'door') {
+      const top = centerY - 24;
+      const height = profile.kind === 'door' ? 18 : 20;
+      this.context.fillStyle = profile.kind === 'door'
+        ? (open ? 'rgba(155, 106, 63, 0.88)' : '#5b3722')
+        : '#5c3924';
+      this.context.fillRect(left, top, right - left, height);
+      this.context.fillStyle = profile.kind === 'door' ? '#d09a5c' : '#a87545';
+      this.context.fillRect(left + 3, top + 4, Math.max(3, right - left - 6), 2);
+      if (profile.kind === 'door') {
+        this.context.fillStyle = open ? '#d9ba73' : '#f0c96b';
+        this.context.fillRect(x + TILE_SIZE / 2 + 4, centerY - 15, 3, 3);
+      }
+    } else if (profile.kind === 'fence' || profile.kind === 'gate') {
+      this.context.fillStyle = profile.kind === 'gate' ? '#6a4126' : '#5a3520';
+      this.context.fillRect(left, centerY - 10, right - left, 3);
+    }
+    this.context.restore();
+  }
+
   getBarrierRenderProfile(type, open = false) {
     if (type === OBJECT_TYPES.woodWall) {
-      return { kind: 'wall', mass: 'solid', connectsWith: 'wall', openable: false };
+      return { kind: 'wall', mass: 'solid', connectsWith: 'wall', openable: false, horizontalTopOffset: -8, foregroundLayer: true };
     }
     if (type === OBJECT_TYPES.door) {
-      return { kind: 'door', mass: open ? 'open-solid' : 'solid', connectsWith: 'wall', openable: true, open };
+      return { kind: 'door', mass: open ? 'open-solid' : 'solid', connectsWith: 'wall', openable: true, open, horizontalTopOffset: -6, foregroundLayer: true };
     }
     if (type === OBJECT_TYPES.fence) {
-      return { kind: 'fence', mass: 'open', connectsWith: 'fence', openable: false };
+      return { kind: 'fence', mass: 'open', connectsWith: 'fence', openable: false, centerPost: true, sidePosts: false, foregroundLayer: true };
     }
     if (type === OBJECT_TYPES.gate) {
-      return { kind: 'gate', mass: open ? 'open-light' : 'light', connectsWith: 'fence', openable: true, open };
+      return { kind: 'gate', mass: open ? 'open-light' : 'light', connectsWith: 'fence', openable: true, open, centerPost: false, sidePosts: true, foregroundLayer: true };
     }
     return { kind: 'object', mass: 'none', connectsWith: 'none', openable: false };
   }
@@ -666,12 +760,64 @@ export class RenderSystem {
     this.context.globalAlpha = 0.08;
     this.context.fillStyle = '#223149';
 
+    const bottomRows = new Map();
     tileMap.forEachTile((tile) => {
-      const x = Math.round(tile.x * TILE_SIZE - camera.x);
-      const y = Math.round(tile.y * TILE_SIZE - camera.y);
-      this.context.fillRect(x + 3, y + TILE_SIZE + 14, TILE_SIZE - 6, 8);
+      if (tileMap.getTile(tile.x, tile.y + 1)) return;
+      if (!bottomRows.has(tile.y)) bottomRows.set(tile.y, []);
+      bottomRows.get(tile.y).push(tile.x);
     });
 
+    for (const [rowY, xs] of bottomRows.entries()) {
+      const sorted = [...xs].sort((a, b) => a - b);
+      let runStart = sorted[0];
+      let previous = sorted[0];
+      const drawRun = (start, end) => {
+        const x = Math.round(start * TILE_SIZE - camera.x);
+        const y = Math.round(rowY * TILE_SIZE - camera.y);
+        const width = (end - start + 1) * TILE_SIZE;
+        this.context.fillRect(x + 3, y + TILE_SIZE + 14, width - 6, 8);
+      };
+
+      for (let index = 1; index < sorted.length; index += 1) {
+        if (sorted[index] === previous + 1) {
+          previous = sorted[index];
+          continue;
+        }
+        drawRun(runStart, previous);
+        runStart = sorted[index];
+        previous = sorted[index];
+      }
+      drawRun(runStart, previous);
+    }
+
     this.context.restore();
+  }
+
+  getIslandShadowRuns(tileMap) {
+    const rows = new Map();
+    tileMap.forEachTile((tile) => {
+      if (tileMap.getTile(tile.x, tile.y + 1)) return;
+      if (!rows.has(tile.y)) rows.set(tile.y, []);
+      rows.get(tile.y).push(tile.x);
+    });
+
+    const runs = [];
+    for (const [y, xs] of rows.entries()) {
+      const sorted = [...xs].sort((a, b) => a - b);
+      if (sorted.length === 0) continue;
+      let start = sorted[0];
+      let end = sorted[0];
+      for (let index = 1; index < sorted.length; index += 1) {
+        if (sorted[index] === end + 1) {
+          end = sorted[index];
+          continue;
+        }
+        runs.push({ y, start, end });
+        start = sorted[index];
+        end = sorted[index];
+      }
+      runs.push({ y, start, end });
+    }
+    return runs.sort((a, b) => a.y - b.y || a.start - b.start);
   }
 }

@@ -21,45 +21,55 @@ export class TerrainRenderer {
 
   drawBaseTile(context, tile, tileMap, x, y) {
     const palette = edgeMap[tile.type] || edgeMap.earth;
-    const hasTileBelow = tileMap.getTile(tile.x, tile.y + 1);
     const same = this.getSameNeighborMask(tile, tileMap);
+    const edges = this.getEdgeProfile(tile, tileMap);
 
     context.save();
-    context.fillStyle = palette.dark;
-    context.fillRect(x + 1, y + 23, TILE_SIZE - 2, 9);
-    context.fillStyle = palette.side;
-    context.fillRect(x + 2, y + 25, TILE_SIZE - 4, 6);
-
-    if (!hasTileBelow) {
-      context.fillStyle = palette.dark;
-      context.fillRect(x + 3, y + 30, TILE_SIZE - 6, 4);
-      context.fillStyle = 'rgba(0, 0, 0, 0.2)';
-      context.fillRect(x + 6, y + 34, TILE_SIZE - 12, 3);
-    }
-
     context.fillStyle = palette.mid;
     context.fillRect(
-      x + (same.left ? 0 : 1),
-      y + (same.up ? 1 : 2),
-      TILE_SIZE - (same.left ? 0 : 1) - (same.right ? 0 : 1),
-      24 + (same.down ? 2 : 0)
+      x + (same.left ? 0 : edges.hasLeft ? 1 : 2),
+      y + (same.up ? 0 : edges.hasUp ? 1 : 2),
+      TILE_SIZE - (same.left ? 0 : edges.hasLeft ? 1 : 2) - (same.right ? 0 : edges.hasRight ? 1 : 2),
+      25 + (same.down ? 5 : edges.hasDown ? 3 : 0)
     );
     context.fillStyle = palette.top;
     context.fillRect(
-      x + (same.left ? 0 : 2),
-      y + (same.up ? 1 : 2),
-      TILE_SIZE - (same.left ? 0 : 2) - (same.right ? 0 : 2),
-      20 + (same.down ? 1 : 0)
+      x + (same.left ? 0 : edges.hasLeft ? 1 : 2),
+      y + (same.up ? 0 : edges.hasUp ? 1 : 2),
+      TILE_SIZE - (same.left ? 0 : edges.hasLeft ? 1 : 2) - (same.right ? 0 : edges.hasRight ? 1 : 2),
+      22 + (same.down ? 4 : edges.hasDown ? 2 : 0)
     );
     context.fillStyle = palette.light;
-    if (!same.up) {
+    if (!edges.hasUp) {
       context.fillRect(x + 4, y + 4, TILE_SIZE - 8, 3);
-    } else {
+    } else if (!same.up) {
       context.fillRect(x + 6, y + 5, TILE_SIZE - 12, 2);
     }
     context.fillStyle = palette.dark;
-    if (!same.left) context.fillRect(x, y + 2, 2, 24);
-    if (!same.right) context.fillRect(x + TILE_SIZE - 2, y + 2, 2, 24);
+    if (!edges.hasLeft) context.fillRect(x, y + 2, 2, 26);
+    if (!edges.hasRight) context.fillRect(x + TILE_SIZE - 2, y + 2, 2, 26);
+    if (edges.hasLeft && !same.left) {
+      context.fillStyle = 'rgba(35, 23, 16, 0.16)';
+      context.fillRect(x, y + 5, 1, 18);
+    }
+    if (edges.hasRight && !same.right) {
+      context.fillStyle = 'rgba(35, 23, 16, 0.16)';
+      context.fillRect(x + TILE_SIZE - 1, y + 5, 1, 18);
+    }
+
+    if (edges.bottomOuter) {
+      const leftInset = edges.bottomContinuesLeft ? 0 : 3;
+      const rightInset = edges.bottomContinuesRight ? 0 : 3;
+      context.fillStyle = palette.dark;
+      context.fillRect(x + leftInset, y + 27, TILE_SIZE - leftInset - rightInset, 7);
+      context.fillStyle = palette.side;
+      context.fillRect(x + leftInset, y + 25, TILE_SIZE - leftInset - rightInset, 5);
+      context.fillStyle = 'rgba(0, 0, 0, 0.18)';
+      context.fillRect(x + leftInset, y + 34, TILE_SIZE - leftInset - rightInset, 3);
+    } else if (!same.down && edges.hasDown) {
+      context.fillStyle = 'rgba(35, 23, 16, 0.12)';
+      context.fillRect(x + 2, y + 24, TILE_SIZE - 4, 1);
+    }
 
     this.drawTileDetails(context, tile, palette, x, y, this.detailVariant(tile));
     if (tile.type !== TILE_TYPES.water && tileMap.isWatered?.(tile.x, tile.y)) {
@@ -80,6 +90,27 @@ export class TerrainRenderer {
     };
   }
 
+  getEdgeProfile(tile, tileMap) {
+    const hasUp = Boolean(tileMap.getTile(tile.x, tile.y - 1));
+    const hasDown = Boolean(tileMap.getTile(tile.x, tile.y + 1));
+    const hasLeft = Boolean(tileMap.getTile(tile.x - 1, tile.y));
+    const hasRight = Boolean(tileMap.getTile(tile.x + 1, tile.y));
+    const bottomOuter = !hasDown;
+
+    return {
+      hasUp,
+      hasDown,
+      hasLeft,
+      hasRight,
+      topOuter: !hasUp,
+      bottomOuter,
+      leftOuter: !hasLeft,
+      rightOuter: !hasRight,
+      bottomContinuesLeft: bottomOuter && Boolean(tileMap.getTile(tile.x - 1, tile.y)) && !tileMap.getTile(tile.x - 1, tile.y + 1),
+      bottomContinuesRight: bottomOuter && Boolean(tileMap.getTile(tile.x + 1, tile.y)) && !tileMap.getTile(tile.x + 1, tile.y + 1)
+    };
+  }
+
   detailVariant(tile) {
     const value = Math.abs((tile.x * 7349 + tile.y * 9151 + String(tile.type).length * 101) % 5);
     return value;
@@ -87,12 +118,21 @@ export class TerrainRenderer {
 
   getRenderProfile(tile, tileMap) {
     const same = this.getSameNeighborMask(tile, tileMap);
+    const edges = this.getEdgeProfile(tile, tileMap);
     const sameCount = Object.values(same).filter(Boolean).length;
     return {
       same,
+      edges,
       variant: this.detailVariant(tile),
       interior: sameCount === 4,
-      outerEdge: sameCount < 4
+      outerEdge: edges.topOuter || edges.bottomOuter || edges.leftOuter || edges.rightOuter,
+      transitionEdge: (edges.hasUp && !same.up) ||
+        (edges.hasDown && !same.down) ||
+        (edges.hasLeft && !same.left) ||
+        (edges.hasRight && !same.right),
+      connectedSurfaceHorizontal: same.left || same.right,
+      connectedSurfaceVertical: same.up || same.down,
+      connectedBottomEdge: edges.bottomOuter && (edges.bottomContinuesLeft || edges.bottomContinuesRight)
     };
   }
 

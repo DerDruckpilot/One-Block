@@ -194,6 +194,9 @@ const map = new TileMap();
   assert.equal(indexHtml.includes('user-scalable=no'), true, 'mobile viewport disables browser double-tap zoom');
   assert.equal(styles.includes('touch-action: pan-y'), true, 'menu panels keep vertical touch scrolling enabled');
   assert.equal(styles.includes('-webkit-overflow-scrolling: touch'), true, 'menu panels keep momentum scrolling on mobile Safari');
+  assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
+  assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
+  assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
@@ -3414,13 +3417,31 @@ const map = new TileMap();
   assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.door), renderer.getBarrierRenderProfile(OBJECT_TYPES.woodWall), 'door has its own render profile');
   assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate, true), renderer.getBarrierRenderProfile(OBJECT_TYPES.gate, false), 'open and closed gate render profiles differ');
   assert.notDeepEqual(renderer.getBarrierRenderProfile(OBJECT_TYPES.door, true), renderer.getBarrierRenderProfile(OBJECT_TYPES.door, false), 'open and closed door render profiles differ');
+  assert.equal(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate).sidePosts, true, 'gate profile uses two side posts');
+  assert.equal(renderer.getBarrierRenderProfile(OBJECT_TYPES.gate).centerPost, false, 'gate profile does not use the normal fence center post');
 
   const horizontalShape = { horizontal: true, vertical: false, connections: { left: true, right: true, up: false, down: false } };
   renderer.drawWoodWall(0, 0, horizontalShape);
   const wallCalls = [...context.calls];
+  assert.equal(wallCalls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wood wall is rendered upward onto the barrier line instead of flat on the tile');
   context.calls.length = 0;
   renderer.drawFence(0, 0, horizontalShape);
   assert.notDeepEqual(wallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'horizontal wall rendering is not identical to horizontal fence rendering');
+  const fenceCalls = [...context.calls];
+
+  context.calls.length = 0;
+  renderer.drawGate(0, 0, false, horizontalShape);
+  const gatePostCalls = context.calls.filter((call) =>
+    call.fn === 'fillRect' &&
+    call.fillStyle === '#3a2418' &&
+    call.args[3] >= 20
+  );
+  assert.deepEqual(gatePostCalls.map((call) => call.args[0]), [4, 22], 'horizontal gate draws left and right posts instead of a center fence post');
+  assert.notDeepEqual(context.calls.map((call) => call.args), fenceCalls.map((call) => call.args), 'gate rendering is not identical to a normal fence segment');
+
+  context.calls.length = 0;
+  renderer.drawDoor(0, 0, false, horizontalShape);
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal wall door is rendered upward with the wall barrier');
 
   context.calls.length = 0;
   const verticalShape = { horizontal: false, vertical: true, connections: { left: false, right: false, up: true, down: true } };
@@ -3429,6 +3450,13 @@ const map = new TileMap();
   context.calls.length = 0;
   renderer.drawFence(0, 0, verticalShape);
   assert.notDeepEqual(verticalWallCalls.map((call) => call.args), context.calls.map((call) => call.args), 'vertical wall rendering is not identical to vertical fence rendering');
+
+  context.calls.length = 0;
+  const barrierMap = new TileMap();
+  barrierMap.setObject(0, 0, OBJECT_TYPES.woodWall);
+  barrierMap.setObject(1, 0, OBJECT_TYPES.woodWall);
+  renderer.renderForegroundBarriers(barrierMap, { x: 0, y: 0 });
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[1] < 0), true, 'horizontal barriers draw a foreground strip for depth layering');
 }
 
 {
@@ -3463,10 +3491,24 @@ const map = new TileMap();
   const profile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
   assert.equal(profile.interior, true, 'ground rendering detects same-type interior surfaces');
   assert.equal(profile.outerEdge, false, 'interior ground surface does not render as outer edge');
+  assert.equal(profile.connectedSurfaceHorizontal, true, 'ground rendering connects same-type tiles horizontally');
+  assert.equal(profile.connectedSurfaceVertical, true, 'ground rendering connects same-type tiles vertically');
   terrainMap.setEarth(1, 0);
   const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
-  assert.equal(edgeProfile.outerEdge, true, 'ground rendering detects outer/different-type edges');
+  assert.equal(edgeProfile.transitionEdge, true, 'ground rendering detects different-type transition edges');
   assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
+
+  const lowerEdgeMap = new TileMap();
+  lowerEdgeMap.tiles.clear();
+  lowerEdgeMap.setStone(0, 0);
+  lowerEdgeMap.setStone(1, 0);
+  lowerEdgeMap.setStone(2, 0);
+  const lowerEdgeProfile = terrain.getRenderProfile({ x: 1, y: 0, type: 'stone' }, lowerEdgeMap);
+  assert.equal(lowerEdgeProfile.connectedBottomEdge, true, 'neighboring bottom island edges are treated as a connected edge');
+  const shadowContext = createDrawContext();
+  const { RenderSystem } = await import('../src/systems/render-system.js');
+  const shadowRenderer = new RenderSystem(shadowContext);
+  assert.deepEqual(shadowRenderer.getIslandShadowRuns(lowerEdgeMap), [{ y: 0, start: 0, end: 2 }], 'shadow logic groups adjacent bottom-edge tiles into one run');
 }
 
 console.log('Gameplay-Basics OK.');
