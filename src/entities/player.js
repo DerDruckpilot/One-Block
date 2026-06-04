@@ -59,7 +59,8 @@ export class Player {
 
   canMoveTo(x, y, tileMap) {
     const foot = this.getFootPositionAt(x, y);
-    return !tileMap.isCrystalAtWorld(foot.x, foot.y);
+    return !tileMap.isCrystalAtWorld(foot.x, foot.y) &&
+      !tileMap.isBlockingObjectAtWorld?.(foot.x, foot.y);
   }
 
   setPosition(x, y) {

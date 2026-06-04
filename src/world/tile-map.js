@@ -36,12 +36,28 @@ export class TileMap {
     this.tiles.set(keyOf(x, y), TILE_TYPES.stone);
   }
 
+  setClay(x, y) {
+    this.tiles.set(keyOf(x, y), TILE_TYPES.clay);
+  }
+
+  setMoistEarth(x, y) {
+    this.tiles.set(keyOf(x, y), TILE_TYPES.moistEarth);
+  }
+
+  setWater(x, y) {
+    this.tiles.set(keyOf(x, y), TILE_TYPES.water);
+  }
+
   getObject(x, y) {
     return this.objects.get(keyOf(x, y)) || null;
   }
 
   setObject(x, y, type) {
     this.objects.set(keyOf(x, y), type);
+  }
+
+  removeObject(x, y) {
+    this.objects.delete(keyOf(x, y));
   }
 
   setWorkbench(x, y) {
@@ -63,7 +79,15 @@ export class TileMap {
   loadTiles(tiles) {
     this.tiles.clear();
     for (const tile of tiles) {
-      if ([TILE_TYPES.earth, TILE_TYPES.grass, TILE_TYPES.stone, TILE_TYPES.crystal].includes(tile.type)) {
+      if ([
+        TILE_TYPES.earth,
+        TILE_TYPES.grass,
+        TILE_TYPES.stone,
+        TILE_TYPES.clay,
+        TILE_TYPES.moistEarth,
+        TILE_TYPES.water,
+        TILE_TYPES.crystal
+      ].includes(tile.type)) {
         this.tiles.set(keyOf(tile.x, tile.y), tile.type);
       }
     }
@@ -113,11 +137,31 @@ export class TileMap {
     return tile === TILE_TYPES.earth ||
       tile === TILE_TYPES.grass ||
       tile === TILE_TYPES.stone ||
+      tile === TILE_TYPES.clay ||
+      tile === TILE_TYPES.moistEarth ||
+      tile === TILE_TYPES.water ||
       tile === TILE_TYPES.crystal;
   }
 
   isPlantableEarth(x, y) {
     return this.getTile(x, y) === TILE_TYPES.earth;
+  }
+
+  isPlantableForTree(x, y) {
+    const tile = this.getTile(x, y);
+    return tile === TILE_TYPES.earth || tile === TILE_TYPES.grass || tile === TILE_TYPES.moistEarth;
+  }
+
+  isWatered(x, y) {
+    const tile = this.getTile(x, y);
+    if (tile === TILE_TYPES.moistEarth || tile === TILE_TYPES.water) return true;
+    const neighbors = [
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 }
+    ];
+    return neighbors.some((neighbor) => this.getTile(neighbor.x, neighbor.y) === TILE_TYPES.water);
   }
 
   isGrass(x, y) {
@@ -199,6 +243,11 @@ export class TileMap {
   isCrystalAtWorld(x, y) {
     const tile = this.worldToTile(x, y);
     return this.isCrystal(tile.x, tile.y);
+  }
+
+  isBlockingObjectAtWorld(x, y) {
+    const tile = this.worldToTile(x, y);
+    return this.getObject(tile.x, tile.y) === OBJECT_TYPES.tree;
   }
 
   getCrystalCenter() {

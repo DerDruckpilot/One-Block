@@ -96,6 +96,15 @@ export class RenderSystem {
       if (object.type === OBJECT_TYPES.chair) {
         this.drawChair(screenX, screenY);
       }
+      if (object.type === OBJECT_TYPES.sapling) {
+        this.drawSapling(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.tree) {
+        this.drawTree(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.berryBush) {
+        this.drawBerryBush(screenX, screenY);
+      }
     });
   }
 
@@ -384,6 +393,43 @@ export class RenderSystem {
     this.context.fillStyle = '#2e1d14';
     this.context.fillRect(x + 10, y + 25, 3, 5);
     this.context.fillRect(x + 20, y + 25, 3, 5);
+    this.context.restore();
+  }
+
+  drawSapling(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#5b331c';
+    this.context.fillRect(x + 15, y + 16, 3, 10);
+    this.context.fillStyle = '#4f9e42';
+    this.context.fillRect(x + 10, y + 11, 8, 6);
+    this.context.fillRect(x + 17, y + 9, 7, 6);
+    this.context.restore();
+  }
+
+  drawTree(x, y) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    this.context.fillRect(x + 6, y + 25, 20, 5);
+    this.context.fillStyle = '#6b3f22';
+    this.context.fillRect(x + 13, y + 13, 7, 16);
+    this.context.fillStyle = '#2f6f35';
+    this.context.fillRect(x + 5, y + 4, 22, 12);
+    this.context.fillStyle = '#4f9e42';
+    this.context.fillRect(x + 8, y, 16, 10);
+    this.context.fillStyle = '#83c85e';
+    this.context.fillRect(x + 12, y + 3, 5, 3);
+    this.context.restore();
+  }
+
+  drawBerryBush(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#2f6f35';
+    this.context.fillRect(x + 7, y + 12, 18, 13);
+    this.context.fillStyle = '#4f9e42';
+    this.context.fillRect(x + 10, y + 9, 12, 9);
+    this.context.fillStyle = '#bf3158';
+    this.context.fillRect(x + 11, y + 14, 3, 3);
+    this.context.fillRect(x + 19, y + 17, 3, 3);
     this.context.restore();
   }
 

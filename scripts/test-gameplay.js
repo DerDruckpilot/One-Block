@@ -8,12 +8,15 @@ import {
   GAME_VIEW,
   HOTBAR_SLOT_COUNT,
   BOW_RANGE,
+  BERRY_BUSH_GROW_SECONDS,
   FLYING_ENEMY_MAX_TILE_DISTANCE,
+  OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   RESOURCE_LABELS,
+  SAPLING_GROW_SECONDS,
   SLINGSHOT_RANGE,
   TILE_SIZE
 } from '../src/config/constants.js';
@@ -43,6 +46,14 @@ const createSpawnedPlayer = () => new Player(
   PLAYER_SPAWN_TILE.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
   PLAYER_SPAWN_TILE.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
 );
+
+const setGamePlayerOnTile = (game, x, y, facing = { x: 1, y: 0 }) => {
+  game.player.setPosition(
+    x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = facing;
+};
 
 const createMemoryStorage = () => {
   const data = new Map();
@@ -2202,9 +2213,12 @@ const map = new TileMap();
   assert.equal(chooseWeightedDrop(0.89).resource, 'fiber', 'fiber covers the next 20 percent');
   assert.equal(chooseWeightedDrop(0.90).resource, 'grassSeed', 'grass seed covers the final 10 percent');
   assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0).resource, 'stone', 'pickaxe crystal drops start with stone');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.44).resource, 'stone', 'stone covers the first 45 percent of pickaxe drops');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.45).resource, 'earth', 'earth follows stone in pickaxe drops');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.75).resource, 'rawWood', 'raw wood follows earth in pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.39).resource, 'stone', 'stone stays the frequent pickaxe drop');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.40).resource, 'earth', 'earth follows stone in pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.65).resource, 'rawWood', 'raw wood follows earth in pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.91).resource, 'clay', 'clay is an uncommon pickaxe progress drop');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.97).resource, 'treeSeed', 'tree seeds are rare pickaxe progress drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.99).resource, 'berry', 'berries are rare pickaxe progress drops for berry bushes');
 
   const inventory = new ResourceInventory();
   const randomValues = [0.10, 0.55, 0.75, 0.95];
@@ -2584,6 +2598,264 @@ const map = new TileMap();
   assert.equal(game.animalSystem.activeCount(), 0, 'reset clears animals');
   assert.equal(game.flyingEnemySystem.activeCount(), 0, 'reset clears flying enemies');
   assert.equal(game.projectileSystem.activeCount(), 0, 'reset clears projectiles');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.dayNightSystem.load(0.3);
+  game.crystalSystem.random = () => 0.91;
+  game.inventory.add('woodenPickaxe', 1);
+  game.hotbarSlots[0] = 'woodenPickaxe';
+  game.activeHotbarSlot = 0;
+
+  game.tryAttackAction();
+
+  assert.equal(game.dropSystem.drops[0].resource, 'clay', 'wooden pickaxe can create clay drops at the crystal');
+  assert.equal(game.inventory.get('clay'), 0, 'clay pickaxe drops stay visible until collected');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('clay', 1);
+  game.hotbarSlots[0] = 'clay';
+  setGamePlayerOnTile(game, 1, 0, { x: 1, y: 0 });
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'clay can be placed like a floor tile');
+  assert.equal(game.tileMap.getTile(2, 0), 'clay', 'placed clay becomes a clay tile');
+  assert.equal(game.inventory.get('clay'), 0, 'placing clay consumes one clay item');
+  assert.equal(game.tileMap.isGround(2, 0), true, 'clay tile is a support tile');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const dayGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  dayGame.dayNightSystem.load(0.3);
+  dayGame.crystalSystem.random = () => 0.01;
+  dayGame.tryUseCrystal();
+  assert.notEqual(dayGame.dropSystem.drops[0].resource, 'springDrop', 'spring drops do not appear during day crystal interactions');
+
+  const nightGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  nightGame.dayNightSystem.load(0.9);
+  nightGame.crystalSystem.random = () => 0.01;
+  nightGame.tryUseCrystal();
+  assert.equal(nightGame.dropSystem.drops[0].resource, 'springDrop', 'spring drops can appear during night crystal interactions');
+  assert.equal(nightGame.crystalSystem.lastMessage, 'Ein Quelltropfen erscheint.', 'night spring drop writes a clear log');
+
+  const pickaxeGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  pickaxeGame.dayNightSystem.load(0.9);
+  pickaxeGame.crystalSystem.random = () => 0.01;
+  pickaxeGame.inventory.add('woodenPickaxe', 1);
+  pickaxeGame.hotbarSlots[0] = 'woodenPickaxe';
+  pickaxeGame.tryAttackAction();
+  assert.equal(pickaxeGame.dropSystem.drops[0].resource, 'springDrop', 'night pickaxe crystal action can create a spring drop');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('springDrop', 1);
+  game.hotbarSlots[0] = 'springDrop';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'spring drop can be used on earth');
+  assert.equal(game.tileMap.getTile(1, 1), 'moistEarth', 'spring drop turns earth into moist earth');
+  assert.equal(game.inventory.get('springDrop'), 0, 'using a spring drop on earth consumes it');
+  assert.equal(game.tileMap.isGround(1, 1), true, 'moist earth remains walkable support');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setClay(1, 1);
+  game.inventory.add('springDrop', 1);
+  game.hotbarSlots[0] = 'springDrop';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'spring drop can be used on clay');
+  assert.equal(game.tileMap.getTile(1, 1), 'water', 'spring drop turns clay into a water source');
+  assert.equal(game.inventory.get('springDrop'), 0, 'using a spring drop on clay consumes it');
+  assert.equal(game.tileMap.isGround(1, 1), true, 'water source is walkable in the prototype');
+}
+
+{
+  const tileMap = new TileMap();
+  tileMap.setWater(2, 0);
+
+  assert.equal(tileMap.isWatered(1, 0), true, 'water source moistens direct neighbor tiles');
+  assert.equal(tileMap.isWatered(2, 0), true, 'water source is considered watered itself');
+  assert.equal(tileMap.isWatered(-1, -1), false, 'water source does not moisten distant tiles');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setGrass(1, 1);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryContextAction(), true, 'grass context action is handled even without a scythe');
+  assert.equal(game.crystalSystem.lastMessage, 'Dafür brauchst du eine Sense.', 'grass harvest requires a scythe');
+  assert.equal(game.dropSystem.drops.length, 0, 'grass does not drop fibers without a scythe');
+
+  game.inventory.add('scythe', 1);
+  assert.equal(game.tryContextAction(), true, 'scythe enables grass harvest as a passive ability');
+  assert.equal(game.dropSystem.drops[0].resource, 'fiber', 'scythe grass harvest creates fiber drops');
+  assert.equal(game.tileMap.getTile(1, 1), 'grass', 'harvested grass remains a grass tile');
+  assert.equal(game.plantSystem.grassCooldowns.size, 1, 'grass harvest starts a regrowth cooldown');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('treeSeed', 1);
+  game.hotbarSlots[0] = 'treeSeed';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'tree seeds can be planted on earth');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.sapling, 'tree seed creates a sapling object');
+  game.plantSystem.update(SAPLING_GROW_SECONDS + 0.1, game.tileMap);
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'sapling grows into a tree');
+
+  const treeBlockedPlayer = new Player(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  treeBlockedPlayer.update(0.2, inputWith('d'), game.tileMap);
+  assert.equal(treeBlockedPlayer.getTilePosition().x, 0, 'grown tree blocks the tile for player movement');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('treeSeed', 1);
+  game.hotbarSlots[0] = 'treeSeed';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  game.tryPlaceSelectedItem();
+  game.plantSystem.update(SAPLING_GROW_SECONDS + 0.1, game.tileMap);
+
+  assert.equal(game.tryContextAction(), true, 'tree context action is handled without an axe');
+  assert.equal(game.crystalSystem.lastMessage, 'Dafür brauchst du eine Axt.', 'tree harvest requires an axe');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'tree remains without an axe');
+
+  game.inventory.add('axe', 1);
+  game.hotbarSlots[0] = 'earth';
+  assert.equal(game.tryContextAction(), true, 'axe enables tree felling as a passive ability');
+  assert.equal(game.tileMap.getObject(1, 1), null, 'tree is removed after axe felling');
+  assert.ok(game.dropSystem.drops.filter((drop) => drop.resource === 'rawWood').length >= 2, 'felled tree creates raw wood drops');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('berry', 1);
+  game.hotbarSlots[0] = 'berry';
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'berries can seed a berry bush for the first farming slice');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.berryBush, 'berry planting creates a berry bush');
+  assert.equal(game.inventory.get('berry'), 0, 'planting a berry bush consumes one berry');
+
+  game.plantSystem.update(BERRY_BUSH_GROW_SECONDS + 0.1, game.tileMap);
+  assert.equal(game.tryContextAction(), true, 'ripe berry bush can be harvested');
+  assert.equal(game.inventory.get('berry'), 1, 'berry bush harvest adds berries');
+  assert.equal(game.crystalSystem.lastMessage, 'Beeren geerntet.', 'berry harvest writes the requested log');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+
+  inventory.add('rawWood', 6);
+  inventory.add('stone', 4);
+  inventory.add('fiber', 2);
+  assert.equal(crafting.craft('axe', { hasWorkbenchAccess: true }).crafted, true, 'axe can be crafted at a workbench');
+  assert.equal(inventory.get('axe'), 1, 'axe crafting adds axe item');
+
+  inventory.add('rawWood', 4);
+  inventory.add('stone', 3);
+  inventory.add('fiber', 4);
+  assert.equal(crafting.craft('scythe', { hasWorkbenchAccess: true }).crafted, true, 'scythe can be crafted at a workbench');
+  assert.equal(inventory.get('scythe'), 1, 'scythe crafting adds scythe item');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setClay(2, 0);
+  game.tileMap.setMoistEarth(3, 0);
+  game.tileMap.setWater(4, 0);
+  game.inventory.add('clay', 2);
+  game.inventory.add('springDrop', 1);
+  game.inventory.add('treeSeed', 1);
+  game.inventory.add('berry', 3);
+  game.inventory.add('axe', 1);
+  game.inventory.add('scythe', 1);
+  game.plantSystem.plantTreeSeed(game.tileMap, 1, 1);
+  game.plantSystem.update(SAPLING_GROW_SECONDS + 0.1, game.tileMap);
+  game.plantSystem.plantBerryBush(game.tileMap, -1, 1);
+  game.dropSystem.spawnAtTile({ resource: 'springDrop', amount: 1 }, { x: 1, y: 0 });
+  game.hotbarSlots = ['clay', 'springDrop', 'axe', 'scythe'];
+  game.activeHotbarSlot = 2;
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getTile(2, 0), 'clay', 'saved clay tiles load');
+  assert.equal(loadedGame.tileMap.getTile(3, 0), 'moistEarth', 'saved moist earth tiles load');
+  assert.equal(loadedGame.tileMap.getTile(4, 0), 'water', 'saved water source tiles load');
+  assert.equal(loadedGame.inventory.get('clay'), 2, 'saved clay item loads');
+  assert.equal(loadedGame.inventory.get('springDrop'), 1, 'saved spring drop item loads');
+  assert.equal(loadedGame.inventory.get('treeSeed'), 1, 'saved tree seed item loads');
+  assert.equal(loadedGame.inventory.get('berry'), 3, 'saved berries load');
+  assert.equal(loadedGame.inventory.get('axe'), 1, 'saved axe loads');
+  assert.equal(loadedGame.inventory.get('scythe'), 1, 'saved scythe loads');
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'saved grown tree loads');
+  assert.equal(loadedGame.tileMap.getObject(-1, 1), OBJECT_TYPES.berryBush, 'saved berry bush loads');
+  assert.equal(loadedGame.dropSystem.drops[0].resource, 'springDrop', 'saved visible spring drops load');
+  assert.deepEqual(loadedGame.hotbarSlots, ['clay', 'springDrop', 'axe', 'scythe'], 'new items can be assigned to the four-slot hotbar');
+  assert.equal(loadedGame.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar stays capped at four slots after new item save/load');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setClay(2, 0);
+  game.tileMap.setWater(3, 0);
+  game.inventory.add('clay', 1);
+  game.inventory.add('springDrop', 1);
+  game.inventory.add('treeSeed', 1);
+  game.inventory.add('berry', 1);
+  game.inventory.add('axe', 1);
+  game.inventory.add('scythe', 1);
+  game.plantSystem.plantTreeSeed(game.tileMap, 1, 1);
+  game.dropSystem.spawnAtTile({ resource: 'springDrop', amount: 1 }, { x: 1, y: 0 });
+  game.saveGame();
+  game.input.keys.add('r');
+  game.update(2.1);
+
+  assert.equal(game.tileMap.getTile(2, 0), null, 'reset removes placed clay tiles');
+  assert.equal(game.tileMap.getTile(3, 0), null, 'reset removes water sources');
+  assert.equal(game.inventory.get('clay'), 0, 'reset clears clay items');
+  assert.equal(game.inventory.get('springDrop'), 0, 'reset clears spring drops');
+  assert.equal(game.inventory.get('treeSeed'), 0, 'reset clears tree seeds');
+  assert.equal(game.inventory.get('berry'), 0, 'reset clears berries');
+  assert.equal(game.inventory.get('axe'), 0, 'reset clears axe');
+  assert.equal(game.inventory.get('scythe'), 0, 'reset clears scythe');
+  assert.equal(game.plantSystem.plants.size, 0, 'reset clears new plants');
+  assert.equal(game.dropSystem.drops.length, 0, 'reset clears new visible drops');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.plantSystem.plantTreeSeed(game.tileMap, 1, 1);
+  const before = game.plantSystem.getPlant(1, 1).growthSeconds;
+  game.inventoryOpen = true;
+  game.update(1);
+
+  assert.equal(game.plantSystem.getPlant(1, 1).growthSeconds, before, 'menu pause stops plant growth timers');
 }
 
 console.log('Gameplay-Basics OK.');
