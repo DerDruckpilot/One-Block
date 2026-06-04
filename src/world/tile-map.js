@@ -390,17 +390,17 @@ export class TileMap {
 
   getConnectableVariant(x, y) {
     const connections = this.getConnectableConnections(x, y);
-    const connected = Object.entries(connections)
-      .filter(([, value]) => value)
-      .map(([name]) => name);
+    const connected = ['up', 'right', 'down', 'left'].filter((name) => connections[name]);
 
     if (connected.length === 0) return 'single';
     if (connected.length === 4) return 'cross';
-    if (connected.length === 3) return `t-${['up', 'right', 'down', 'left'].filter((name) => !connections[name])[0]}`;
+    if (connected.length === 3) return `tee-${['up', 'right', 'down', 'left'].filter((name) => !connections[name])[0]}`;
     if (connected.length === 2) {
       if (connections.left && connections.right) return 'horizontal';
       if (connections.up && connections.down) return 'vertical';
-      return `corner-${connected.join('-')}`;
+      const vertical = connections.up ? 'up' : 'down';
+      const horizontal = connections.left ? 'left' : 'right';
+      return `corner-${vertical}-${horizontal}`;
     }
     return `end-${connected[0]}`;
   }

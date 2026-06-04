@@ -494,6 +494,11 @@ export class RenderSystem {
   }
 
   drawBarrierShape(x, y, shape = null, palette) {
+    if (palette.kind === 'wall' || palette.kind === 'door') {
+      this.drawWallDoorShape(x, y, shape, palette);
+      return;
+    }
+
     const connections = shape?.connections || { up: false, down: false, left: false, right: false };
     const hasHorizontal = shape?.horizontal || connections.left || connections.right;
     const hasVertical = shape?.vertical || connections.up || connections.down;
@@ -607,6 +612,80 @@ export class RenderSystem {
     }
   }
 
+  drawWallDoorShape(x, y, shape = null, palette) {
+    const connections = shape?.connections || { up: false, down: false, left: false, right: false };
+    const variant = this.getCanonicalBarrierVariant(connections);
+    const thickness = palette.thickness;
+    const half = Math.floor(thickness / 2);
+    const visualHeight = palette.height || palette.capHeight;
+    const centerX = x + TILE_SIZE / 2;
+    const centerY = y + TILE_SIZE / 2;
+    const horizontalTop = centerY - visualHeight + 4;
+    const horizontalBottom = horizontalTop + visualHeight;
+    const verticalLeft = centerX - half;
+    const drawSolidRect = (left, top, width, height) => {
+      if (width <= 0 || height <= 0) return;
+      this.context.fillStyle = palette.main;
+      this.context.fillRect(left, top, width, height);
+      this.context.fillStyle = palette.highlight;
+      this.context.fillRect(left + 2, top + 3, Math.max(2, width - 4), 2);
+      this.context.fillStyle = palette.accent;
+      if (width >= height) {
+        this.context.fillRect(left + 3, top + 12, Math.max(2, width - 6), 2);
+        this.context.fillRect(left + 3, top + 20, Math.max(2, width - 6), 2);
+      } else {
+        this.context.fillRect(left + width - 3, top + 3, 2, Math.max(2, height - 6));
+      }
+    };
+
+    const segments = [];
+    const hasHorizontal = connections.left || connections.right;
+    const hasVertical = connections.up || connections.down;
+
+    if (!hasHorizontal && !hasVertical) {
+      segments.push({ left: verticalLeft - 1, top: centerY - visualHeight / 2, width: thickness + 2, height: visualHeight });
+    } else if (hasVertical && !hasHorizontal) {
+      const top = connections.up ? y : centerY - visualHeight / 2;
+      const bottom = connections.down ? y + TILE_SIZE : centerY + visualHeight / 2;
+      segments.push({ left: verticalLeft, top, width: thickness, height: bottom - top });
+    } else {
+      if (connections.left) {
+        segments.push({ left: x, top: horizontalTop, width: centerX - half - x, height: visualHeight });
+      }
+      if (connections.right) {
+        segments.push({ left: centerX + half, top: horizontalTop, width: x + TILE_SIZE - (centerX + half), height: visualHeight });
+      }
+      if (connections.up) {
+        segments.push({ left: verticalLeft, top: y, width: thickness, height: Math.max(0, horizontalTop - y) });
+      }
+      if (connections.down) {
+        segments.push({ left: verticalLeft, top: horizontalBottom, width: thickness, height: Math.max(0, y + TILE_SIZE - horizontalBottom) });
+      }
+      segments.push({ left: verticalLeft, top: horizontalTop, width: thickness, height: visualHeight });
+    }
+
+    for (const segment of segments) {
+      drawSolidRect(segment.left, segment.top, segment.width, segment.height);
+    }
+
+    if (palette.kind === 'door') {
+      this.context.fillStyle = palette.open ? '#d9ba73' : '#f0c96b';
+      const knobX = variant === 'vertical' || variant === 'single' || variant.startsWith('end-up') || variant.startsWith('end-down')
+        ? centerX + 4
+        : centerX + (palette.open ? 7 : 4);
+      this.context.fillRect(knobX, centerY - 1, 3, 3);
+      this.context.fillStyle = '#2e1d14';
+      if (variant === 'single' || variant === 'vertical') {
+        this.context.fillRect(verticalLeft - 2, centerY - visualHeight / 2 + 3, 2, 6);
+        this.context.fillRect(verticalLeft - 2, centerY + visualHeight / 2 - 9, 2, 6);
+      }
+      if (palette.open) {
+        this.context.fillStyle = palette.accent;
+        this.context.fillRect(centerX + 5, centerY - 10, 4, 16);
+      }
+    }
+  }
+
   getBarrierJointProfile(shape = null, palette) {
     const connections = shape?.connections || { up: false, down: false, left: false, right: false };
     const hasHorizontal = shape?.horizontal || connections.left || connections.right;
@@ -620,6 +699,21 @@ export class RenderSystem {
       connectedCount,
       variant: shape?.variant || 'single'
     };
+  }
+
+  getCanonicalBarrierVariant(connections = { up: false, down: false, left: false, right: false }) {
+    const connected = ['up', 'right', 'down', 'left'].filter((name) => connections[name]);
+    if (connected.length === 0) return 'single';
+    if (connected.length === 4) return 'cross';
+    if (connected.length === 3) return `tee-${['up', 'right', 'down', 'left'].find((name) => !connections[name])}`;
+    if (connected.length === 2) {
+      if (connections.left && connections.right) return 'horizontal';
+      if (connections.up && connections.down) return 'vertical';
+      const vertical = connections.up ? 'up' : 'down';
+      const horizontal = connections.left ? 'left' : 'right';
+      return `corner-${vertical}-${horizontal}`;
+    }
+    return `end-${connected[0]}`;
   }
 
   drawGateShape(x, y, shape = null, palette) {
@@ -773,7 +867,7 @@ export class RenderSystem {
             ? 'vertical'
             : 'single',
       connections: connected.join('|'),
-      variant: shape?.variant || 'single',
+      variant: this.getCanonicalBarrierVariant(connections),
       splitSegments: joint.splitSegments
     };
   }
