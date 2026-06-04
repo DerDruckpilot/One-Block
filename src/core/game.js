@@ -1,5 +1,7 @@
 import {
   ATTACK_FEEDBACK_SECONDS,
+  BED_INTERACTION_DISTANCE,
+  CAMPFIRE_INTERACTION_DISTANCE,
   CRYSTAL_ENCOUNTER_DROPS,
   CRYSTAL_INTERACTION_DISTANCE,
   DEFAULT_HOTBAR_SLOTS,
@@ -11,6 +13,7 @@ import {
   OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
+  PLAYER_MAX_HP,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   REMOVABLE_OBJECT_TYPES,
@@ -51,11 +54,17 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
   OBJECT_TYPES.door,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
+  OBJECT_TYPES.bed,
   OBJECT_TYPES.table,
   OBJECT_TYPES.chair
 ]);
 
 const REMOVABLE_OBJECT_ITEMS = new Set(REMOVABLE_OBJECT_TYPES);
+const FOOD_HEALING = {
+  berry: 1,
+  roastedBerries: 2,
+  cookedSteak: 3
+};
 
 export class Game {
   constructor(canvas, hudElement, options = {}) {
@@ -93,6 +102,7 @@ export class Game {
     this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({
       buildPanel: options.buildPanel,
+      cookingPanel: options.cookingPanel,
       craftingPanel: options.craftingPanel,
       inventoryPanel: options.inventoryPanel
     });
@@ -103,20 +113,27 @@ export class Game {
       buildButton: options.buildButton,
       buildPanel: options.buildPanel,
       canvas,
+      cookingPanel: options.cookingPanel,
       craftingButton: options.craftingButton,
       craftingPanel: options.craftingPanel,
       getBuildOpen: () => this.buildOpen,
+      getCookingOpen: () => this.cookingOpen,
       getCraftingOpen: () => this.craftingOpen,
       getInventoryOpen: () => this.inventoryOpen,
       hotbarElement: options.hotbarElement,
       inventoryButton: options.inventoryButton,
       inventoryPanel: options.inventoryPanel,
+      onBlockedCook: () => {
+        this.setLog('Nicht genug Zutaten.');
+      },
       onBlockedCraft: () => {
         this.setLog('Nicht genug Material.');
       },
       onBuildItemSelect: (resource) => this.selectBuildResource(resource),
       onBuildRemoveToggle: () => this.toggleRemoveMode(),
       onBuildToggle: () => this.toggleBuildMenu(),
+      onCook: (recipeId) => this.tryCook(recipeId),
+      onCookSelect: (recipeId) => this.menuPanels.selectCookingRecipe(recipeId),
       onCraft: (recipeId) => this.tryCraft(recipeId),
       onCraftSelect: (recipeId) => this.menuPanels.selectCraftingRecipe(recipeId),
       onCraftingToggle: () => this.toggleCraftingMenu(),
@@ -124,6 +141,7 @@ export class Game {
       onInventoryItemSelect: (resource) => this.selectInventoryResource(resource),
       onInventoryTabSelect: (tabId) => this.menuPanels.selectInventoryTab(tabId),
       onInventoryToggle: () => this.toggleInventoryMenu(),
+      onMenuClose: (menuId) => this.closeMenu(menuId),
       pointerTarget: options.pointerTarget
     });
 
@@ -136,6 +154,7 @@ export class Game {
     this.inventoryOpen = false;
     this.craftingOpen = false;
     this.buildOpen = false;
+    this.cookingOpen = false;
     this.craftingContext = 'normal';
     this.buildSelectedResource = null;
     this.removeMode = false;
@@ -143,6 +162,7 @@ export class Game {
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
     this.attackFeedback = null;
+    this.respawnTarget = { type: 'crystal' };
     this.running = false;
     this.loadGame();
   }
@@ -197,6 +217,7 @@ export class Game {
       this.handleEnemyEvents(this.enemySystem.update(deltaSeconds, this.tileMap, this.player));
       this.handleAnimalEvents(this.animalSystem.update(deltaSeconds, this.tileMap, this.player));
       this.flyingEnemySystem.update(deltaSeconds, this.tileMap, this.player);
+      this.handlePlayerContactDamage();
       this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem));
       this.plantSystem.update(deltaSeconds, this.tileMap);
       this.handleDropCollections(this.dropSystem.update(deltaSeconds, this.player, this.inventory, this.tileMap));
@@ -236,6 +257,7 @@ export class Game {
       logs: this.logSystem.toJSON(),
       debug: this.getDebugState(),
       debugEnabled: this.debugEnabled,
+      hearts: this.player.getHeartStates(),
       resetHoldSeconds: this.resetHoldSeconds
     });
     this.hotbar.update({
@@ -247,6 +269,8 @@ export class Game {
       buildOpen: this.buildOpen,
       buildRemoveMode: this.removeMode,
       buildSelectedResource: this.buildSelectedResource,
+      cookingOpen: this.cookingOpen,
+      cookingRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'cooking' }),
       craftingOpen: this.craftingOpen,
       craftingContext: this.craftingContext,
       activeHotbarSlot: this.activeHotbarSlot,
@@ -317,13 +341,20 @@ export class Game {
       return true;
     }
 
-    const placement = this.getPlacementPreview();
-    if (placement.canPlace) {
-      return this.tryPlaceSelectedItem();
+    if (this.tryUseSelectedItem()) {
+      return true;
     }
 
     if (this.tryUseLasso({ requireActive: true })) {
       return true;
+    }
+
+    if (this.tryUseBed()) {
+      return true;
+    }
+
+    if (this.hasCampfireAccess()) {
+      return this.openCookingMenu();
     }
 
     if (this.hasWorkbenchAccess()) {
@@ -413,6 +444,9 @@ export class Game {
     this.setSpearAttackFeedback();
     const hit = this.enemySystem.attackWithSpear(this.player);
     if (hit.hit) {
+      if (hit.defeated) {
+        this.spawnEnemyLoot(hit.enemy.lastGroundTile, hit.enemy);
+      }
       this.setLog(hit.message);
       this.saveGame();
       return true;
@@ -532,7 +566,7 @@ export class Game {
       if (event.targetType === 'flying') {
         const hit = this.flyingEnemySystem.applyDamage(event.target, event.projectile.damage, source);
         if (hit.defeated) {
-          this.dropSystem.spawnNearWorld({ resource: 'fiber', amount: 1 }, this.tileMap, event.target.x, event.target.y);
+          this.dropSystem.spawnNearWorld({ resource: 'rawMeat', amount: 1 }, this.tileMap, event.target.x, event.target.y);
         }
         this.setLog(hit.message);
         this.saveGame();
@@ -540,18 +574,45 @@ export class Game {
     }
   }
 
+  handlePlayerContactDamage() {
+    const contacts = [
+      ...this.enemySystem.enemies.map((enemy) => ({ enemy, damage: 1 })),
+      ...this.flyingEnemySystem.enemies.map((enemy) => ({ enemy, damage: 1 }))
+    ];
+
+    for (const contact of contacts) {
+      if (!this.isEntityTouchingPlayer(contact.enemy)) continue;
+      if (!this.player.takeDamage(contact.damage)) return false;
+      this.setLog('Du wurdest getroffen.');
+      if (this.player.hp <= 0) {
+        this.handlePlayerDeath('Du bist gestorben.');
+      }
+      this.saveGame();
+      return true;
+    }
+
+    return false;
+  }
+
+  isEntityTouchingPlayer(entity) {
+    const playerCenter = this.player.getCenterPosition();
+    const entityCenter = entity.getCenterPosition();
+    const radius = (this.player.width + entity.width) * 0.28;
+    return Math.hypot(playerCenter.x - entityCenter.x, playerCenter.y - entityCenter.y) <= radius;
+  }
+
   spawnEnemyLoot(tile, enemy) {
     const center = enemy?.getCenterPosition?.() || this.tileMap.getCrystalCenter();
     if (tile) {
       this.dropSystem.spawnNearWorld(
-        { resource: 'stone', amount: 1 },
+        { resource: 'rawMeat', amount: 1 },
         this.tileMap,
         tile.x * TILE_SIZE + TILE_SIZE / 2,
         tile.y * TILE_SIZE + TILE_SIZE / 2
       );
       return;
     }
-    this.dropSystem.spawnNearWorld({ resource: 'stone', amount: 1 }, this.tileMap, center.x, center.y);
+    this.dropSystem.spawnNearWorld({ resource: 'rawMeat', amount: 1 }, this.tileMap, center.x, center.y);
   }
 
   setSpearAttackFeedback() {
@@ -583,6 +644,42 @@ export class Game {
     if (this.attackFeedback.seconds <= 0) {
       this.attackFeedback = null;
     }
+  }
+
+  tryUseSelectedItem() {
+    const activeItem = this.getActiveHotbarItem();
+    if (FOOD_HEALING[activeItem]) {
+      return this.tryEatFood(activeItem);
+    }
+
+    const placement = this.getPlacementPreview();
+    if (placement.canPlace) {
+      return this.tryPlaceSelectedItem();
+    }
+
+    return false;
+  }
+
+  tryEatFood(resource) {
+    if (this.inventory.get(resource) <= 0) {
+      this.setLog(`Keine ${RESOURCE_LABELS[resource]}.`);
+      return true;
+    }
+
+    if (!this.player.heal(FOOD_HEALING[resource])) {
+      this.setLog('Du bist bereits gesund.');
+      return true;
+    }
+
+    this.inventory.remove(resource, 1);
+    const messages = {
+      berry: 'Beere gegessen.',
+      roastedBerries: 'Geröstete Beeren gegessen.',
+      cookedSteak: 'Steak gegessen.'
+    };
+    this.setLog(messages[resource] || `${RESOURCE_LABELS[resource]} gegessen.`);
+    this.saveGame();
+    return true;
   }
 
   tryPlaceEarth() {
@@ -775,6 +872,14 @@ export class Game {
       };
     }
 
+    if (resource === OBJECT_TYPES.bed && this.tileMap.getTile(target.x, target.y) === TILE_TYPES.water) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Bett braucht festen Boden.'
+      };
+    }
+
     if (this.tileMap.isCrystal(target.x, target.y)) {
       return {
         ...target,
@@ -820,6 +925,9 @@ export class Game {
     const object = this.tileMap.getObject(preview.x, preview.y);
     this.tileMap.removeObject(preview.x, preview.y);
     this.inventory.add(object, 1);
+    if (object === OBJECT_TYPES.bed && this.respawnTarget?.type === 'bed' && this.respawnTarget.x === preview.x && this.respawnTarget.y === preview.y) {
+      this.respawnTarget = { type: 'crystal' };
+    }
     this.setLog('Objekt entfernt.');
     this.saveGame();
     return true;
@@ -1133,17 +1241,63 @@ export class Game {
     this.falling = !support.supported;
 
     if (this.falling) {
-      this.respawnPlayer();
-      this.setLog('Du bist in den Void gefallen und beim Kristall respawnt.');
+      this.respawnPlayer({ restoreHp: true });
+      this.setLog('Du bist in den Void gefallen und respawnt.');
       this.saveGame();
     }
   }
 
-  respawnPlayer() {
-    const spawnX = PLAYER_SPAWN_TILE.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2;
-    const spawnY = PLAYER_SPAWN_TILE.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET);
+  handlePlayerDeath(message = 'Du bist gestorben.') {
+    this.respawnPlayer({ restoreHp: true });
+    this.setLog(message);
+  }
+
+  respawnPlayer({ restoreHp = false } = {}) {
+    const spawnTile = this.getRespawnTile();
+    const spawnX = spawnTile.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2;
+    const spawnY = spawnTile.y * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET);
     this.player.setPosition(spawnX, spawnY);
     this.player.facing = { x: 0, y: -1 };
+    if (restoreHp) {
+      this.player.restoreHp();
+    }
+  }
+
+  getRespawnTile() {
+    if (this.respawnTarget?.type === 'bed' && this.isValidRespawnBed(this.respawnTarget)) {
+      const tile = this.findSafeTileNear(this.respawnTarget.x, this.respawnTarget.y);
+      if (tile) return tile;
+    }
+
+    this.respawnTarget = { type: 'crystal' };
+    return { ...PLAYER_SPAWN_TILE };
+  }
+
+  isValidRespawnBed(target) {
+    return target &&
+      target.type === 'bed' &&
+      Number.isInteger(target.x) &&
+      Number.isInteger(target.y) &&
+      this.tileMap.getObject(target.x, target.y) === OBJECT_TYPES.bed;
+  }
+
+  findSafeTileNear(x, y) {
+    const candidates = [
+      { x: x + 1, y },
+      { x: x - 1, y },
+      { x, y: y + 1 },
+      { x, y: y - 1 },
+      { x: x + 1, y: y + 1 },
+      { x: x - 1, y: y + 1 },
+      { x: x + 1, y: y - 1 },
+      { x: x - 1, y: y - 1 }
+    ];
+
+    return candidates.find((candidate) =>
+      this.tileMap.isGround(candidate.x, candidate.y) &&
+      !this.tileMap.isCrystal(candidate.x, candidate.y) &&
+      !this.tileMap.getObject(candidate.x, candidate.y)
+    ) || null;
   }
 
   handleDebugToggle() {
@@ -1162,6 +1316,11 @@ export class Game {
   }
 
   handleMenuToggles() {
+    if (this.input.wasPressed('Escape')) {
+      this.closeAllMenus();
+      return;
+    }
+
     if (this.input.wasPressed('i')) {
       this.toggleInventoryMenu();
     }
@@ -1175,8 +1334,17 @@ export class Game {
     }
   }
 
+  closeAllMenus() {
+    this.inventoryOpen = false;
+    this.craftingOpen = false;
+    this.buildOpen = false;
+    this.cookingOpen = false;
+    this.selectedInventoryResource = null;
+    return true;
+  }
+
   isMenuOpen() {
-    return this.inventoryOpen || this.craftingOpen || this.buildOpen;
+    return this.inventoryOpen || this.craftingOpen || this.buildOpen || this.cookingOpen;
   }
 
   isGamePaused() {
@@ -1188,6 +1356,7 @@ export class Game {
     if (this.inventoryOpen) {
       this.craftingOpen = false;
       this.buildOpen = false;
+      this.cookingOpen = false;
     } else {
       this.selectedInventoryResource = null;
     }
@@ -1207,6 +1376,7 @@ export class Game {
     this.craftingOpen = true;
     this.inventoryOpen = false;
     this.buildOpen = false;
+    this.cookingOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('workbench');
     return true;
@@ -1222,6 +1392,7 @@ export class Game {
     this.craftingOpen = true;
     this.inventoryOpen = false;
     this.buildOpen = false;
+    this.cookingOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('woodenPickaxe');
     this.setLog('Werkbank geöffnet.');
@@ -1233,8 +1404,30 @@ export class Game {
     if (this.buildOpen) {
       this.inventoryOpen = false;
       this.craftingOpen = false;
+      this.cookingOpen = false;
       this.selectedInventoryResource = null;
     }
+  }
+
+  closeMenu(menuId) {
+    if (menuId === 'inventory') {
+      this.inventoryOpen = false;
+      this.selectedInventoryResource = null;
+      return true;
+    }
+    if (menuId === 'crafting') {
+      this.craftingOpen = false;
+      return true;
+    }
+    if (menuId === 'build') {
+      this.buildOpen = false;
+      return true;
+    }
+    if (menuId === 'cooking') {
+      this.cookingOpen = false;
+      return true;
+    }
+    return false;
   }
 
   selectBuildResource(resource) {
@@ -1280,6 +1473,96 @@ export class Game {
       OBJECT_TYPES.workbench,
       WORKBENCH_INTERACTION_DISTANCE
     );
+  }
+
+  hasCampfireAccess() {
+    const foot = this.player.getFootPosition();
+    return this.tileMap.isNearObjectWorld(
+      foot.x,
+      foot.y,
+      OBJECT_TYPES.campfire,
+      CAMPFIRE_INTERACTION_DISTANCE
+    );
+  }
+
+  findNearestObject(type, maxDistance) {
+    const foot = this.player.getFootPosition();
+    let nearest = null;
+    let nearestDistance = Infinity;
+    this.tileMap.forEachObject((object) => {
+      if (object.type !== type) return;
+      const center = {
+        x: object.x * TILE_SIZE + TILE_SIZE / 2,
+        y: object.y * TILE_SIZE + TILE_SIZE / 2
+      };
+      const distance = Math.hypot(foot.x - center.x, foot.y - center.y);
+      if (distance <= maxDistance && distance < nearestDistance) {
+        nearest = object;
+        nearestDistance = distance;
+      }
+    });
+    return nearest;
+  }
+
+  tryUseBed() {
+    const bed = this.findNearestObject(OBJECT_TYPES.bed, BED_INTERACTION_DISTANCE);
+    if (!bed) return false;
+
+    if (!this.isActiveRespawnBed(bed)) {
+      this.respawnTarget = { type: 'bed', x: bed.x, y: bed.y };
+      this.setLog('Respawnpunkt gesetzt.');
+      this.saveGame();
+      return true;
+    }
+
+    if (this.dayNightSystem.getPhaseId() === 'night') {
+      this.dayNightSystem.sleepUntilMorning();
+      this.setLog('Du schläfst bis zum Morgen.');
+    } else {
+      this.dayNightSystem.sleepUntilNight();
+      this.setLog('Du schläfst bis zur Nacht.');
+    }
+    this.saveGame();
+    return true;
+  }
+
+  isActiveRespawnBed(object) {
+    return this.respawnTarget?.type === 'bed' &&
+      this.respawnTarget.x === object.x &&
+      this.respawnTarget.y === object.y;
+  }
+
+  openCookingMenu() {
+    if (!this.hasCampfireAccess()) {
+      this.setLog('Kein Lagerfeuer in Reichweite.');
+      return false;
+    }
+
+    this.cookingOpen = true;
+    this.inventoryOpen = false;
+    this.craftingOpen = false;
+    this.buildOpen = false;
+    this.selectedInventoryResource = null;
+    this.menuPanels.selectCookingRecipe('roastedBerries');
+    this.setLog('Koch-Menü geöffnet.');
+    return true;
+  }
+
+  tryCook(recipeId) {
+    const result = this.craftingSystem.craft(recipeId, {
+      craftingContext: 'cooking',
+      hasWorkbenchAccess: false
+    });
+
+    const messages = {
+      roastedBerries: 'Geröstete Beeren gekocht.',
+      cookedSteak: 'Steak gebraten.'
+    };
+    this.setLog(result.crafted ? (messages[recipeId] || result.message) : result.message);
+    if (result.crafted) {
+      this.saveGame();
+    }
+    return result.crafted;
   }
 
   getActiveHotbarItem() {
@@ -1363,10 +1646,13 @@ export class Game {
     this.inventoryOpen = false;
     this.craftingOpen = false;
     this.buildOpen = false;
+    this.cookingOpen = false;
     this.craftingContext = 'normal';
     this.buildSelectedResource = null;
     this.removeMode = false;
+    this.respawnTarget = { type: 'crystal' };
     this.respawnPlayer();
+    this.player.restoreHp();
     this.resetHoldSeconds = 0;
     this.autosaveSeconds = 0;
     this.saveStatus = 'new';
@@ -1405,6 +1691,8 @@ export class Game {
     this.plantSystem.load(save.plants, save.grassCooldowns, this.tileMap);
 
     this.inventory.load(save.resources);
+    this.player.setHp(Number.isFinite(save.player?.hp) ? save.player.hp : PLAYER_MAX_HP);
+    this.respawnTarget = this.normalizeRespawnTarget(save.respawnTarget);
 
     if (save.player && Number.isFinite(save.player.x) && Number.isFinite(save.player.y)) {
       this.player.setPosition(save.player.x, save.player.y);
@@ -1443,6 +1731,18 @@ export class Game {
     );
   }
 
+  normalizeRespawnTarget(target) {
+    if (
+      target?.type === 'bed' &&
+      Number.isInteger(target.x) &&
+      Number.isInteger(target.y) &&
+      this.tileMap.getObject(target.x, target.y) === OBJECT_TYPES.bed
+    ) {
+      return { type: 'bed', x: target.x, y: target.y };
+    }
+    return { type: 'crystal' };
+  }
+
   saveGame() {
     const saved = this.saveSystem.save({
       tiles: this.tileMap.toJSON(),
@@ -1460,9 +1760,12 @@ export class Game {
       activeHotbarSlot: this.activeHotbarSlot,
       buildSelectedResource: this.buildSelectedResource,
       removeMode: this.removeMode,
+      respawnTarget: this.respawnTarget,
       player: {
         x: this.player.x,
         y: this.player.y,
+        hp: this.player.hp,
+        maxHp: this.player.maxHp,
         facing: this.player.facing
       }
     });
@@ -1471,7 +1774,7 @@ export class Game {
   }
 
   render() {
-    this.backgroundSystem.render(this.context, this.camera);
+    this.backgroundSystem.render(this.context, this.camera, this.dayNightSystem);
     this.renderSystem.renderWorld(this.tileMap, this.camera);
     this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now());
     this.renderSystem.renderObjects(this.tileMap, this.camera);
@@ -1545,6 +1848,19 @@ export class Game {
       saveStatus: this.saveStatus,
       activeHotbarSlot: this.activeHotbarSlot,
       activeHotbarItem: this.getActiveHotbarItem(),
+      hp: this.player.hp,
+      maxHp: this.player.maxHp,
+      damageCooldown: this.player.damageCooldownSeconds,
+      respawnTarget: this.respawnTarget?.type || 'crystal',
+      activeMenu: this.cookingOpen
+        ? 'cooking'
+        : this.craftingOpen
+          ? `crafting:${this.craftingContext}`
+          : this.inventoryOpen
+            ? 'inventory'
+            : this.buildOpen
+              ? 'build'
+              : 'none',
       buildOpen: this.buildOpen,
       removeMode: this.removeMode,
       buildSelectedResource: this.buildSelectedResource || 'none',

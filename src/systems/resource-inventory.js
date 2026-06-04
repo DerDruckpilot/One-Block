@@ -10,6 +10,9 @@ export class ResourceInventory {
       treeSeed: 0,
       springDrop: 0,
       berry: 0,
+      rawMeat: 0,
+      roastedBerries: 0,
+      cookedSteak: 0,
       arrow: 0,
       stoneBall: 0,
       workbench: 0,
@@ -26,6 +29,7 @@ export class ResourceInventory {
       door: 0,
       fence: 0,
       gate: 0,
+      bed: 0,
       table: 0,
       chair: 0
     };

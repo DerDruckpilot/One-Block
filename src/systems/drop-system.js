@@ -14,7 +14,8 @@ const VALID_DROP_RESOURCES = new Set([
   'grassSeed',
   'treeSeed',
   'springDrop',
-  'berry'
+  'berry',
+  'rawMeat'
 ]);
 
 const DROP_TILE_OFFSET = 8;

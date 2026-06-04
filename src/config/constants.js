@@ -17,8 +17,12 @@ export const PLAYER_SPAWN_TILE = {
 };
 
 export const PLAYER_FOOT_OFFSET = 10;
+export const PLAYER_MAX_HP = 6;
+export const PLAYER_DAMAGE_COOLDOWN_SECONDS = 1;
 export const CRYSTAL_INTERACTION_DISTANCE = TILE_SIZE * 1.45;
 export const WORKBENCH_INTERACTION_DISTANCE = TILE_SIZE * 1.8;
+export const CAMPFIRE_INTERACTION_DISTANCE = TILE_SIZE * 1.55;
+export const BED_INTERACTION_DISTANCE = TILE_SIZE * 1.55;
 export const LASSO_INTERACTION_DISTANCE = TILE_SIZE * 1.55;
 export const GATE_INTERACTION_DISTANCE = TILE_SIZE * 1.35;
 export const ENEMY_SIZE = 30;
@@ -46,8 +50,14 @@ export const BERRY_BUSH_GROW_SECONDS = 18;
 export const GRASS_HARVEST_COOLDOWN_SECONDS = 16;
 export const DROP_PICKUP_DISTANCE = TILE_SIZE * 0.72;
 export const DROP_ANIMATION_SECONDS = 0.42;
-export const DAY_NIGHT_CYCLE_SECONDS = 120;
-export const DAY_NIGHT_START_TIME = 0.18;
+export const DAY_NIGHT_CYCLE_SECONDS = 600;
+export const DAY_NIGHT_START_TIME = 0;
+export const DAY_NIGHT_PHASES = {
+  day: { id: 'day', label: 'Tag', start: 0, end: 0.45, durationSeconds: 270 },
+  dusk: { id: 'dusk', label: 'Dämmerung', start: 0.45, end: 0.5, durationSeconds: 30 },
+  night: { id: 'night', label: 'Nacht', start: 0.5, end: 0.95, durationSeconds: 270 },
+  dawn: { id: 'dawn', label: 'Morgengrauen', start: 0.95, end: 1, durationSeconds: 30 }
+};
 
 export const TILE_TYPES = {
   earth: 'earth',
@@ -69,6 +79,7 @@ export const OBJECT_TYPES = {
   fence: 'fence',
   gate: 'gate',
   door: 'door',
+  bed: 'bed',
   sapling: 'sapling',
   tree: 'tree',
   berryBush: 'berryBush'
@@ -93,6 +104,7 @@ export const PLAYER_BLOCKING_OBJECTS = [
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.door,
+  OBJECT_TYPES.bed,
   OBJECT_TYPES.tree
 ];
 
@@ -103,6 +115,7 @@ export const GROUND_ENTITY_BLOCKING_OBJECTS = [
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.door,
+  OBJECT_TYPES.bed,
   OBJECT_TYPES.tree
 ];
 
@@ -121,7 +134,8 @@ export const REMOVABLE_OBJECT_TYPES = [
   OBJECT_TYPES.chair,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
-  OBJECT_TYPES.door
+  OBJECT_TYPES.door,
+  OBJECT_TYPES.bed
 ];
 
 export const CRYSTAL_ENCOUNTER_DROPS = [
@@ -156,14 +170,19 @@ export const RESOURCE_LABELS = {
   lasso: 'Lasso',
   fence: 'Zaun',
   gate: 'Tor',
-  door: 'Tür'
+  door: 'Tür',
+  bed: 'Bett',
+  rawMeat: 'Rohes Fleisch',
+  roastedBerries: 'Geröstete Beeren',
+  cookedSteak: 'Gebratenes Steak'
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 export const WORLD_RESOURCES = ['earth', 'stone', 'clay'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'woodWall', 'door', 'fence', 'gate', 'table', 'chair'];
+export const FOOD_RESOURCES = ['berry', 'rawMeat', 'roastedBerries', 'cookedSteak'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'woodWall', 'door', 'fence', 'gate', 'bed', 'table', 'chair'];
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
-export const INVENTORY_RESOURCES = ['earth', 'stone', 'clay', 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', 'berry', ...AMMO_RESOURCES, ...TOOL_RESOURCES];
+export const INVENTORY_RESOURCES = ['earth', 'stone', 'clay', 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
 export const DEFAULT_HOTBAR_SLOTS = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 
@@ -194,7 +213,11 @@ export const RESOURCE_SHORT_LABELS = {
   lasso: 'LA',
   fence: 'ZA',
   gate: 'TO',
-  door: 'TU'
+  door: 'TU',
+  bed: 'BD',
+  rawMeat: 'RF',
+  roastedBerries: 'RB',
+  cookedSteak: 'CS'
 };
 
 export const RESOURCE_ICONS = {
@@ -224,7 +247,11 @@ export const RESOURCE_ICONS = {
   lasso: 'o-',
   fence: '|=',
   gate: '[]',
-  door: 'D'
+  door: 'D',
+  bed: 'Zz',
+  rawMeat: 'rm',
+  roastedBerries: 'rb',
+  cookedSteak: 'cs'
 };
 
 export const INVENTORY_TABS = [
@@ -233,7 +260,8 @@ export const INVENTORY_TABS = [
   { id: 'tools', label: 'Werkzeuge' },
   { id: 'ammo', label: 'Munition' },
   { id: 'building', label: 'Bauelemente' },
-  { id: 'seeds', label: 'Samen' }
+  { id: 'seeds', label: 'Samen' },
+  { id: 'food', label: 'Nahrung' }
 ];
 
 export const RESOURCE_CATEGORIES = {
@@ -245,7 +273,10 @@ export const RESOURCE_CATEGORIES = {
   grassSeed: ['seeds'],
   treeSeed: ['seeds'],
   springDrop: ['resources'],
-  berry: ['resources'],
+  berry: ['resources', 'food'],
+  rawMeat: ['resources', 'food'],
+  roastedBerries: ['food'],
+  cookedSteak: ['food'],
   workbench: ['building'],
   woodenPickaxe: ['tools'],
   woodenSpear: ['tools'],
@@ -259,6 +290,7 @@ export const RESOURCE_CATEGORIES = {
   campfire: ['building'],
   woodWall: ['building'],
   door: ['building'],
+  bed: ['building'],
   table: ['building'],
   chair: ['building'],
   lasso: ['tools'],
@@ -270,7 +302,7 @@ export const BUILD_MENU_CATEGORIES = [
   { id: 'terrain', label: 'Gelände', resources: ['earth', 'stone', 'clay'] },
   { id: 'nature', label: 'Natur', resources: ['grassSeed', 'treeSeed'] },
   { id: 'light', label: 'Licht', resources: ['torch', 'campfire'] },
-  { id: 'furniture', label: 'Möbel', resources: ['table', 'chair'] },
+  { id: 'furniture', label: 'Möbel', resources: ['table', 'chair', 'bed'] },
   { id: 'building', label: 'Bau', resources: ['woodWall', 'door', 'fence', 'gate'] },
   { id: 'stations', label: 'Stationen', resources: ['workbench'] }
 ];
@@ -529,6 +561,43 @@ export const DOOR_RECIPE = {
   }
 };
 
+export const BED_RECIPE = {
+  id: 'bed',
+  name: 'Bett',
+  result: 'bed',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 6,
+    fiber: 6
+  }
+};
+
+export const ROASTED_BERRIES_RECIPE = {
+  id: 'roastedBerries',
+  name: 'Geröstete Beeren',
+  result: 'roastedBerries',
+  resultAmount: 1,
+  craftingContext: 'cooking',
+  requiresWorkbench: false,
+  costs: {
+    berry: 2
+  }
+};
+
+export const COOKED_STEAK_RECIPE = {
+  id: 'cookedSteak',
+  name: 'Gebratenes Steak',
+  result: 'cookedSteak',
+  resultAmount: 1,
+  craftingContext: 'cooking',
+  requiresWorkbench: false,
+  costs: {
+    rawMeat: 1
+  }
+};
+
 export const CRAFTING_RECIPES = [
   WORKBENCH_RECIPE,
   TORCH_RECIPE,
@@ -546,6 +615,12 @@ export const CRAFTING_RECIPES = [
   DOOR_RECIPE,
   FENCE_RECIPE,
   GATE_RECIPE,
+  BED_RECIPE,
   TABLE_RECIPE,
   CHAIR_RECIPE
+];
+
+export const COOKING_RECIPES = [
+  ROASTED_BERRIES_RECIPE,
+  COOKED_STEAK_RECIPE
 ];

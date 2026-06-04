@@ -10,19 +10,23 @@ import {
 } from '../config/constants.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel, buildPanel }) {
+  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
     this.buildPanel = buildPanel;
+    this.cookingPanel = cookingPanel;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
     this.lastBuildHtml = '';
+    this.lastCookingHtml = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
+    this.selectedCookingRecipeId = null;
     this.craftingScrollTop = {
       normal: 0,
-      workbench: 0
+      workbench: 0,
+      cooking: 0
     };
 
     this.inventoryPanel?.addEventListener?.('input', (event) => {
@@ -37,6 +41,8 @@ export class MenuPanels {
     buildOpen = false,
     buildRemoveMode = false,
     buildSelectedResource = null,
+    cookingOpen = false,
+    cookingRecipeStates = [],
     craftingContext = 'normal',
     craftingOpen,
     hotbarSlots = [],
@@ -48,6 +54,7 @@ export class MenuPanels {
   }) {
     this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
+    this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
     this.renderBuildMenu(inventory, buildOpen, buildSelectedResource, buildRemoveMode);
   }
 
@@ -66,6 +73,15 @@ export class MenuPanels {
   selectCraftingRecipe(recipeId) {
     this.selectedCraftingRecipeId = recipeId;
     this.lastCraftingHtml = '';
+  }
+
+  selectCookingRecipe(recipeId) {
+    this.selectedCookingRecipeId = recipeId;
+    this.lastCookingHtml = '';
+  }
+
+  renderCloseButton(menuId) {
+    return `<button class="menu-close-button" type="button" data-menu-close="${menuId}" aria-label="Menue schliessen">x</button>`;
   }
 
   renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0) {
@@ -102,9 +118,10 @@ export class MenuPanels {
 
     const selectedText = selectedInventoryResource
       ? `${RESOURCE_LABELS[selectedInventoryResource]} ausgewählt`
-      : 'Kein Item für Hotbar-Zuweisung ausgewählt';
+      : 'Kein Item fuer Hotbar-Zuweisung ausgewaehlt';
 
     this.setInventoryHtml(`
+      ${this.renderCloseButton('inventory')}
       <div class="menu-frame-title">Inventar</div>
       <div class="menu-tabs">${tabs}</div>
       <label class="menu-search">
@@ -170,36 +187,62 @@ export class MenuPanels {
       return;
     }
 
-    const selectedState = this.getSelectedRecipeState(recipeStates);
+    const selectedState = this.getSelectedRecipeState(recipeStates, this.selectedCraftingRecipeId);
     const title = craftingContext === 'workbench' ? 'Werkbank' : 'Crafting';
-    const recipes = recipeStates.map((recipeState) => this.renderRecipeListItem(recipeState, selectedState)).join('');
+    const recipes = recipeStates.map((recipeState) => this.renderRecipeListItem(recipeState, selectedState, 'craft-select')).join('');
     const detail = selectedState
       ? this.renderRecipeDetail(inventory, selectedState)
-      : '<div class="recipe-detail-empty">Keine Rezepte verfügbar.</div>';
+      : '<div class="recipe-detail-empty">Keine Rezepte verfuegbar.</div>';
 
     this.setCraftingHtml(`
+      ${this.renderCloseButton('crafting')}
       <div class="menu-frame-title">${title}</div>
       <div class="crafting-layout">
         <div class="recipe-list" data-craft-scroll="${craftingContext}">${recipes}</div>
         <div class="recipe-detail">${detail}</div>
       </div>
-    `, craftingContext);
+    `);
   }
 
-  getSelectedRecipeState(recipeStates) {
+  renderCooking(inventory, isOpen, recipeStates) {
+    if (!this.cookingPanel) return;
+    this.cookingPanel.hidden = !isOpen;
+
+    if (!isOpen) {
+      this.setCookingHtml('');
+      return;
+    }
+
+    const selectedState = this.getSelectedRecipeState(recipeStates, this.selectedCookingRecipeId);
+    const recipes = recipeStates.map((recipeState) => this.renderRecipeListItem(recipeState, selectedState, 'cook-select')).join('');
+    const detail = selectedState
+      ? this.renderRecipeDetail(inventory, selectedState, { buttonLabel: 'Kochen', buttonDataset: 'cook' })
+      : '<div class="recipe-detail-empty">Keine Kochrezepte verfuegbar.</div>';
+
+    this.setCookingHtml(`
+      ${this.renderCloseButton('cooking')}
+      <div class="menu-frame-title">Kochen</div>
+      <div class="crafting-layout">
+        <div class="recipe-list" data-craft-scroll="cooking">${recipes}</div>
+        <div class="recipe-detail">${detail}</div>
+      </div>
+    `);
+  }
+
+  getSelectedRecipeState(recipeStates, selectedRecipeId = null) {
     if (!recipeStates.length) return null;
-    const selected = recipeStates.find((recipeState) => recipeState.recipe.id === this.selectedCraftingRecipeId);
+    const selected = recipeStates.find((recipeState) => recipeState.recipe.id === selectedRecipeId);
     return selected || recipeStates[0];
   }
 
-  renderRecipeListItem(recipeState, selectedState) {
+  renderRecipeListItem(recipeState, selectedState, dataset = 'craft-select') {
     const { recipe } = recipeState;
     const isSelected = selectedState?.recipe.id === recipe.id;
     return `
       <button
         class="recipe-list-item${isSelected ? ' is-selected' : ''}${recipeState.canCraft ? '' : ' is-disabled'}"
         type="button"
-        data-craft-select="${recipe.id}"
+        data-${dataset}="${recipe.id}"
         aria-pressed="${isSelected ? 'true' : 'false'}"
       >
         <span class="menu-icon">${RESOURCE_ICONS[recipe.result]}</span>
@@ -208,7 +251,7 @@ export class MenuPanels {
     `;
   }
 
-  renderRecipeDetail(inventory, recipeState) {
+  renderRecipeDetail(inventory, recipeState, { buttonLabel = 'Herstellen', buttonDataset = 'craft' } = {}) {
     const { recipe } = recipeState;
     const costs = Object.entries(recipe.costs)
       .map(([resource, amount]) => {
@@ -225,8 +268,8 @@ export class MenuPanels {
       .join('');
     const missingText = recipeState.missing.length > 0
       ? `<div class="menu-note">Fehlt: ${recipeState.missing.map((cost) => `${cost.missing}x ${cost.label}`).join(', ')}</div>`
-      : '<div class="menu-note">Alle Materialien verfügbar.</div>';
-    const lockedText = recipeState.isAvailable ? '' : '<div class="menu-note">Werkbank benötigt.</div>';
+      : '<div class="menu-note">Alle Materialien verfuegbar.</div>';
+    const lockedText = recipeState.isAvailable ? '' : '<div class="menu-note">Werkbank benoetigt.</div>';
 
     return `
       <h3>${recipe.name}</h3>
@@ -234,8 +277,8 @@ export class MenuPanels {
       <div class="material-grid">${costs}</div>
       ${lockedText}
       ${missingText}
-      <button class="craft-button" type="button" data-craft="${recipe.id}" ${recipeState.canCraft ? '' : 'disabled'}>
-        Herstellen
+      <button class="craft-button" type="button" data-${buttonDataset}="${recipe.id}" ${recipeState.canCraft ? '' : 'disabled'}>
+        ${buttonLabel}
       </button>
     `;
   }
@@ -275,6 +318,7 @@ export class MenuPanels {
     }).join('');
 
     this.setBuildHtml(`
+      ${this.renderCloseButton('build')}
       <div class="menu-frame-title">Bauen</div>
       <button
         class="build-remove-toggle${removeMode ? ' is-selected' : ''}"
@@ -282,7 +326,7 @@ export class MenuPanels {
         data-build-remove="true"
         aria-pressed="${removeMode ? 'true' : 'false'}"
       >Entfernen</button>
-      <div class="menu-note">${removeMode ? 'Entfernen aktiv: Ziel markieren und Aktion drücken.' : 'Item wählen, dann mit B oder Aktion platzieren.'}</div>
+      <div class="menu-note">${removeMode ? 'Entfernen aktiv: Ziel markieren und Aktion druecken.' : 'Item waehlen, dann mit B oder Aktion platzieren.'}</div>
       <div class="build-menu-scroll">${categories}</div>
     `);
   }
@@ -317,6 +361,21 @@ export class MenuPanels {
     if (html !== this.lastBuildHtml) {
       this.buildPanel.innerHTML = html;
       this.lastBuildHtml = html;
+    }
+  }
+
+  setCookingHtml(html) {
+    if (html !== this.lastCookingHtml) {
+      const currentList = this.cookingPanel?.querySelector?.('[data-craft-scroll]');
+      if (currentList?.dataset?.craftScroll) {
+        this.craftingScrollTop[currentList.dataset.craftScroll] = currentList.scrollTop;
+      }
+      this.cookingPanel.innerHTML = html;
+      this.lastCookingHtml = html;
+      const nextList = this.cookingPanel?.querySelector?.('[data-craft-scroll]');
+      if (nextList?.dataset?.craftScroll) {
+        nextList.scrollTop = this.craftingScrollTop[nextList.dataset.craftScroll] || 0;
+      }
     }
   }
 }
