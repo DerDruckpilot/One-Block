@@ -11,6 +11,7 @@ import {
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   RESOURCE_LABELS,
+  TILE_TYPES,
   TILE_SIZE,
   WORKBENCH_INTERACTION_DISTANCE
 } from '../config/constants.js';
@@ -31,6 +32,7 @@ import { EnemySystem } from '../systems/enemy-system.js';
 import { AnimalSystem } from '../systems/animal-system.js';
 import { FlyingEnemySystem } from '../systems/flying-enemy-system.js';
 import { ProjectileSystem } from '../systems/projectile-system.js';
+import { PlantSystem } from '../systems/plant-system.js';
 import { LogSystem } from '../systems/log-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
@@ -72,6 +74,7 @@ export class Game {
     this.animalSystem = new AnimalSystem();
     this.flyingEnemySystem = new FlyingEnemySystem();
     this.projectileSystem = new ProjectileSystem();
+    this.plantSystem = new PlantSystem();
     this.logSystem = new LogSystem();
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
@@ -175,6 +178,7 @@ export class Game {
       this.handleAnimalEvents(this.animalSystem.update(deltaSeconds, this.tileMap));
       this.flyingEnemySystem.update(deltaSeconds, this.tileMap, this.player);
       this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem));
+      this.plantSystem.update(deltaSeconds, this.tileMap);
       this.handleDropCollections(this.dropSystem.update(deltaSeconds, this.player, this.inventory, this.tileMap));
       this.dayNightSystem.update(deltaSeconds);
       this.updateAttackFeedback(deltaSeconds);
@@ -245,6 +249,11 @@ export class Game {
     );
 
     if (isCloseToCrystal) {
+      if (this.trySpawnNightSpringDrop()) {
+        this.saveGame();
+        return true;
+      }
+
       const drop = this.rollCrystalDrop();
       this.spawnVisibleDrop(drop, `Kristall wirft ${RESOURCE_LABELS[drop.resource]} aus.`);
       const animalSpawn = this.animalSystem.maybeSpawn(
@@ -280,6 +289,10 @@ export class Game {
 
     if (this.hasWorkbenchAccess()) {
       return this.openWorkbenchCrafting();
+    }
+
+    if (this.tryHarvestContext()) {
+      return true;
     }
 
     if (this.isNearCrystal()) {
@@ -322,6 +335,14 @@ export class Game {
       });
     }
 
+    if (activeItem === 'axe' && this.inventory.get('axe') > 0) {
+      return this.tryHarvestTree();
+    }
+
+    if (activeItem === 'scythe' && this.inventory.get('scythe') > 0) {
+      return this.tryHarvestGrass();
+    }
+
     this.setLog('Keine Waffe ausgewählt.');
     return false;
   }
@@ -334,6 +355,11 @@ export class Game {
 
     this.setCrystalHitFeedback();
     this.setLog('Du schlägst Splitter aus dem Kristall.');
+    if (this.trySpawnNightSpringDrop()) {
+      this.saveGame();
+      return true;
+    }
+
     const drop = this.rollCrystalDrop(PICKAXE_RESOURCE_DROPS);
     this.spawnVisibleDrop(drop, `${RESOURCE_LABELS[drop.resource]} splittert heraus.`);
     this.saveGame();
@@ -420,6 +446,15 @@ export class Game {
     }
 
     this.setLog(message);
+    return true;
+  }
+
+  trySpawnNightSpringDrop() {
+    if (this.dayNightSystem.getPhase() !== 'Nacht') return false;
+    if (this.crystalSystem.random() >= 0.22) return false;
+
+    this.crystalSystem.hitCounter += 1;
+    this.spawnVisibleDrop({ resource: 'springDrop', amount: 1 }, 'Ein Quelltropfen erscheint.');
     return true;
   }
 
@@ -540,6 +575,12 @@ export class Game {
       this.setLog('Stein platziert.');
     }
 
+    if (activeItem === 'clay') {
+      this.tileMap.setClay(placement.x, placement.y);
+      this.inventory.remove('clay', 1);
+      this.setLog('Lehm platziert.');
+    }
+
     if (PLACEABLE_OBJECT_ITEMS.has(activeItem)) {
       this.tileMap.setObject(placement.x, placement.y, activeItem);
       this.inventory.remove(activeItem, 1);
@@ -550,6 +591,22 @@ export class Game {
       this.tileMap.setGrass(placement.x, placement.y);
       this.inventory.remove('grassSeed', 1);
       this.setLog('Grassamen gepflanzt.');
+    }
+
+    if (activeItem === 'springDrop') {
+      this.applySpringDrop(placement);
+    }
+
+    if (activeItem === 'treeSeed') {
+      this.plantSystem.plantTreeSeed(this.tileMap, placement.x, placement.y);
+      this.inventory.remove('treeSeed', 1);
+      this.setLog('Baumsamen gepflanzt.');
+    }
+
+    if (activeItem === 'berry') {
+      this.plantSystem.plantBerryBush(this.tileMap, placement.x, placement.y);
+      this.inventory.remove('berry', 1);
+      this.setLog('Beerenbusch gepflanzt.');
     }
 
     this.saveGame();
@@ -581,7 +638,15 @@ export class Game {
       return this.getGrassSeedPlacementPreview(target);
     }
 
-    if (activeItem === 'earth' || activeItem === 'stone') {
+    if (activeItem === 'springDrop') {
+      return this.getSpringDropPlacementPreview(target);
+    }
+
+    if (activeItem === 'treeSeed' || activeItem === 'berry') {
+      return this.getPlantingPlacementPreview(activeItem, target, playerTile);
+    }
+
+    if (activeItem === 'earth' || activeItem === 'stone' || activeItem === 'clay') {
       return this.getFloorTilePlacementPreview(activeItem, target, playerTile);
     }
 
@@ -725,6 +790,144 @@ export class Game {
       canPlace: true,
       message: 'Grassamen können gepflanzt werden.'
     };
+  }
+
+  getSpringDropPlacementPreview(target = this.player.getFacingTile()) {
+    if (this.inventory.get('springDrop') <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht genug Quelltropfen.'
+      };
+    }
+
+    if (this.tileMap.isCrystal(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Nicht auf dem Kristall.'
+      };
+    }
+
+    const tile = this.tileMap.getTile(target.x, target.y);
+    if (tile === TILE_TYPES.earth || tile === TILE_TYPES.moistEarth || tile === TILE_TYPES.clay) {
+      return {
+        ...target,
+        canPlace: true,
+        message: 'Quelltropfen kann genutzt werden.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: false,
+      message: 'Quelltropfen brauchen Erde oder Lehm.'
+    };
+  }
+
+  getPlantingPlacementPreview(resource, target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
+    if (this.inventory.get(resource) <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: `Nicht genug ${RESOURCE_LABELS[resource]}.`
+      };
+    }
+
+    if (target.x === playerTile.x && target.y === playerTile.y) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist blockiert.'
+      };
+    }
+
+    if (!this.plantSystem.canPlantOn(this.tileMap, target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Hier kann nichts gepflanzt werden.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: true,
+      message: `${RESOURCE_LABELS[resource]} kann gepflanzt werden.`
+    };
+  }
+
+  applySpringDrop(placement) {
+    const tile = this.tileMap.getTile(placement.x, placement.y);
+    if (tile === TILE_TYPES.clay) {
+      this.tileMap.setWater(placement.x, placement.y);
+      this.inventory.remove('springDrop', 1);
+      this.setLog('Eine Wasserquelle entsteht.');
+      return true;
+    }
+
+    if (tile === TILE_TYPES.earth || tile === TILE_TYPES.moistEarth) {
+      this.tileMap.setMoistEarth(placement.x, placement.y);
+      this.inventory.remove('springDrop', 1);
+      this.setLog('Die Erde wird feucht.');
+      return true;
+    }
+
+    return false;
+  }
+
+  tryHarvestContext() {
+    return this.tryHarvestTree() || this.tryHarvestGrass() || this.tryHarvestBerryBush();
+  }
+
+  tryHarvestTree() {
+    const target = this.player.getFacingTile();
+    if (this.tileMap.getObject(target.x, target.y) !== OBJECT_TYPES.tree) return false;
+
+    if (this.inventory.get('axe') <= 0) {
+      this.setLog('Dafür brauchst du eine Axt.');
+      return true;
+    }
+
+    const result = this.plantSystem.fellTree(this.tileMap, target.x, target.y);
+    this.setLog(result.message);
+    if (result.harvested) {
+      this.dropSystem.spawnAtTile({ resource: 'rawWood', amount: 1 }, target);
+      this.dropSystem.spawnAtTile({ resource: 'rawWood', amount: 1 }, target);
+      this.saveGame();
+    }
+    return true;
+  }
+
+  tryHarvestGrass() {
+    const target = this.player.getFacingTile();
+    if (!this.tileMap.isGrass(target.x, target.y)) return false;
+
+    if (this.inventory.get('scythe') <= 0) {
+      this.setLog('Dafür brauchst du eine Sense.');
+      return true;
+    }
+
+    const result = this.plantSystem.harvestGrass(this.tileMap, target.x, target.y);
+    this.setLog(result.message);
+    if (result.harvested) {
+      this.dropSystem.spawnAtTile({ resource: 'fiber', amount: 1 }, target);
+      this.saveGame();
+    }
+    return true;
+  }
+
+  tryHarvestBerryBush() {
+    const target = this.player.getFacingTile();
+    if (this.tileMap.getObject(target.x, target.y) !== OBJECT_TYPES.berryBush) return false;
+
+    const result = this.plantSystem.harvestBerryBush(target.x, target.y);
+    this.setLog(result.message);
+    if (result.harvested) {
+      this.inventory.add('berry', 1);
+      this.saveGame();
+    }
+    return true;
   }
 
   handleVoidFall() {
@@ -936,6 +1139,7 @@ export class Game {
     this.animalSystem.clear();
     this.flyingEnemySystem.clear();
     this.projectileSystem.clear();
+    this.plantSystem.clear();
     this.dropSystem.clear();
     this.dayNightSystem.reset();
     this.attackFeedback = null;
@@ -963,6 +1167,7 @@ export class Game {
 
     this.tileMap.loadTiles(save.tiles);
     this.tileMap.loadObjects(save.objects);
+    this.plantSystem.load(save.plants, save.grassCooldowns, this.tileMap);
 
     this.inventory.load(save.resources);
 
@@ -1008,6 +1213,8 @@ export class Game {
       animals: this.animalSystem.toJSON(),
       flyingEnemies: this.flyingEnemySystem.toJSON(),
       drops: this.dropSystem.toJSON(),
+      plants: this.plantSystem.toJSON(),
+      grassCooldowns: this.plantSystem.grassCooldownsToJSON(),
       dayNightTime: this.dayNightSystem.toJSON(),
       logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
@@ -1084,6 +1291,7 @@ export class Game {
       activeAnimals: this.animalSystem.activeCount(),
       activeFlyingEnemies: this.flyingEnemySystem.activeCount(),
       activeProjectiles: this.projectileSystem.activeCount(),
+      activePlants: this.plantSystem.plants.size,
       dayNightTime: this.dayNightSystem.time,
       dayNightPhase: this.dayNightSystem.getPhase(),
       activeDrops: this.dropSystem.drops.length

@@ -39,6 +39,9 @@ export const BOW_RANGE = TILE_SIZE * 4;
 export const BOW_DAMAGE = 2;
 export const PROJECTILE_SPEED = 240;
 export const PROJECTILE_HIT_RADIUS = 18;
+export const SAPLING_GROW_SECONDS = 24;
+export const BERRY_BUSH_GROW_SECONDS = 18;
+export const GRASS_HARVEST_COOLDOWN_SECONDS = 16;
 export const DROP_PICKUP_DISTANCE = TILE_SIZE * 0.72;
 export const DROP_ANIMATION_SECONDS = 0.42;
 export const DAY_NIGHT_CYCLE_SECONDS = 120;
@@ -48,7 +51,10 @@ export const TILE_TYPES = {
   earth: 'earth',
   crystal: 'crystal',
   grass: 'grass',
-  stone: 'stone'
+  stone: 'stone',
+  clay: 'clay',
+  moistEarth: 'moistEarth',
+  water: 'water'
 };
 
 export const OBJECT_TYPES = {
@@ -57,7 +63,10 @@ export const OBJECT_TYPES = {
   campfire: 'campfire',
   woodWall: 'woodWall',
   table: 'table',
-  chair: 'chair'
+  chair: 'chair',
+  sapling: 'sapling',
+  tree: 'tree',
+  berryBush: 'berryBush'
 };
 
 export const RESOURCE_LABELS = {
@@ -66,11 +75,17 @@ export const RESOURCE_LABELS = {
   rawWood: 'Rohholz',
   fiber: 'Fasern',
   grassSeed: 'Grassamen',
+  clay: 'Lehm',
+  springDrop: 'Quelltropfen',
+  treeSeed: 'Baumsamen',
+  berry: 'Beeren',
   workbench: 'Werkbank',
   woodenPickaxe: 'Holzspitzhacke',
   woodenSpear: 'Holzspeer',
   slingshot: 'Schleuder',
   bow: 'Bogen',
+  axe: 'Axt',
+  scythe: 'Sense',
   arrow: 'Pfeil',
   stoneBall: 'Steinkugel',
   torch: 'Fackel',
@@ -81,10 +96,10 @@ export const RESOURCE_LABELS = {
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
-export const WORLD_RESOURCES = ['earth', 'stone'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'torch', 'campfire', 'woodWall', 'table', 'chair'];
+export const WORLD_RESOURCES = ['earth', 'stone', 'clay'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'torch', 'campfire', 'woodWall', 'table', 'chair'];
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
-export const INVENTORY_RESOURCES = ['earth', 'stone', 'rawWood', 'fiber', 'grassSeed', ...AMMO_RESOURCES, ...TOOL_RESOURCES];
+export const INVENTORY_RESOURCES = ['earth', 'stone', 'clay', 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', 'berry', ...AMMO_RESOURCES, ...TOOL_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
 export const DEFAULT_HOTBAR_SLOTS = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 
@@ -94,11 +109,17 @@ export const RESOURCE_SHORT_LABELS = {
   rawWood: 'RH',
   fiber: 'FA',
   grassSeed: 'GS',
+  clay: 'CL',
+  springDrop: 'QT',
+  treeSeed: 'BS',
+  berry: 'BE',
   workbench: 'WB',
   woodenPickaxe: 'HP',
   woodenSpear: 'HS',
   slingshot: 'SL',
   bow: 'BO',
+  axe: 'AX',
+  scythe: 'SC',
   arrow: 'AR',
   stoneBall: 'SB',
   torch: 'TO',
@@ -114,11 +135,17 @@ export const RESOURCE_ICONS = {
   rawWood: '||',
   fiber: '~~',
   grassSeed: '**',
+  clay: '==',
+  springDrop: '~o',
+  treeSeed: 't*',
+  berry: 'bb',
   workbench: '#',
   woodenPickaxe: '/\\',
   woodenSpear: '-->',
   slingshot: 'Y',
   bow: ')',
+  axe: '7',
+  scythe: 'J',
   arrow: '->',
   stoneBall: 'o',
   torch: '!',
@@ -140,14 +167,20 @@ export const INVENTORY_TABS = [
 export const RESOURCE_CATEGORIES = {
   earth: ['resources', 'building'],
   stone: ['resources', 'building'],
+  clay: ['resources', 'building'],
   rawWood: ['resources'],
   fiber: ['resources'],
   grassSeed: ['seeds'],
+  treeSeed: ['seeds'],
+  springDrop: ['resources'],
+  berry: ['resources'],
   workbench: ['building'],
   woodenPickaxe: ['tools'],
   woodenSpear: ['tools'],
   slingshot: ['tools'],
   bow: ['tools'],
+  axe: ['tools'],
+  scythe: ['tools'],
   arrow: ['ammo'],
   stoneBall: ['ammo'],
   torch: ['building'],
@@ -165,11 +198,14 @@ export const BASIC_RESOURCE_DROPS = [
 ];
 
 export const PICKAXE_RESOURCE_DROPS = [
-  { resource: 'stone', amount: 1, weight: 45 },
-  { resource: 'earth', amount: 1, weight: 30 },
+  { resource: 'stone', amount: 1, weight: 40 },
+  { resource: 'earth', amount: 1, weight: 23 },
   { resource: 'rawWood', amount: 1, weight: 10 },
   { resource: 'fiber', amount: 1, weight: 10 },
-  { resource: 'grassSeed', amount: 1, weight: 5 }
+  { resource: 'grassSeed', amount: 1, weight: 5 },
+  { resource: 'clay', amount: 1, weight: 8 },
+  { resource: 'treeSeed', amount: 1, weight: 2 },
+  { resource: 'berry', amount: 1, weight: 2 }
 ];
 
 export const WORKBENCH_RECIPE = {
@@ -289,6 +325,34 @@ export const BOW_RECIPE = {
   }
 };
 
+export const AXE_RECIPE = {
+  id: 'axe',
+  name: 'Axt',
+  result: 'axe',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 6,
+    stone: 4,
+    fiber: 2
+  }
+};
+
+export const SCYTHE_RECIPE = {
+  id: 'scythe',
+  name: 'Sense',
+  result: 'scythe',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 4,
+    stone: 3,
+    fiber: 4
+  }
+};
+
 export const WOOD_WALL_RECIPE = {
   id: 'woodWall',
   name: 'Holzwand',
@@ -338,6 +402,8 @@ export const CRAFTING_RECIPES = [
   WOODEN_SPEAR_RECIPE,
   SLINGSHOT_RECIPE,
   BOW_RECIPE,
+  AXE_RECIPE,
+  SCYTHE_RECIPE,
   WOOD_WALL_RECIPE,
   TABLE_RECIPE,
   CHAIR_RECIPE

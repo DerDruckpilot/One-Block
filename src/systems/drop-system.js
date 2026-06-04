@@ -5,7 +5,17 @@ import {
   TILE_SIZE
 } from '../config/constants.js';
 
-const VALID_DROP_RESOURCES = new Set(['earth', 'stone', 'rawWood', 'fiber', 'grassSeed']);
+const VALID_DROP_RESOURCES = new Set([
+  'earth',
+  'stone',
+  'clay',
+  'rawWood',
+  'fiber',
+  'grassSeed',
+  'treeSeed',
+  'springDrop',
+  'berry'
+]);
 
 export class DropSystem {
   constructor() {

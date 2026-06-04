@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-3-6';
+const CACHE_NAME = 'one-block-v0-3-7';
 
 const CORE_ASSETS = [
   './',
@@ -24,6 +24,7 @@ const CORE_ASSETS = [
   './src/systems/enemy-system.js',
   './src/systems/flying-enemy-system.js',
   './src/systems/log-system.js',
+  './src/systems/plant-system.js',
   './src/systems/projectile-system.js',
   './src/systems/resource-inventory.js',
   './src/systems/save-system.js',
