@@ -1,6 +1,7 @@
 import { OBJECT_TYPES, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 
 const keyOf = (x, y) => `${x},${y}`;
+const PLACEABLE_OBJECTS = new Set(Object.values(OBJECT_TYPES));
 
 export class TileMap {
   constructor() {
@@ -47,12 +48,16 @@ export class TileMap {
     this.setObject(x, y, OBJECT_TYPES.workbench);
   }
 
-  canPlaceWorkbench(x, y, playerTile = null) {
+  canPlaceObject(x, y, playerTile = null) {
     if (!this.isGround(x, y)) return false;
     if (this.isCrystal(x, y)) return false;
     if (this.getObject(x, y)) return false;
     if (playerTile && playerTile.x === x && playerTile.y === y) return false;
     return true;
+  }
+
+  canPlaceWorkbench(x, y, playerTile = null) {
+    return this.canPlaceObject(x, y, playerTile);
   }
 
   loadTiles(tiles) {
@@ -68,7 +73,7 @@ export class TileMap {
   loadObjects(objects = []) {
     this.objects.clear();
     for (const object of objects) {
-      if (object.type === OBJECT_TYPES.workbench) {
+      if (PLACEABLE_OBJECTS.has(object.type)) {
         this.objects.set(keyOf(object.x, object.y), object.type);
       }
     }

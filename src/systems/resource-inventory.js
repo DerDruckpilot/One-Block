@@ -8,7 +8,12 @@ export class ResourceInventory {
       grassSeed: 0,
       workbench: 0,
       woodenPickaxe: 0,
-      woodenSpear: 0
+      woodenSpear: 0,
+      torch: 0,
+      campfire: 0,
+      woodWall: 0,
+      table: 0,
+      chair: 0
     };
   }
 

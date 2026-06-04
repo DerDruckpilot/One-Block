@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
+  DAY_NIGHT_START_TIME,
   CRYSTAL_INTERACTION_DISTANCE,
   DEFAULT_HOTBAR_SLOTS,
   GAME_VIEW,
@@ -9,6 +11,7 @@ import {
   PLAYER_FOOT_OFFSET,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
+  RESOURCE_LABELS,
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
@@ -137,6 +140,18 @@ const createDrawContext = () => {
     fillRect(...args) {
       calls.push({ fn: 'fillRect', args, fillStyle: this.fillStyle });
     },
+    arc(...args) {
+      calls.push({ fn: 'arc', args, fillStyle: this.fillStyle });
+    },
+    beginPath() {
+      calls.push({ fn: 'beginPath' });
+    },
+    fill() {
+      calls.push({ fn: 'fill', fillStyle: this.fillStyle });
+    },
+    fillText(...args) {
+      calls.push({ fn: 'fillText', args, fillStyle: this.fillStyle });
+    },
     restore() {
       calls.push({ fn: 'restore' });
     },
@@ -150,6 +165,18 @@ const createDrawContext = () => {
 };
 
 const map = new TileMap();
+
+{
+  const indexHtml = readFileSync('index.html', 'utf8');
+  const styles = readFileSync('src/styles.css', 'utf8');
+  const mainScript = readFileSync('src/main.js', 'utf8');
+
+  assert.equal(indexHtml.includes('maximum-scale=1'), true, 'mobile viewport caps pinch and double-tap zoom scale');
+  assert.equal(indexHtml.includes('user-scalable=no'), true, 'mobile viewport disables browser double-tap zoom');
+  assert.equal(styles.includes('touch-action: pan-y'), true, 'menu panels keep vertical touch scrolling enabled');
+  assert.equal(styles.includes('-webkit-overflow-scrolling: touch'), true, 'menu panels keep momentum scrolling on mobile Safari');
+  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+}
 
 {
   assert.equal(isPortraitViewport({ width: 390, height: 844 }), true, 'portrait viewport is detected');
@@ -574,6 +601,12 @@ const map = new TileMap();
   assert.equal(game.getActiveHotbarItem(), null, 'hotbar slots may be empty');
   assert.equal(game.selectHotbarResource('unknown'), false, 'hotbar selection rejects unknown resources');
   assert.equal(game.activeHotbarSlot, 2, 'invalid hotbar resource does not change selection');
+
+  game.hotbarSlots = ['torch', 'campfire', 'woodWall', 'table'];
+  game.selectInventoryResource('chair');
+  game.handleHotbarSlotClick(3);
+  assert.equal(game.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar keeps exactly four slots after assigning new items');
+  assert.deepEqual(game.hotbarSlots, ['torch', 'campfire', 'woodWall', 'chair'], 'inventory hotbar assignment replaces a slot instead of adding one');
 }
 
 {
@@ -1004,6 +1037,24 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
+  const startTime = game.dayNightSystem.time;
+  game.update(12);
+  assert.ok(game.dayNightSystem.time > startTime, 'day-night time advances during active gameplay');
+
+  game.inventoryOpen = true;
+  const pausedTime = game.dayNightSystem.time;
+  game.update(12);
+  assert.equal(game.dayNightSystem.time, pausedTime, 'day-night time pauses while a menu is open');
+
+  game.dayNightSystem.load(0.72);
+  assert.equal(game.dayNightSystem.getPhase(), 'Dämmerung', 'day-night system reports dusk phase');
+  assert.equal(game.getDebugState().dayNightPhase, 'Dämmerung', 'debug state exposes day-night phase');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
   assert.equal(game.openWorkbenchCrafting(), false, 'workbench crafting does not open away from a placed workbench');
   assert.equal(game.craftingOpen, false, 'failed workbench crafting open keeps menus closed');
   assert.equal(game.crystalSystem.lastMessage, 'Keine Werkbank in Reichweite.', 'failed workbench crafting open writes a clear log');
@@ -1062,9 +1113,29 @@ const map = new TileMap();
     'normal crafting does not show wooden pickaxe recipe'
   );
   assert.equal(
+    crafting.getRecipeStates({ craftingContext: 'normal' }).some((state) => state.recipe.id === 'torch'),
+    true,
+    'normal crafting shows torch recipe'
+  );
+  assert.equal(
+    crafting.getRecipeStates({ craftingContext: 'normal' }).some((state) => state.recipe.id === 'campfire'),
+    true,
+    'normal crafting shows campfire recipe'
+  );
+  assert.equal(
+    crafting.getRecipeStates({ craftingContext: 'normal' }).some((state) => state.recipe.id === 'woodWall'),
+    false,
+    'normal crafting hides workbench building recipes'
+  );
+  assert.equal(
     crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: false }).find((state) => state.recipe.id === 'woodenSpear').isAvailable,
     false,
     'wooden spear recipe is unavailable without workbench access'
+  );
+  assert.equal(
+    crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }).some((state) => state.recipe.id === 'table'),
+    true,
+    'workbench crafting shows table recipe'
   );
   assert.equal(
     crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }).some((state) => state.recipe.id === 'workbench'),
@@ -1099,6 +1170,32 @@ const map = new TileMap();
   assert.equal(inventory.get('fiber'), 0, 'wooden spear crafting consumes fibers');
   assert.equal(inventory.get('woodenSpear'), 1, 'wooden spear crafting adds the tool item');
   assert.equal(spearResult.message, 'Holzspeer hergestellt.', 'wooden spear crafting returns a clear log message');
+
+  inventory.add('rawWood', 1);
+  inventory.add('fiber', 1);
+  const torchResult = crafting.craft('torch');
+  assert.equal(torchResult.crafted, true, 'torch can be crafted in normal crafting');
+  assert.equal(inventory.get('torch'), 1, 'torch crafting adds a torch item');
+  assert.equal(torchResult.message, 'Fackel hergestellt.', 'torch crafting writes a clear log message');
+
+  inventory.add('stone', 3);
+  inventory.add('rawWood', 2);
+  const campfireResult = crafting.craft('campfire');
+  assert.equal(campfireResult.crafted, true, 'campfire can be crafted in normal crafting');
+  assert.equal(inventory.get('campfire'), 1, 'campfire crafting adds a campfire item');
+  assert.equal(campfireResult.message, 'Lagerfeuer hergestellt.', 'campfire crafting writes a clear log message');
+
+  inventory.add('rawWood', 13);
+  inventory.add('fiber', 4);
+  const wallResult = crafting.craft('woodWall', { hasWorkbenchAccess: true });
+  const tableResult = crafting.craft('table', { hasWorkbenchAccess: true });
+  const chairResult = crafting.craft('chair', { hasWorkbenchAccess: true });
+  assert.equal(wallResult.crafted, true, 'wood wall can be crafted near a workbench');
+  assert.equal(tableResult.crafted, true, 'table can be crafted near a workbench');
+  assert.equal(chairResult.crafted, true, 'chair can be crafted near a workbench');
+  assert.equal(inventory.get('woodWall'), 1, 'wood wall crafting adds the buildable item');
+  assert.equal(inventory.get('table'), 1, 'table crafting adds the buildable item');
+  assert.equal(inventory.get('chair'), 1, 'chair crafting adds the buildable item');
 
   inventory.add('rawWood', 12);
   inventory.add('fiber', 12);
@@ -1144,8 +1241,11 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('Hotbar 2: Stein'), true, 'inventory hotbar shows assigned slot labels');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Fackel'), true, 'normal crafting panel shows torch recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Lagerfeuer'), true, 'normal crafting panel shows campfire recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), false, 'normal crafting hides workbench-gated recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), false, 'normal crafting hides wooden spear recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzwand'), false, 'normal crafting hides workbench building recipe');
   assert.equal(craftingPanel.innerHTML.includes('data-craft-select="workbench"'), true, 'normal crafting exposes selectable workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('disabled'), true, 'crafting button is disabled when resources are missing');
 
@@ -1187,6 +1287,9 @@ const map = new TileMap();
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'workbench crafting title is shown');
   assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'workbench crafting shows pickaxe recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), true, 'workbench crafting shows spear recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Holzwand'), true, 'workbench crafting shows wall recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Tisch'), true, 'workbench crafting shows table recipe');
+  assert.equal(craftingPanel.innerHTML.includes('Stuhl'), true, 'workbench crafting shows chair recipe');
   assert.equal(craftingPanel.innerHTML.includes('data-craft-select="woodenPickaxe"'), true, 'crafting list exposes selectable recipes');
 }
 
@@ -1312,12 +1415,36 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
 
+  game.inventory.add('torch', 1);
+  game.selectHotbarResource('torch');
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+  actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 37 });
+  game.update(0.016);
+
+  assert.equal(game.tileMap.getObject(1, 1), 'torch', 'mobile action button places a selected buildable item');
+  assert.equal(game.inventory.get('torch'), 0, 'mobile buildable placement consumes the selected item');
+  assert.equal(game.crystalSystem.lastMessage, 'Fackel platziert.', 'mobile buildable placement writes a placement log');
+}
+
+{
+  const actionButton = createInteractiveRectElement({ left: 800, top: 400, width: 80, height: 80 });
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
+
   actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 32 });
   game.update(0.016);
 
   const totalResources = Object.values(game.inventory.resources).reduce((sum, amount) => sum + amount, 0);
-  assert.equal(totalResources, 1, 'mobile action button activates the crystal when placement is not valid');
-  assert.equal(game.crystalSystem.lastMessage.startsWith('Kristall:'), true, 'mobile crystal action keeps the existing crystal log');
+  assert.equal(totalResources, 0, 'mobile crystal action creates a visible drop instead of direct inventory');
+  assert.equal(game.dropSystem.drops.length, 1, 'mobile crystal action spawns a visible drop');
+  assert.equal(game.crystalSystem.lastMessage.includes('Kristall wirft'), true, 'mobile crystal action logs visible drop spawn');
+  game.player.setPosition(game.dropSystem.drops[0].x - PLAYER_SIZE / 2, game.dropSystem.drops[0].y - PLAYER_SIZE + PLAYER_FOOT_OFFSET);
+  game.update(0.016);
+  assert.equal(Object.values(game.inventory.resources).reduce((sum, amount) => sum + amount, 0), 1, 'player collects visible crystal drop by proximity');
 }
 
 {
@@ -1346,8 +1473,9 @@ const map = new TileMap();
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 33 });
   game.update(0.016);
 
-  assert.equal(game.inventory.get('stone'), 1, 'mobile attack button uses selected pickaxe on the crystal');
-  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'mobile pickaxe attack uses the existing pickaxe crystal logic');
+  assert.equal(game.inventory.get('stone'), 0, 'mobile pickaxe attack creates a visible stone drop first');
+  assert.equal(game.dropSystem.drops[0].resource, 'stone', 'mobile pickaxe attack uses stone drop logic');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein splittert heraus.', 'mobile pickaxe attack logs visible stone drop');
 }
 
 {
@@ -1376,7 +1504,8 @@ const map = new TileMap();
   game.inventory.add('woodenPickaxe', 1);
   game.hotbarSlots[0] = 'woodenPickaxe';
   assert.equal(game.tryAttackAction(), true, 'wooden pickaxe attack works at the crystal');
-  assert.equal(game.inventory.get('stone'), 1, 'wooden pickaxe attack uses stone drop logic');
+  assert.equal(game.inventory.get('stone'), 0, 'wooden pickaxe attack spawns a visible drop before pickup');
+  assert.equal(game.dropSystem.drops[0].resource, 'stone', 'wooden pickaxe attack uses stone drop logic');
   assert.equal(game.attackFeedback.type, 'crystalHit', 'wooden pickaxe attack shows crystal hit feedback');
   assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'wooden pickaxe attack logs the hit');
 
@@ -1534,6 +1663,69 @@ const map = new TileMap();
 }
 
 {
+  const placeables = ['torch', 'campfire', 'woodWall', 'table', 'chair'];
+
+  for (const resource of placeables) {
+    const { Game } = await import('../src/core/game.js');
+    const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+    game.inventory.add(resource, 1);
+    game.selectHotbarResource(resource);
+    game.player.setPosition(
+      0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+      1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+    );
+    game.player.facing = { x: 1, y: 0 };
+
+    assert.equal(game.getPlacementPreview().canPlace, true, `${resource} can be previewed on a free ground tile`);
+    assert.equal(game.tryPlaceSelectedItem(), true, `${resource} can be placed on a free ground tile`);
+    assert.equal(game.tileMap.getObject(1, 1), resource, `${resource} becomes a placed world object`);
+    assert.equal(game.inventory.get(resource), 0, `${resource} placement consumes one item`);
+    assert.equal(game.crystalSystem.lastMessage, `${RESOURCE_LABELS[resource]} platziert.`, `${resource} placement writes a clear log`);
+  }
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.inventory.add('torch', 1);
+  game.inventory.add('table', 1);
+  game.selectHotbarResource('torch');
+  game.player.setPosition(
+    0 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
+    1 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
+  );
+  game.player.facing = { x: 1, y: 0 };
+
+  assert.equal(game.tryPlaceSelectedItem(), true, 'first buildable can occupy a ground tile');
+  game.selectHotbarResource('table');
+  assert.equal(game.tryPlaceSelectedItem(), false, 'second buildable cannot be placed on an occupied tile');
+  assert.equal(game.tileMap.getObject(1, 1), 'torch', 'occupied object tile keeps the first object');
+  assert.equal(game.inventory.get('table'), 1, 'blocked buildable placement does not consume inventory');
+  assert.equal(game.crystalSystem.lastMessage, 'Zielfeld ist bereits belegt.', 'occupied buildable placement writes a clear log');
+}
+
+{
+  const { RenderSystem } = await import('../src/systems/render-system.js');
+  const context = createDrawContext();
+  const renderer = new RenderSystem(context);
+  const tileMap = new TileMap();
+
+  tileMap.setObject(-1, 1, 'torch');
+  tileMap.setObject(1, 1, 'campfire');
+  renderer.renderLighting({ getDarkness: () => 0.52 }, tileMap, { x: 0, y: 0 }, GAME_VIEW);
+
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[2] === GAME_VIEW.width), true, 'night lighting draws a screen darkness overlay');
+  assert.equal(context.calls.filter((call) => call.fn === 'arc').length, 2, 'torch and campfire draw light radii at night');
+
+  const dayContext = createDrawContext();
+  const dayRenderer = new RenderSystem(dayContext);
+  dayRenderer.renderLighting({ getDarkness: () => 0 }, tileMap, { x: 0, y: 0 }, GAME_VIEW);
+  assert.equal(dayContext.calls.length, 0, 'day lighting skips darkness and object lights');
+}
+
+{
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
@@ -1568,7 +1760,7 @@ const map = new TileMap();
   game.player.facing = { x: 1, y: 0 };
 
   assert.equal(game.tryPlaceSelectedItem(), false, 'workbench cannot be placed in the void');
-  assert.equal(game.crystalSystem.lastMessage, 'Werkbank braucht ein vorhandenes Tile.', 'void placement writes a clear log message');
+  assert.equal(game.crystalSystem.lastMessage, 'Hier kann das nicht platziert werden.', 'void placement writes a clear log message');
 }
 
 {
@@ -1711,6 +1903,51 @@ const map = new TileMap();
 }
 
 {
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+
+  game.crystalSystem.random = () => 0.1;
+  assert.equal(game.tryUseCrystal(), true, 'crystal interaction spawns a visible drop');
+  assert.equal(game.inventory.get('earth'), 0, 'crystal interaction does not add resources directly');
+  assert.equal(game.dropSystem.drops.length, 1, 'crystal interaction creates one world drop');
+  assert.equal(game.dropSystem.drops[0].resource, 'earth', 'crystal drop uses weighted base resource roll');
+  const dropTile = game.tileMap.getTileAtWorldPosition(game.dropSystem.drops[0].x, game.dropSystem.drops[0].y);
+  assert.equal(game.tileMap.isGround(dropTile.x, dropTile.y), true, 'visible drop lands on a real ground tile');
+  assert.equal(game.tileMap.isCrystal(dropTile.x, dropTile.y), false, 'visible drop does not land on the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Kristall wirft Erde aus.', 'crystal interaction logs visible drop spawn');
+
+  game.player.setPosition(
+    game.dropSystem.drops[0].x - PLAYER_SIZE / 2,
+    game.dropSystem.drops[0].y - PLAYER_SIZE + PLAYER_FOOT_OFFSET
+  );
+  game.update(0.016);
+  assert.equal(game.dropSystem.drops.length, 0, 'nearby player automatically picks up a visible drop');
+  assert.equal(game.inventory.get('earth'), 1, 'pickup adds dropped resource to inventory');
+  assert.equal(game.crystalSystem.lastMessage, 'Erde eingesammelt.', 'pickup writes a clear log message');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.dropSystem.spawn({
+    resource: 'stone',
+    amount: 1,
+    x: TILE_SIZE * 24,
+    y: TILE_SIZE * 24
+  });
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.dropSystem.drops.length, 1, 'saved visible drops load from storage');
+  const repairedDrop = loadedGame.dropSystem.drops[0];
+  const repairedTile = loadedGame.tileMap.getTileAtWorldPosition(repairedDrop.x, repairedDrop.y);
+  assert.equal(loadedGame.tileMap.isGround(repairedTile.x, repairedTile.y), true, 'invalid saved drop positions are repaired onto ground');
+  assert.equal(loadedGame.tileMap.isCrystal(repairedTile.x, repairedTile.y), false, 'repaired saved drops avoid the crystal');
+}
+
+{
   const storage = createMemoryStorage();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
@@ -1720,6 +1957,11 @@ const map = new TileMap();
   game.inventory.add('workbench', 2);
   game.inventory.add('woodenPickaxe', 1);
   game.inventory.add('woodenSpear', 1);
+  game.inventory.add('torch', 2);
+  game.inventory.add('campfire', 1);
+  game.inventory.add('woodWall', 1);
+  game.inventory.add('table', 1);
+  game.inventory.add('chair', 1);
   game.inventory.add('grassSeed', 1);
   game.selectHotbarResource('earth');
   game.player.setPosition(
@@ -1743,6 +1985,16 @@ const map = new TileMap();
   game.enemySystem.spawnNearCrystal(game.tileMap);
   game.enemySystem.enemies[0].hp = 2;
   game.enemySystem.enemies[0].healthVisible = true;
+  game.tileMap.setObject(-1, 1, 'torch');
+  game.tileMap.setObject(-1, 0, 'campfire');
+  game.tileMap.setObject(1, -1, 'woodWall');
+  game.dropSystem.spawn({
+    resource: 'fiber',
+    amount: 1,
+    x: -1 * TILE_SIZE + TILE_SIZE / 2,
+    y: -1 * TILE_SIZE + TILE_SIZE / 2
+  });
+  game.dayNightSystem.load(0.76);
   for (let index = 1; index <= 6; index += 1) {
     game.setLog(`Log ${index}`);
   }
@@ -1762,12 +2014,23 @@ const map = new TileMap();
   assert.equal(loadedGame.inventory.get('workbench'), 1, 'saved workbench item count loads from local storage');
   assert.equal(loadedGame.inventory.get('woodenPickaxe'), 1, 'saved wooden pickaxe item count loads from local storage');
   assert.equal(loadedGame.inventory.get('woodenSpear'), 1, 'saved wooden spear item count loads from local storage');
+  assert.equal(loadedGame.inventory.get('torch'), 2, 'saved torch count loads from local storage');
+  assert.equal(loadedGame.inventory.get('campfire'), 1, 'saved campfire count loads from local storage');
+  assert.equal(loadedGame.inventory.get('woodWall'), 1, 'saved wood wall count loads from local storage');
+  assert.equal(loadedGame.inventory.get('table'), 1, 'saved table count loads from local storage');
+  assert.equal(loadedGame.inventory.get('chair'), 1, 'saved chair count loads from local storage');
   assert.equal(loadedGame.tileMap.getTile(1, 1), 'grass', 'saved grass tile loads from local storage');
   assert.equal(loadedGame.tileMap.getObject(2, 0), 'workbench', 'saved placed workbench loads as world object');
+  assert.equal(loadedGame.tileMap.getObject(-1, 1), 'torch', 'saved placed torch loads as world object');
+  assert.equal(loadedGame.tileMap.getObject(-1, 0), 'campfire', 'saved placed campfire loads as world object');
+  assert.equal(loadedGame.tileMap.getObject(1, -1), 'woodWall', 'saved placed wood wall loads as world object');
   assert.deepEqual(loadedGame.player.getTilePosition(), { x: 1, y: 1 }, 'saved player position loads from local storage');
   assert.equal(loadedGame.enemySystem.activeCount(), 1, 'saved active enemy loads from local storage');
   assert.equal(loadedGame.enemySystem.enemies[0].hp, 2, 'saved enemy hit points load from local storage');
   assert.equal(loadedGame.enemySystem.enemies[0].healthVisible, true, 'saved enemy health-bar state loads from local storage');
+  assert.equal(loadedGame.dropSystem.drops.length, 1, 'saved visible drops load from local storage');
+  assert.equal(loadedGame.dropSystem.drops[0].resource, 'fiber', 'saved visible drop resource loads from local storage');
+  assert.equal(loadedGame.dayNightSystem.time, 0.76, 'saved day-night time loads from local storage');
   assert.equal(loadedGame.logSystem.toJSON().length, 5, 'loaded log keeps at most five entries');
   assert.equal(loadedGame.logSystem.toJSON().includes('Log 6'), true, 'saved log entries load from local storage');
 
@@ -1803,9 +2066,23 @@ const map = new TileMap();
   game.inventory.add('workbench', 1);
   game.inventory.add('woodenPickaxe', 1);
   game.inventory.add('woodenSpear', 1);
+  game.inventory.add('torch', 1);
+  game.inventory.add('campfire', 1);
+  game.inventory.add('woodWall', 1);
+  game.inventory.add('table', 1);
+  game.inventory.add('chair', 1);
   game.tileMap.setWorkbench(1, 1);
+  game.tileMap.setObject(-1, 1, 'torch');
+  game.tileMap.setObject(-1, 0, 'campfire');
+  game.tileMap.setObject(1, -1, 'table');
   game.tileMap.setGrass(1, 0);
   game.tileMap.setStone(2, 0);
+  game.dropSystem.spawn({
+    resource: 'earth',
+    x: TILE_SIZE + TILE_SIZE / 2,
+    y: TILE_SIZE / 2
+  });
+  game.dayNightSystem.load(0.88);
   game.enemySystem.spawnNearCrystal(game.tileMap);
   game.hotbarSlots = ['stone', 'woodenPickaxe', null, 'woodenSpear'];
   game.activeHotbarSlot = 3;
@@ -1822,9 +2099,19 @@ const map = new TileMap();
   assert.equal(game.inventory.get('workbench'), 0, 'reset clears crafted workbench items');
   assert.equal(game.inventory.get('woodenPickaxe'), 0, 'reset clears crafted wooden pickaxes');
   assert.equal(game.inventory.get('woodenSpear'), 0, 'reset clears crafted wooden spears');
+  assert.equal(game.inventory.get('torch'), 0, 'reset clears torch items');
+  assert.equal(game.inventory.get('campfire'), 0, 'reset clears campfire items');
+  assert.equal(game.inventory.get('woodWall'), 0, 'reset clears wood wall items');
+  assert.equal(game.inventory.get('table'), 0, 'reset clears table items');
+  assert.equal(game.inventory.get('chair'), 0, 'reset clears chair items');
   assert.equal(game.tileMap.getObject(1, 1), null, 'reset clears placed workbenches');
+  assert.equal(game.tileMap.getObject(-1, 1), null, 'reset clears placed torches');
+  assert.equal(game.tileMap.getObject(-1, 0), null, 'reset clears placed campfires');
+  assert.equal(game.tileMap.getObject(1, -1), null, 'reset clears placed furniture');
   assert.equal(game.tileMap.getTile(1, 0), 'earth', 'reset restores grass tiles back to the start island earth');
   assert.equal(game.tileMap.getTile(2, 0), null, 'reset clears placed stone tiles outside the start island');
+  assert.equal(game.dropSystem.drops.length, 0, 'reset removes visible drops');
+  assert.equal(game.dayNightSystem.time, DAY_NIGHT_START_TIME, 'reset restores start day-night time');
   assert.deepEqual(game.hotbarSlots, DEFAULT_HOTBAR_SLOTS, 'reset restores default hotbar assignment');
   assert.equal(game.activeHotbarSlot, 0, 'reset restores first active hotbar slot');
   assert.equal(game.enemySystem.activeCount(), 0, 'reset removes active enemies');
@@ -1944,8 +2231,10 @@ const map = new TileMap();
 
   game.tryAttackAction();
 
-  assert.equal(game.inventory.get('stone'), 1, 'wooden pickaxe attack unlocks stone drops at the crystal');
-  assert.equal(game.crystalSystem.lastMessage, 'Stein erhalten.', 'pickaxe attack writes the drop log');
+  assert.equal(game.inventory.get('stone'), 0, 'wooden pickaxe attack spawns stone before pickup');
+  assert.equal(game.dropSystem.drops.length, 1, 'wooden pickaxe attack creates a visible drop');
+  assert.equal(game.dropSystem.drops[0].resource, 'stone', 'wooden pickaxe attack unlocks stone drops at the crystal');
+  assert.equal(game.crystalSystem.lastMessage, 'Stein splittert heraus.', 'pickaxe attack writes the visible drop log');
   assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'pickaxe attack logs the crystal hit feedback');
 }
 

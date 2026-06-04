@@ -1,4 +1,4 @@
-import { OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
+import { DROP_ANIMATION_SECONDS, OBJECT_TYPES, PLAYER_SIZE, RESOURCE_ICONS, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 import { TerrainRenderer } from './terrain-renderer.js';
 
 export class RenderSystem {
@@ -81,7 +81,44 @@ export class RenderSystem {
       if (object.type === OBJECT_TYPES.workbench) {
         this.drawWorkbench(screenX, screenY);
       }
+      if (object.type === OBJECT_TYPES.torch) {
+        this.drawTorch(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.campfire) {
+        this.drawCampfire(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.woodWall) {
+        this.drawWoodWall(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.table) {
+        this.drawTable(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.chair) {
+        this.drawChair(screenX, screenY);
+      }
     });
+  }
+
+  renderDrops(drops, camera) {
+    for (const drop of drops) {
+      const progress = Math.min(1, drop.age / (drop.duration || DROP_ANIMATION_SECONDS));
+      const arc = Math.sin(progress * Math.PI) * 18;
+      const worldX = drop.startX + (drop.x - drop.startX) * progress;
+      const worldY = drop.startY + (drop.y - drop.startY) * progress - arc;
+      const x = Math.round(worldX - camera.x);
+      const y = Math.round(worldY - camera.y);
+
+      this.context.save();
+      this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
+      this.context.fillRect(x - 7, Math.round(drop.y - camera.y) + 8, 14, 4);
+      this.context.fillStyle = '#f7d979';
+      this.context.fillRect(x - 6, y - 8, 12, 12);
+      this.context.fillStyle = '#5b3b2c';
+      this.context.font = '10px monospace';
+      this.context.textAlign = 'center';
+      this.context.fillText?.(RESOURCE_ICONS[drop.resource] || '?', x, y + 2);
+      this.context.restore();
+    }
   }
 
   renderEnemies(enemies, camera) {
@@ -210,6 +247,95 @@ export class RenderSystem {
     this.context.fillStyle = '#d2a06a';
     this.context.fillRect(x + 10, y + 11, 4, 3);
     this.context.fillRect(x + 18, y + 11, 4, 3);
+    this.context.restore();
+  }
+
+  drawTorch(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#5b331c';
+    this.context.fillRect(x + 14, y + 12, 4, 16);
+    this.context.fillStyle = '#ffb33c';
+    this.context.fillRect(x + 12, y + 8, 8, 7);
+    this.context.fillStyle = '#ffe889';
+    this.context.fillRect(x + 14, y + 6, 4, 6);
+    this.context.restore();
+  }
+
+  drawCampfire(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#3b281d';
+    this.context.fillRect(x + 7, y + 22, 18, 5);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 6, y + 19, 20, 4);
+    this.context.fillStyle = '#e7442e';
+    this.context.fillRect(x + 11, y + 11, 10, 10);
+    this.context.fillStyle = '#ffb33c';
+    this.context.fillRect(x + 13, y + 8, 6, 11);
+    this.context.fillStyle = '#ffe889';
+    this.context.fillRect(x + 15, y + 10, 2, 7);
+    this.context.restore();
+  }
+
+  drawWoodWall(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#3a2418';
+    this.context.fillRect(x + 5, y + 6, 22, 23);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 7, y + 8, 5, 19);
+    this.context.fillRect(x + 14, y + 8, 5, 19);
+    this.context.fillRect(x + 21, y + 8, 4, 19);
+    this.context.fillStyle = '#c08a53';
+    this.context.fillRect(x + 7, y + 12, 18, 2);
+    this.context.restore();
+  }
+
+  drawTable(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#3a2418';
+    this.context.fillRect(x + 7, y + 15, 18, 8);
+    this.context.fillStyle = '#b57a45';
+    this.context.fillRect(x + 5, y + 11, 22, 7);
+    this.context.fillStyle = '#2e1d14';
+    this.context.fillRect(x + 8, y + 22, 3, 7);
+    this.context.fillRect(x + 21, y + 22, 3, 7);
+    this.context.restore();
+  }
+
+  drawChair(x, y) {
+    this.context.save();
+    this.context.fillStyle = '#7d4e2d';
+    this.context.fillRect(x + 11, y + 8, 10, 13);
+    this.context.fillStyle = '#b57a45';
+    this.context.fillRect(x + 9, y + 19, 14, 7);
+    this.context.fillStyle = '#2e1d14';
+    this.context.fillRect(x + 10, y + 25, 3, 5);
+    this.context.fillRect(x + 20, y + 25, 3, 5);
+    this.context.restore();
+  }
+
+  renderLighting(dayNightSystem, tileMap, camera, view) {
+    const darkness = dayNightSystem.getDarkness();
+    if (darkness <= 0) return;
+
+    this.context.save();
+    this.context.fillStyle = `rgba(12, 20, 43, ${darkness})`;
+    this.context.fillRect(0, 0, view.width, view.height);
+
+    tileMap.forEachObject((object) => {
+      if (object.type !== OBJECT_TYPES.torch && object.type !== OBJECT_TYPES.campfire) return;
+      const radius = object.type === OBJECT_TYPES.campfire ? 78 : 48;
+      const x = object.x * TILE_SIZE + TILE_SIZE / 2 - camera.x;
+      const y = object.y * TILE_SIZE + TILE_SIZE / 2 - camera.y;
+      this.context.globalAlpha = object.type === OBJECT_TYPES.campfire ? 0.26 : 0.18;
+      this.context.fillStyle = '#ffe889';
+      if (this.context.beginPath && this.context.arc && this.context.fill) {
+        this.context.beginPath();
+        this.context.arc(x, y, radius, 0, Math.PI * 2);
+        this.context.fill();
+      } else {
+        this.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      }
+    });
     this.context.restore();
   }
 
