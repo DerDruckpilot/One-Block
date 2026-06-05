@@ -111,7 +111,7 @@ export class Game {
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
-    this.hud = new Hud(hudElement);
+    this.hud = new Hud(hudElement, options.heartElement);
     this.hotbar = new Hotbar(options.hotbarElement);
     this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({

@@ -2185,7 +2185,9 @@ const map = new TileMap();
 
 {
   const element = { innerHTML: '' };
+  const heartElement = { innerHTML: '' };
   const hud = new Hud(element);
+  const detachedHeartHud = new Hud(element, heartElement);
   const debug = {
     playerX: 0,
     playerY: 0,
@@ -2219,6 +2221,17 @@ const map = new TileMap();
   });
   assert.equal(element.innerHTML.includes('<strong>Debug:</strong>'), true, 'HUD shows debug information when enabled');
   assert.equal(element.innerHTML.includes('save: saved'), true, 'debug HUD shows save status');
+
+  detachedHeartHud.update({
+    inventory: {},
+    hint: 'Neues Spiel gestartet.',
+    debug,
+    debugEnabled: true,
+    hearts: ['full', 'half', 'empty'],
+    resetHoldSeconds: 0
+  });
+  assert.equal(element.innerHTML.includes('heart-hud'), false, 'detached heart HUD is not rendered inside the log HUD');
+  assert.equal(heartElement.innerHTML.includes('heart-full'), true, 'detached heart HUD receives heart markup');
 }
 
 {

@@ -3,6 +3,7 @@ import { updateOrientationState } from './ui/orientation.js';
 
 const canvas = document.querySelector('#game');
 const hudElement = document.querySelector('#hud-content');
+const heartElement = document.querySelector('#heart-hud');
 const hotbarElement = document.querySelector('#hotbar');
 const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
@@ -35,6 +36,7 @@ const game = new Game(canvas, hudElement, {
   craftingPanel,
   cookingPanel,
   furnacePanel,
+  heartElement,
   hotbarElement,
   inventoryButton,
   inventoryPanel,
