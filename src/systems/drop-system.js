@@ -15,7 +15,14 @@ const VALID_DROP_RESOURCES = new Set([
   'treeSeed',
   'springDrop',
   'berry',
-  'rawMeat'
+  'rawMeat',
+  'egg',
+  'friedEgg',
+  'clayBrick',
+  'unfiredBowl',
+  'bowl',
+  'unfiredJug',
+  'jug'
 ]);
 
 const DROP_TILE_OFFSET = 8;

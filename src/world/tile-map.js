@@ -77,6 +77,12 @@ export class TileMap {
     this.objects.set(keyOf(x, y), type);
     if (OPENABLE_BARRIERS.has(type)) {
       this.objectStates.set(keyOf(x, y), { open: false });
+    } else if (type === OBJECT_TYPES.chickenNest) {
+      this.objectStates.set(keyOf(x, y), { eggTimer: 0 });
+    } else if (type === OBJECT_TYPES.feedTrough) {
+      this.objectStates.set(keyOf(x, y), { feed: 0 });
+    } else if (type === OBJECT_TYPES.waterTrough) {
+      this.objectStates.set(keyOf(x, y), { filled: false });
     } else if (![OBJECT_TYPES.sapling, OBJECT_TYPES.tree, OBJECT_TYPES.berryBush].includes(type)) {
       this.objectStates.delete(keyOf(x, y));
     }
@@ -139,6 +145,12 @@ export class TileMap {
         this.objects.set(keyOf(object.x, object.y), object.type);
         if (OPENABLE_BARRIERS.has(object.type)) {
           this.objectStates.set(keyOf(object.x, object.y), { open: object.open === true });
+        } else if (object.type === OBJECT_TYPES.chickenNest) {
+          this.objectStates.set(keyOf(object.x, object.y), { eggTimer: Math.max(0, Number(object.eggTimer || 0)) });
+        } else if (object.type === OBJECT_TYPES.feedTrough) {
+          this.objectStates.set(keyOf(object.x, object.y), { feed: Math.max(0, Number(object.feed || 0)) });
+        } else if (object.type === OBJECT_TYPES.waterTrough) {
+          this.objectStates.set(keyOf(object.x, object.y), { filled: object.filled === true });
         }
       }
     }

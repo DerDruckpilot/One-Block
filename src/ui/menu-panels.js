@@ -10,23 +10,27 @@ import {
 } from '../config/constants.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel }) {
+  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
     this.buildPanel = buildPanel;
     this.cookingPanel = cookingPanel;
+    this.furnacePanel = furnacePanel;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
     this.lastBuildHtml = '';
     this.lastCookingHtml = '';
+    this.lastFurnaceHtml = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
     this.selectedCookingRecipeId = null;
+    this.selectedFurnaceRecipeId = null;
     this.craftingScrollTop = {
       normal: 0,
       workbench: 0,
-      cooking: 0
+      cooking: 0,
+      furnace: 0
     };
 
     this.inventoryPanel?.addEventListener?.('input', (event) => {
@@ -45,6 +49,8 @@ export class MenuPanels {
     cookingRecipeStates = [],
     craftingContext = 'normal',
     craftingOpen,
+    furnaceOpen = false,
+    furnaceRecipeStates = [],
     hotbarSlots = [],
     activeHotbarSlot = 0,
     inventory,
@@ -55,6 +61,7 @@ export class MenuPanels {
     this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
     this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
+    this.renderFurnace(inventory, furnaceOpen, furnaceRecipeStates);
     this.renderBuildMenu(inventory, buildOpen, buildSelectedResource, buildRemoveMode);
   }
 
@@ -78,6 +85,11 @@ export class MenuPanels {
   selectCookingRecipe(recipeId) {
     this.selectedCookingRecipeId = recipeId;
     this.lastCookingHtml = '';
+  }
+
+  selectFurnaceRecipe(recipeId) {
+    this.selectedFurnaceRecipeId = recipeId;
+    this.lastFurnaceHtml = '';
   }
 
   renderCloseButton(menuId) {
@@ -229,6 +241,31 @@ export class MenuPanels {
     `);
   }
 
+  renderFurnace(inventory, isOpen, recipeStates) {
+    if (!this.furnacePanel) return;
+    this.furnacePanel.hidden = !isOpen;
+
+    if (!isOpen) {
+      this.setFurnaceHtml('');
+      return;
+    }
+
+    const selectedState = this.getSelectedRecipeState(recipeStates, this.selectedFurnaceRecipeId);
+    const recipes = recipeStates.map((recipeState) => this.renderRecipeListItem(recipeState, selectedState, 'furnace-select')).join('');
+    const detail = selectedState
+      ? this.renderRecipeDetail(inventory, selectedState, { buttonLabel: 'Brennen', buttonDataset: 'furnace' })
+      : '<div class="recipe-detail-empty">Keine Ofenrezepte verfuegbar.</div>';
+
+    this.setFurnaceHtml(`
+      ${this.renderCloseButton('furnace')}
+      <div class="menu-frame-title">Ofen</div>
+      <div class="crafting-layout">
+        <div class="recipe-list" data-craft-scroll="furnace">${recipes}</div>
+        <div class="recipe-detail">${detail}</div>
+      </div>
+    `);
+  }
+
   getSelectedRecipeState(recipeStates, selectedRecipeId = null) {
     if (!recipeStates.length) return null;
     const selected = recipeStates.find((recipeState) => recipeState.recipe.id === selectedRecipeId);
@@ -373,6 +410,21 @@ export class MenuPanels {
       this.cookingPanel.innerHTML = html;
       this.lastCookingHtml = html;
       const nextList = this.cookingPanel?.querySelector?.('[data-craft-scroll]');
+      if (nextList?.dataset?.craftScroll) {
+        nextList.scrollTop = this.craftingScrollTop[nextList.dataset.craftScroll] || 0;
+      }
+    }
+  }
+
+  setFurnaceHtml(html) {
+    if (html !== this.lastFurnaceHtml) {
+      const currentList = this.furnacePanel?.querySelector?.('[data-craft-scroll]');
+      if (currentList?.dataset?.craftScroll) {
+        this.craftingScrollTop[currentList.dataset.craftScroll] = currentList.scrollTop;
+      }
+      this.furnacePanel.innerHTML = html;
+      this.lastFurnaceHtml = html;
+      const nextList = this.furnacePanel?.querySelector?.('[data-craft-scroll]');
       if (nextList?.dataset?.craftScroll) {
         nextList.scrollTop = this.craftingScrollTop[nextList.dataset.craftScroll] || 0;
       }

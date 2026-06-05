@@ -6,7 +6,10 @@ import {
   DAY_NIGHT_PHASES,
   DAY_NIGHT_START_TIME,
   CRYSTAL_INTERACTION_DISTANCE,
+  CRYSTAL_LEVEL_THRESHOLDS,
   DEFAULT_HOTBAR_SLOTS,
+  EGG_PRODUCTION_SECONDS,
+  FURNACE_INTERACTION_DISTANCE,
   GAME_VIEW,
   HOTBAR_SLOT_COUNT,
   BOW_RANGE,
@@ -218,7 +221,7 @@ const map = new TileMap();
   assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
-  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
 {
@@ -4051,9 +4054,10 @@ const map = new TileMap();
   const craftingPanel = { hidden: true, innerHTML: '' };
   const buildPanel = { hidden: true, innerHTML: '' };
   const cookingPanel = { hidden: true, innerHTML: '' };
+  const furnacePanel = { hidden: true, innerHTML: '' };
   const inventory = new ResourceInventory();
   const crafting = new CraftingSystem(inventory);
-  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel });
+  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel });
 
   menus.update({
     inventory,
@@ -4061,8 +4065,10 @@ const map = new TileMap();
     craftingOpen: true,
     buildOpen: true,
     cookingOpen: true,
+    furnaceOpen: true,
     recipeStates: crafting.getRecipeStates({ craftingContext: 'normal' }),
     cookingRecipeStates: crafting.getRecipeStates({ craftingContext: 'cooking' }),
+    furnaceRecipeStates: crafting.getRecipeStates({ craftingContext: 'furnace' }),
     hotbarSlots: [...DEFAULT_HOTBAR_SLOTS]
   });
 
@@ -4070,6 +4076,7 @@ const map = new TileMap();
   assert.equal(craftingPanel.innerHTML.includes('data-menu-close="crafting"'), true, 'crafting menu has an X close button');
   assert.equal(buildPanel.innerHTML.includes('data-menu-close="build"'), true, 'build menu has an X close button');
   assert.equal(cookingPanel.innerHTML.includes('data-menu-close="cooking"'), true, 'cooking menu has an X close button');
+  assert.equal(furnacePanel.innerHTML.includes('data-menu-close="furnace"'), true, 'furnace menu has an X close button');
 
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
@@ -4077,10 +4084,12 @@ const map = new TileMap();
   game.craftingOpen = true;
   game.buildOpen = true;
   game.cookingOpen = true;
+  game.furnaceOpen = true;
   game.closeMenu('inventory');
   game.closeMenu('crafting');
   game.closeMenu('build');
   game.closeMenu('cooking');
+  game.closeMenu('furnace');
   assert.equal(game.isGamePaused(), false, 'closing all menus through X handlers resumes gameplay');
 }
 
@@ -4136,6 +4145,193 @@ const map = new TileMap();
   assert.equal(game.tryContextAction(), true, 'action priority uses active food before campfire cooking');
   assert.equal(game.cookingOpen, false, 'food action does not open cooking menu first');
   assert.equal(game.player.hp, 5, 'food priority heals the player');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  const normalIds = crafting.getRecipeStates({ craftingContext: 'normal' }).map((state) => state.recipe.id);
+  const cookingIds = crafting.getRecipeStates({ craftingContext: 'cooking' }).map((state) => state.recipe.id);
+  const furnaceIds = crafting.getRecipeStates({ craftingContext: 'furnace' }).map((state) => state.recipe.id);
+  const workbenchIds = crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }).map((state) => state.recipe.id);
+
+  assert.equal(normalIds.includes('unfiredBowl'), true, 'unfired bowl is a normal crafting recipe');
+  assert.equal(normalIds.includes('unfiredJug'), true, 'unfired jug is a normal crafting recipe');
+  assert.equal(cookingIds.includes('friedEgg'), true, 'fried egg appears in cooking recipes');
+  assert.equal(furnaceIds.includes('clayBrick'), true, 'clay brick appears in furnace recipes');
+  assert.equal(furnaceIds.includes('bowl'), true, 'bowl appears in furnace recipes');
+  assert.equal(furnaceIds.includes('jug'), true, 'jug appears in furnace recipes');
+  assert.equal(normalIds.includes('clayBrick'), false, 'furnace recipes do not leak into normal crafting');
+  assert.equal(workbenchIds.includes('friedEgg'), false, 'cooking recipes do not leak into workbench crafting');
+
+  inventory.add('rawWood', 20);
+  inventory.add('fiber', 20);
+  inventory.add('clay', 20);
+  inventory.add('stone', 20);
+  assert.equal(crafting.craft('chickenNest', { craftingContext: 'workbench', hasWorkbenchAccess: true }).crafted, true, 'chicken nest can be crafted at workbench');
+  assert.equal(crafting.craft('feedTrough', { craftingContext: 'workbench', hasWorkbenchAccess: true }).crafted, true, 'feed trough can be crafted at workbench');
+  assert.equal(crafting.craft('waterTrough', { craftingContext: 'workbench', hasWorkbenchAccess: true }).crafted, true, 'water trough can be crafted at workbench');
+  assert.equal(crafting.craft('furnace', { craftingContext: 'workbench', hasWorkbenchAccess: true }).crafted, true, 'furnace can be crafted at workbench');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('chickenNest', 1);
+  game.inventory.add('feedTrough', 1);
+  game.inventory.add('waterTrough', 1);
+  game.inventory.add('furnace', 1);
+
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  game.selectHotbarResource('chickenNest');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'chicken nest can be placed');
+  setGamePlayerOnTile(game, 0, 1, { x: -1, y: 0 });
+  game.selectHotbarResource('feedTrough');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'feed trough can be placed');
+  setGamePlayerOnTile(game, -1, 0, { x: 0, y: -1 });
+  game.selectHotbarResource('waterTrough');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'water trough can be placed');
+  setGamePlayerOnTile(game, 0, 1, { x: 0, y: 1 });
+  game.tileMap.setEarth(0, 2);
+  game.selectHotbarResource('furnace');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'furnace can be placed');
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.chickenNest, 'chicken nest saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(-1, 1), OBJECT_TYPES.feedTrough, 'feed trough saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(-1, -1), OBJECT_TYPES.waterTrough, 'water trough saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(0, 2), OBJECT_TYPES.furnace, 'furnace saves and loads');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.chickenNest);
+  game.tileMap.setObject(0, 1, OBJECT_TYPES.feedTrough);
+  game.tileMap.setObjectState(0, 1, { feed: 2 });
+  game.animalSystem.animals.push(Animal.fromTile({ x: 1, y: 0 }));
+  game.updateHusbandry(EGG_PRODUCTION_SECONDS + 0.1);
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'egg'), true, 'chicken near supplied nest produces an egg drop');
+  assert.equal(game.tileMap.objectsToJSON().find((object) => object.x === 0 && object.y === 1).feed, 1, 'egg production consumes feed');
+  const eggStorage = createMemoryStorage();
+  game.saveSystem = new SaveSystem(eggStorage);
+  game.saveGame();
+  const { Game: EggLoadGame } = await import('../src/core/game.js');
+  const eggLoadedGame = new EggLoadGame({ getContext: () => ({}) }, { innerHTML: '' }, { storage: eggStorage });
+  assert.equal(eggLoadedGame.dropSystem.drops.some((drop) => drop.resource === 'egg'), true, 'egg drop saves and loads');
+
+  const pausedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  pausedGame.tileMap.setObject(1, 1, OBJECT_TYPES.chickenNest);
+  pausedGame.tileMap.setObject(0, 1, OBJECT_TYPES.feedTrough);
+  pausedGame.tileMap.setObjectState(0, 1, { feed: 2 });
+  pausedGame.animalSystem.animals.push(Animal.fromTile({ x: 1, y: 0 }));
+  pausedGame.inventoryOpen = true;
+  pausedGame.update(EGG_PRODUCTION_SECONDS + 0.1);
+  assert.equal(pausedGame.dropSystem.drops.some((drop) => drop.resource === 'egg'), false, 'menu pause stops egg production timer');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('berry', 1);
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.feedTrough);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryContextAction(), true, 'action near feed trough fills it');
+  assert.equal(game.tileMap.objectsToJSON().find((object) => object.x === 1 && object.y === 1).feed, 2, 'feed trough stores fill level');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.objectsToJSON().find((object) => object.x === 1 && object.y === 1).feed, 2, 'feed level saves and loads');
+
+  const waterGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  waterGame.tileMap.setWater(1, 0);
+  waterGame.tileMap.setObject(1, 1, OBJECT_TYPES.waterTrough);
+  setGamePlayerOnTile(waterGame, 0, 1, { x: 1, y: 0 });
+  assert.equal(waterGame.tryContextAction(), true, 'action near water trough fills it near water');
+  assert.equal(waterGame.tileMap.objectsToJSON().find((object) => object.x === 1 && object.y === 1).filled, true, 'water trough stores filled state');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('egg', 2);
+  game.player.setHp(4);
+  game.selectHotbarResource('egg');
+  assert.equal(game.tryContextAction(), true, 'raw egg can be eaten through context action');
+  assert.equal(game.player.hp, 5, 'raw egg heals one HP');
+  assert.equal(game.inventory.get('egg'), 1, 'raw egg is consumed when healing');
+  game.player.restoreHp();
+  assert.equal(game.tryContextAction(), true, 'raw egg action is handled at full HP');
+  assert.equal(game.inventory.get('egg'), 1, 'raw egg is not consumed at full HP');
+  assert.equal(game.tryCook('friedEgg'), true, 'fried egg can be cooked from an egg');
+  game.player.setHp(3);
+  game.selectHotbarResource('friedEgg');
+  assert.equal(game.tryContextAction(), true, 'fried egg can be eaten');
+  assert.equal(game.player.hp, 5, 'fried egg heals two HP');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.inventory.get('friedEgg'), 0, 'eaten fried egg save/load state is kept');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.furnace);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryContextAction(), true, 'action near furnace opens furnace menu');
+  assert.equal(game.furnaceOpen, true, 'furnace menu opens');
+  assert.equal(game.isGamePaused(), true, 'furnace menu pauses gameplay');
+  game.closeMenu('furnace');
+  assert.equal(game.isGamePaused(), false, 'furnace close resumes gameplay');
+
+  game.inventory.add('clay', 4);
+  game.inventory.add('unfiredBowl', 1);
+  game.inventory.add('unfiredJug', 1);
+  assert.equal(game.tryFurnace('clayBrick'), true, 'clay brick can be fired in furnace');
+  assert.equal(game.inventory.get('clayBrick'), 1, 'furnace adds clay brick');
+  assert.equal(game.tryFurnace('bowl'), true, 'bowl can be fired in furnace');
+  assert.equal(game.inventory.get('bowl'), 1, 'furnace adds bowl');
+  assert.equal(game.tryFurnace('jug'), true, 'jug can be fired in furnace');
+  assert.equal(game.inventory.get('jug'), 1, 'furnace adds jug');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.inventory.get('clayBrick'), 1, 'clay brick saves and loads');
+  assert.equal(loadedGame.inventory.get('bowl'), 1, 'bowl saves and loads');
+  assert.equal(loadedGame.inventory.get('jug'), 1, 'jug saves and loads');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  assert.equal(game.crystalLevel, 1, 'crystal starts at level 1');
+  game.advanceCrystalProgress(CRYSTAL_LEVEL_THRESHOLDS[0].xp - 1);
+  assert.equal(game.crystalLevel, 1, 'crystal stays level 1 before threshold');
+  game.advanceCrystalProgress(1);
+  assert.equal(game.crystalLevel, 2, 'crystal reaches level 2 at threshold');
+  assert.equal(game.getCrystalDropTable().some((drop) => drop.resource === 'clay'), true, 'level 2 crystal drop table includes clay');
+  game.advanceCrystalProgress(CRYSTAL_LEVEL_THRESHOLDS[1].xp - CRYSTAL_LEVEL_THRESHOLDS[0].xp);
+  assert.equal(game.crystalLevel, 3, 'crystal reaches level 3 at threshold');
+  assert.equal(game.getCrystalDropTable().some((drop) => drop.resource === 'springDrop'), true, 'level 3 crystal drop table includes spring drops');
+  game.consumeCrystalLevelUpMessage();
+  assert.equal(game.logSystem.toJSON().some((entry) => entry.includes('Kristall erreicht Stufe')), true, 'crystal level up logs a message');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.advanceCrystalProgress(80);
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.crystalLevel, 3, 'crystal level saves and loads');
+  assert.equal(loadedGame.crystalXp, 80, 'crystal XP saves and loads');
+  loadedGame.resetGame();
+  assert.equal(loadedGame.crystalLevel, 1, 'reset restores crystal level 1');
+  assert.equal(loadedGame.crystalXp, 0, 'reset clears crystal XP');
 }
 
 console.log('Gameplay-Basics OK.');

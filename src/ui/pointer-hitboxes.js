@@ -8,13 +8,16 @@ export class PointerHitboxSystem {
     craftingPanel,
     getCookingOpen = () => false,
     getCraftingOpen = () => false,
+    getFurnaceOpen = () => false,
     getInventoryOpen = () => false,
     getBuildOpen = () => false,
+    furnacePanel,
     hotbarElement,
     inventoryButton,
     inventoryPanel,
     onBlockedCook = () => {},
     onBlockedCraft = () => {},
+    onBlockedFurnace = () => {},
     onBuildItemSelect = () => {},
     onBuildRemoveToggle = () => {},
     onBuildToggle = () => {},
@@ -23,6 +26,8 @@ export class PointerHitboxSystem {
     onCraft = () => {},
     onCraftSelect = () => {},
     onCraftingToggle = () => {},
+    onFurnace = () => {},
+    onFurnaceSelect = () => {},
     onHotbarSelect = () => {},
     onInventoryItemSelect = () => {},
     onInventoryTabSelect = () => {},
@@ -38,13 +43,16 @@ export class PointerHitboxSystem {
     this.craftingPanel = craftingPanel;
     this.getCookingOpen = getCookingOpen;
     this.getCraftingOpen = getCraftingOpen;
+    this.getFurnaceOpen = getFurnaceOpen;
     this.getInventoryOpen = getInventoryOpen;
     this.getBuildOpen = getBuildOpen;
+    this.furnacePanel = furnacePanel;
     this.hotbarElement = hotbarElement;
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
     this.onBlockedCook = onBlockedCook;
     this.onBlockedCraft = onBlockedCraft;
+    this.onBlockedFurnace = onBlockedFurnace;
     this.onBuildItemSelect = onBuildItemSelect;
     this.onBuildRemoveToggle = onBuildRemoveToggle;
     this.onBuildToggle = onBuildToggle;
@@ -53,6 +61,8 @@ export class PointerHitboxSystem {
     this.onCraft = onCraft;
     this.onCraftSelect = onCraftSelect;
     this.onCraftingToggle = onCraftingToggle;
+    this.onFurnace = onFurnace;
+    this.onFurnaceSelect = onFurnaceSelect;
     this.onHotbarSelect = onHotbarSelect;
     this.onInventoryItemSelect = onInventoryItemSelect;
     this.onInventoryTabSelect = onInventoryTabSelect;
@@ -196,6 +206,37 @@ export class PointerHitboxSystem {
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
+    if (this.getFurnaceOpen()) {
+      for (const closeButton of Array.from(this.furnacePanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-furnace', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
+      for (const furnaceButton of Array.from(this.furnacePanel?.querySelectorAll?.('[data-furnace]') || [])) {
+        if (!furnaceButton.dataset.furnace) continue;
+        const furnaceButtonHitbox = this.createElementHitbox(furnaceButton, `furnace-${furnaceButton.dataset.furnace}`, () => {
+          if (furnaceButton.disabled) {
+            this.onBlockedFurnace(furnaceButton.dataset.furnace);
+            return;
+          }
+          this.onFurnace(furnaceButton.dataset.furnace);
+        });
+        if (furnaceButtonHitbox) hitboxes.push(furnaceButtonHitbox);
+      }
+
+      for (const recipeButton of Array.from(this.furnacePanel?.querySelectorAll?.('[data-furnace-select]') || [])) {
+        if (!recipeButton.dataset.furnaceSelect) continue;
+        const recipeHitbox = this.createElementHitbox(recipeButton, `furnace-recipe-${recipeButton.dataset.furnaceSelect}`, () => {
+          this.onFurnaceSelect(recipeButton.dataset.furnaceSelect);
+        });
+        if (recipeHitbox) hitboxes.push(recipeHitbox);
+      }
+
+      const panelHitbox = this.createElementHitbox(this.furnacePanel, 'furnace-panel', () => {}, { consume: false });
+      if (panelHitbox) hitboxes.push(panelHitbox);
+    }
+
     if (this.getInventoryOpen()) {
       for (const closeButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
         if (!closeButton.dataset.menuClose) continue;
@@ -261,7 +302,7 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
-    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen()) return [];
+    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen() || this.getFurnaceOpen()) return [];
 
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(
