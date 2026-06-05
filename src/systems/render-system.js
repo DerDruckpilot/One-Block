@@ -87,6 +87,9 @@ export class RenderSystem {
       if (object.type === OBJECT_TYPES.campfire) {
         this.drawCampfire(screenX, screenY);
       }
+      if (object.type === OBJECT_TYPES.bed) {
+        this.drawBed(screenX, screenY);
+      }
       if (object.type === OBJECT_TYPES.woodWall) {
         const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
         this.drawWoodWall(screenX, screenY, renderState);
@@ -311,6 +314,9 @@ export class RenderSystem {
     const y = Math.round(player.y - camera.y);
 
     this.context.save();
+    if (player.hitFlashSeconds > 0) {
+      this.context.globalAlpha = 0.55 + Math.sin(player.hitFlashSeconds * 70) * 0.25;
+    }
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
     this.context.fillRect(x + 12, y + 38, 24, 7);
 
@@ -330,6 +336,24 @@ export class RenderSystem {
     this.context.fillRect(x + 32, y + 30, 4, 8);
     this.context.fillRect(x + 17, y + 39, 5, 5);
     this.context.fillRect(x + 27, y + 39, 5, 5);
+    this.context.restore();
+  }
+
+  drawBed(x, y) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    this.context.fillRect(x + 4, y + 23, 24, 5);
+    this.context.fillStyle = '#4a2d1d';
+    this.context.fillRect(x + 4, y + 9, 24, 18);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 6, y + 11, 20, 14);
+    this.context.fillStyle = '#d9c7ff';
+    this.context.fillRect(x + 8, y + 12, 16, 5);
+    this.context.fillStyle = '#7b4b8f';
+    this.context.fillRect(x + 8, y + 17, 16, 7);
+    this.context.fillStyle = '#2e1d14';
+    this.context.fillRect(x + 4, y + 8, 4, 21);
+    this.context.fillRect(x + 24, y + 8, 4, 21);
     this.context.restore();
   }
 
@@ -968,19 +992,27 @@ export class RenderSystem {
     this.context.save();
     this.context.fillStyle = `rgba(12, 20, 43, ${darkness})`;
     this.context.fillRect(0, 0, view.width, view.height);
+    this.context.globalCompositeOperation = 'destination-out';
 
     tileMap.forEachObject((object) => {
       if (object.type !== OBJECT_TYPES.torch && object.type !== OBJECT_TYPES.campfire) return;
       const radius = object.type === OBJECT_TYPES.campfire ? 78 : 48;
       const x = object.x * TILE_SIZE + TILE_SIZE / 2 - camera.x;
       const y = object.y * TILE_SIZE + TILE_SIZE / 2 - camera.y;
-      this.context.globalAlpha = object.type === OBJECT_TYPES.campfire ? 0.26 : 0.18;
-      this.context.fillStyle = '#ffe889';
-      if (this.context.beginPath && this.context.arc && this.context.fill) {
+      const gradient = this.context.createRadialGradient?.(x, y, radius * 0.18, x, y, radius);
+      if (gradient) {
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.86, darkness + 0.18)})`);
+        gradient.addColorStop(0.62, `rgba(255, 255, 255, ${Math.min(0.5, darkness * 0.62)})`);
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        this.context.fillStyle = gradient;
+        this.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      } else if (this.context.beginPath && this.context.arc && this.context.fill) {
+        this.context.fillStyle = `rgba(255, 255, 255, ${Math.min(0.65, darkness)})`;
         this.context.beginPath();
         this.context.arc(x, y, radius, 0, Math.PI * 2);
         this.context.fill();
       } else {
+        this.context.fillStyle = `rgba(255, 255, 255, ${Math.min(0.65, darkness)})`;
         this.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
       }
     });

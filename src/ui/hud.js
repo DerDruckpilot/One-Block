@@ -3,7 +3,7 @@ export class Hud {
     this.element = element;
   }
 
-  update({ hint, logs = [], debug, debugEnabled, resetHoldSeconds }) {
+  update({ hint, logs = [], debug, debugEnabled, hearts = [], resetHoldSeconds }) {
     const touch = debug.touch || {
       joystickActive: false,
       actionPressed: false,
@@ -21,9 +21,11 @@ export class Hud {
     this.element.innerHTML = `
       <div><strong>Log:</strong></div>
       <ol class="hud-log">${logHtml}</ol>
+      <div class="heart-hud" aria-label="Lebenspunkte">${this.renderHearts(hearts)}</div>
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
       ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>
+        HP: ${debug.hp}/${debug.maxHp}<br>
         Spieler: ${this.formatNumber(debug.playerX)}, ${this.formatNumber(debug.playerY)}<br>
         Kamera: ${this.formatNumber(debug.cameraX)}, ${this.formatNumber(debug.cameraY)}<br>
         Support-Tile: ${debug.supportTileX}, ${debug.supportTileY}<br>
@@ -39,12 +41,25 @@ export class Hud {
         Projektile: ${debug.activeProjectiles || 0}<br>
         Drops: ${debug.activeDrops || 0}<br>
         Tageszeit: ${this.formatNumber(debug.dayNightTime || 0)} / ${debug.dayNightPhase || 'Tag'}<br>
+        Phase-ID: ${debug.dayNightPhaseId || 'day'}<br>
+        Respawn: ${debug.respawnTarget || 'crystal'}<br>
+        Schaden-CD: ${this.formatNumber(debug.damageCooldown || 0)}<br>
+        Menue: ${debug.activeMenu || 'none'}<br>
         Touch: stick ${touch.joystickActive ? 'true' : 'false'}, origin ${touch.joystickOrigin ? `${this.formatNumber(touch.joystickOrigin.x)}, ${this.formatNumber(touch.joystickOrigin.y)}` : 'none'}, action ${touch.actionPressed ? 'true' : 'false'}, attack ${touch.attackPressed ? 'true' : 'false'}, pointer ${touch.pointerCount}<br>
         Touch-Vektor: ${this.formatNumber(virtualMovement.x)}, ${this.formatNumber(virtualMovement.y)}<br>
         Bewegung: ${debug.movementKeys.length > 0 ? debug.movementKeys.join(', ') : 'keine'}<br>
         Letzter Key: ${debug.lastKey}
       </div>` : ''}
     `;
+  }
+
+  renderHearts(hearts) {
+    const icons = {
+      full: '♥',
+      half: '◐',
+      empty: '♡'
+    };
+    return hearts.map((heart) => `<span class="heart heart-${heart}">${icons[heart] || icons.empty}</span>`).join('');
   }
 
   formatNumber(value) {

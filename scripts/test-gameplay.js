@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
+  DAY_NIGHT_CYCLE_SECONDS,
+  DAY_NIGHT_PHASES,
   DAY_NIGHT_START_TIME,
   CRYSTAL_INTERACTION_DISTANCE,
   DEFAULT_HOTBAR_SLOTS,
@@ -16,6 +18,7 @@ import {
   OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
   PLAYER_FOOT_OFFSET,
+  PLAYER_MAX_HP,
   PLAYER_SIZE,
   PLAYER_SPAWN_TILE,
   RESOURCE_LABELS,
@@ -165,6 +168,24 @@ const createDrawContext = () => {
     beginPath() {
       calls.push({ fn: 'beginPath' });
     },
+    createLinearGradient() {
+      const stops = [];
+      return {
+        stops,
+        addColorStop(offset, color) {
+          stops.push({ offset, color });
+        }
+      };
+    },
+    createRadialGradient() {
+      const stops = [];
+      return {
+        stops,
+        addColorStop(offset, color) {
+          stops.push({ offset, color });
+        }
+      };
+    },
     fill() {
       calls.push({ fn: 'fill', fillStyle: this.fillStyle });
     },
@@ -197,7 +218,7 @@ const map = new TileMap();
   assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
-  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
 {
@@ -1068,7 +1089,7 @@ const map = new TileMap();
   game.update(12);
   assert.equal(game.dayNightSystem.time, pausedTime, 'day-night time pauses while a menu is open');
 
-  game.dayNightSystem.load(0.72);
+  game.dayNightSystem.load(0.47);
   assert.equal(game.dayNightSystem.getPhase(), 'Dämmerung', 'day-night system reports dusk phase');
   assert.equal(game.getDebugState().dayNightPhase, 'Dämmerung', 'debug state exposes day-night phase');
 }
@@ -1742,7 +1763,8 @@ const map = new TileMap();
   renderer.renderLighting({ getDarkness: () => 0.52 }, tileMap, { x: 0, y: 0 }, GAME_VIEW);
 
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[2] === GAME_VIEW.width), true, 'night lighting draws a screen darkness overlay');
-  assert.equal(context.calls.filter((call) => call.fn === 'arc').length, 2, 'torch and campfire draw light radii at night');
+  assert.equal(context.calls.filter((call) => call.fn === 'fillRect').length >= 3, true, 'torch and campfire cut soft light windows out of the darkness overlay');
+  assert.equal(context.calls.some((call) => typeof call.fillStyle === 'string' && call.fillStyle.includes('255, 196')), false, 'object light no longer paints the world with a yellow tint');
 
   const dayContext = createDrawContext();
   const dayRenderer = new RenderSystem(dayContext);
@@ -2511,6 +2533,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   for (let x = 2; x <= 5; x += 1) game.tileMap.setEarth(x, 0);
   const enemy = Enemy.fromTile({ x: 5, y: 0 });
+  enemy.hp = 2;
   game.enemySystem.enemies.push(enemy);
   game.inventory.add('bow', 1);
   game.inventory.add('arrow', 2);
@@ -2520,8 +2543,6 @@ const map = new TileMap();
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
   );
   game.player.facing = { x: 1, y: 0 };
-  game.tryAttackAction();
-  game.update(0.35);
   game.tryAttackAction();
   game.update(0.35);
 
@@ -2774,6 +2795,7 @@ const map = new TileMap();
   assert.equal(game.inventory.get('berry'), 0, 'planting a berry bush consumes one berry');
 
   game.plantSystem.update(BERRY_BUSH_GROW_SECONDS + 0.1, game.tileMap);
+  game.hotbarSlots[0] = 'earth';
   assert.equal(game.tryContextAction(), true, 'ripe berry bush can be harvested');
   assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'berry'), true, 'berry bush harvest creates a berry drop');
   assert.equal(game.crystalSystem.lastMessage, 'Beeren geerntet.', 'berry harvest writes the requested log');
@@ -3808,6 +3830,312 @@ const map = new TileMap();
   const loadedWaterProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'water' }, saveLikeMap);
   assert.equal(loadedWaterProfile.connectedSurfaceVertical, true, 'loaded tile maps reconstruct vertical ground render connections from neighbors');
   assert.equal(loadedWaterProfile.waterTransition, true, 'loaded tile maps reconstruct water transition render state from neighbors');
+}
+
+{
+  const player = createSpawnedPlayer();
+  assert.equal(player.maxHp, PLAYER_MAX_HP, 'player starts with 6 max HP');
+  assert.equal(player.hp, PLAYER_MAX_HP, 'player starts with full HP');
+  assert.deepEqual(player.getHeartStates(), ['full', 'full', 'full'], '6 HP renders as 3 full hearts');
+  player.setHp(5);
+  assert.deepEqual(player.getHeartStates(), ['full', 'full', 'half'], 'odd HP renders a half heart');
+  player.setHp(1);
+  assert.deepEqual(player.getHeartStates(), ['half', 'empty', 'empty'], 'missing HP renders empty hearts');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.player.setHp(3);
+  game.inventory.add('rawMeat', 2);
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.player.hp, 3, 'player HP saves and loads');
+  assert.equal(loadedGame.inventory.get('rawMeat'), 2, 'raw meat saves and loads');
+
+  loadedGame.input.keys.add('r');
+  loadedGame.update(2.1);
+  assert.equal(loadedGame.player.hp, PLAYER_MAX_HP, 'reset restores player HP');
+  assert.equal(loadedGame.inventory.get('rawMeat'), 0, 'reset clears raw meat through inventory reset');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const { FlyingEnemy } = await import('../src/entities/flying-enemy.js');
+
+  const groundGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  groundGame.enemySystem.enemies.push(Enemy.fromTile(PLAYER_SPAWN_TILE));
+  assert.equal(groundGame.handlePlayerContactDamage(), true, 'ground enemy contact deals damage');
+  assert.equal(groundGame.player.hp, PLAYER_MAX_HP - 1, 'ground enemy deals 1 HP');
+  assert.equal(groundGame.handlePlayerContactDamage(), false, 'damage cooldown blocks repeated same-frame contact damage');
+  assert.equal(groundGame.player.hp, PLAYER_MAX_HP - 1, 'damage cooldown preserves HP');
+  assert.equal(groundGame.player.hitFlashSeconds > 0, true, 'damage starts player hit flash feedback');
+
+  const flyingGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  const playerCenter = flyingGame.player.getCenterPosition();
+  flyingGame.flyingEnemySystem.enemies.push(new FlyingEnemy({
+    x: playerCenter.x - 14,
+    y: playerCenter.y - 14
+  }));
+  assert.equal(flyingGame.handlePlayerContactDamage(), true, 'flying enemy contact deals damage');
+  assert.equal(flyingGame.player.hp, PLAYER_MAX_HP - 1, 'flying enemy deals 1 HP');
+
+  const pausedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  pausedGame.enemySystem.enemies.push(Enemy.fromTile(PLAYER_SPAWN_TILE));
+  pausedGame.inventoryOpen = true;
+  pausedGame.update(0.5);
+  assert.equal(pausedGame.player.hp, PLAYER_MAX_HP, 'enemy contact damage is ignored while a menu pauses gameplay');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const deathGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  deathGame.player.setHp(1);
+  deathGame.enemySystem.enemies.push(Enemy.fromTile(PLAYER_SPAWN_TILE));
+  assert.equal(deathGame.handlePlayerContactDamage(), true, 'lethal contact damage is handled');
+  assert.equal(deathGame.player.hp, PLAYER_MAX_HP, 'death respawn restores full HP');
+  assert.deepEqual(deathGame.player.getTilePosition(), PLAYER_SPAWN_TILE, 'death without bed respawns near the crystal');
+  assert.equal(deathGame.crystalSystem.lastMessage, 'Du bist gestorben.', 'enemy death writes the requested death log');
+
+  const bedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  bedGame.tileMap.setEarth(2, 1);
+  bedGame.tileMap.setEarth(3, 1);
+  bedGame.tileMap.setObject(2, 1, OBJECT_TYPES.bed);
+  setGamePlayerOnTile(bedGame, 1, 1, { x: 1, y: 0 });
+  assert.equal(bedGame.tryUseBed(), true, 'bed action sets a respawn point first');
+  assert.deepEqual(bedGame.respawnTarget, { type: 'bed', x: 2, y: 1 }, 'active bed respawn target is stored');
+  bedGame.player.setHp(0);
+  bedGame.handlePlayerDeath();
+  assert.equal(bedGame.player.hp, PLAYER_MAX_HP, 'bed death respawn restores full HP');
+  assert.deepEqual(bedGame.player.getTilePosition(), { x: 3, y: 1 }, 'death respawns beside an active valid bed');
+
+  bedGame.player.setPosition(20 * TILE_SIZE, 20 * TILE_SIZE);
+  bedGame.handleVoidFall();
+  assert.equal(bedGame.player.hp, PLAYER_MAX_HP, 'void respawn uses the same HP restoration path');
+  assert.deepEqual(bedGame.player.getTilePosition(), { x: 3, y: 1 }, 'void respawn uses the active bed when valid');
+
+  bedGame.removeMode = true;
+  setGamePlayerOnTile(bedGame, 1, 1, { x: 1, y: 0 });
+  assert.equal(bedGame.tryContextAction(), true, 'active bed can be removed through remove mode');
+  assert.deepEqual(bedGame.respawnTarget, { type: 'crystal' }, 'removing the active bed resets respawn to crystal');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('rawWood', 6);
+  game.inventory.add('fiber', 6);
+  assert.equal(game.craftingSystem.craft('bed', { hasWorkbenchAccess: true }).crafted, true, 'bed can be crafted at a workbench');
+  assert.equal(game.inventory.get('bed'), 1, 'bed crafting adds bed item');
+
+  game.selectHotbarResource('bed');
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  assert.equal(game.tryPlaceSelectedItem(), true, 'bed can be placed on valid solid ground');
+  assert.equal(game.tileMap.getObject(1, 1), OBJECT_TYPES.bed, 'placed bed becomes a world object');
+  assert.equal(game.tileMap.isBlockedForPlayer(1, 1), true, 'bed blocks player movement');
+  game.inventory.add('bed', 1);
+  game.tileMap.setWater(2, 1);
+  setGamePlayerOnTile(game, 1, 1, { x: 1, y: 0 });
+  assert.equal(game.getPlacementPreview().canPlace, false, 'bed cannot be placed on water');
+
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.bed, 'placed bed saves and loads');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setEarth(2, 1);
+  game.tileMap.setEarth(3, 1);
+  game.tileMap.setObject(2, 1, OBJECT_TYPES.bed);
+  setGamePlayerOnTile(game, 1, 1, { x: 1, y: 0 });
+  game.tryUseBed();
+
+  game.dayNightSystem.load(0.1);
+  assert.equal(game.tryUseBed(), true, 'active bed can skip day toward night');
+  assert.equal(game.dayNightSystem.time, DAY_NIGHT_PHASES.night.start, 'sleeping before night jumps to night start');
+  assert.equal(game.crystalSystem.lastMessage, 'Du schläfst bis zur Nacht.', 'day sleep log is clear');
+
+  game.dayNightSystem.load(0.7);
+  assert.equal(game.tryUseBed(), true, 'active bed can skip night toward morning');
+  assert.equal(game.dayNightSystem.time, DAY_NIGHT_PHASES.day.start, 'sleeping during night jumps to day start');
+  assert.equal(game.crystalSystem.lastMessage, 'Du schläfst bis zum Morgen.', 'night sleep log is clear');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.player.setHp(4);
+  game.inventory.add('berry', 2);
+  game.selectHotbarResource('berry');
+  assert.equal(game.tryContextAction(), true, 'selected berries can be eaten through context action');
+  assert.equal(game.player.hp, 5, 'berries heal 1 HP');
+  assert.equal(game.inventory.get('berry'), 1, 'eating berries consumes one berry');
+  game.player.restoreHp();
+  assert.equal(game.tryContextAction(), true, 'food action at full health is handled');
+  assert.equal(game.inventory.get('berry'), 1, 'berries are not consumed at full HP');
+  assert.equal(game.crystalSystem.lastMessage, 'Du bist bereits gesund.', 'full health food action explains why nothing was consumed');
+
+  game.player.setHp(3);
+  game.inventory.add('roastedBerries', 1);
+  game.selectHotbarResource('roastedBerries');
+  game.tryContextAction();
+  assert.equal(game.player.hp, 5, 'roasted berries heal 2 HP');
+
+  game.player.setHp(2);
+  game.inventory.add('cookedSteak', 1);
+  game.selectHotbarResource('cookedSteak');
+  game.tryContextAction();
+  assert.equal(game.player.hp, 5, 'cooked steak heals 3 HP');
+
+  game.inventory.add('rawMeat', 1);
+  game.selectHotbarResource('rawMeat');
+  assert.equal(game.tryContextAction(), true, 'raw meat is not treated as edible and falls through to crystal interaction nearby');
+  assert.equal(game.inventory.get('rawMeat'), 1, 'raw meat is not consumed by the food system');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('bow', 1);
+  game.inventory.add('arrow', 2);
+  game.selectHotbarResource('bow');
+  for (let x = 2; x <= 5; x += 1) game.tileMap.setEarth(x, 0);
+  const enemy = Enemy.fromTile({ x: 5, y: 0 });
+  enemy.hp = 2;
+  game.enemySystem.enemies.push(enemy);
+  setGamePlayerOnTile(game, 2, 0, { x: 1, y: 0 });
+  game.tryAttackAction();
+  game.update(0.35);
+  assert.equal(game.enemySystem.activeCount(), 0, 'defeated ground enemy is removed');
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'rawMeat'), true, 'defeated ground enemies drop raw meat');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.campfire);
+  assert.equal(game.tryContextAction(), true, 'action near campfire opens cooking menu');
+  assert.equal(game.cookingOpen, true, 'cooking menu opens at campfire');
+  assert.equal(game.isGamePaused(), true, 'cooking menu pauses gameplay');
+  assert.equal(game.craftingOpen, false, 'campfire cooking is separate from crafting menu');
+
+  const normalIds = game.craftingSystem.getRecipeStates({ craftingContext: 'normal' }).map((state) => state.recipe.id);
+  const workbenchIds = game.craftingSystem.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }).map((state) => state.recipe.id);
+  assert.equal(normalIds.includes('roastedBerries'), false, 'cooking recipes do not appear in normal crafting');
+  assert.equal(workbenchIds.includes('cookedSteak'), false, 'cooking recipes do not appear in workbench crafting');
+
+  game.inventory.add('berry', 2);
+  assert.equal(game.tryCook('roastedBerries'), true, 'roasted berries can be cooked at campfire');
+  assert.equal(game.inventory.get('berry'), 0, 'roasted berries consume berries');
+  assert.equal(game.inventory.get('roastedBerries'), 1, 'roasted berries add cooked food');
+
+  game.inventory.add('rawMeat', 1);
+  assert.equal(game.tryCook('cookedSteak'), true, 'cooked steak can be cooked at campfire');
+  assert.equal(game.inventory.get('rawMeat'), 0, 'cooked steak consumes raw meat');
+  assert.equal(game.inventory.get('cookedSteak'), 1, 'cooked steak adds cooked food');
+  game.saveGame();
+
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.inventory.get('roastedBerries'), 1, 'roasted berries save and load');
+  assert.equal(loadedGame.inventory.get('cookedSteak'), 1, 'cooked steak save and load');
+}
+
+{
+  const inventoryPanel = { hidden: true, innerHTML: '' };
+  const craftingPanel = { hidden: true, innerHTML: '' };
+  const buildPanel = { hidden: true, innerHTML: '' };
+  const cookingPanel = { hidden: true, innerHTML: '' };
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel });
+
+  menus.update({
+    inventory,
+    inventoryOpen: true,
+    craftingOpen: true,
+    buildOpen: true,
+    cookingOpen: true,
+    recipeStates: crafting.getRecipeStates({ craftingContext: 'normal' }),
+    cookingRecipeStates: crafting.getRecipeStates({ craftingContext: 'cooking' }),
+    hotbarSlots: [...DEFAULT_HOTBAR_SLOTS]
+  });
+
+  assert.equal(inventoryPanel.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu has an X close button');
+  assert.equal(craftingPanel.innerHTML.includes('data-menu-close="crafting"'), true, 'crafting menu has an X close button');
+  assert.equal(buildPanel.innerHTML.includes('data-menu-close="build"'), true, 'build menu has an X close button');
+  assert.equal(cookingPanel.innerHTML.includes('data-menu-close="cooking"'), true, 'cooking menu has an X close button');
+
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventoryOpen = true;
+  game.craftingOpen = true;
+  game.buildOpen = true;
+  game.cookingOpen = true;
+  game.closeMenu('inventory');
+  game.closeMenu('crafting');
+  game.closeMenu('build');
+  game.closeMenu('cooking');
+  assert.equal(game.isGamePaused(), false, 'closing all menus through X handlers resumes gameplay');
+}
+
+{
+  const { DayNightSystem } = await import('../src/systems/day-night-system.js');
+  const dayNight = new DayNightSystem();
+  assert.equal(DAY_NIGHT_CYCLE_SECONDS, 600, 'day/night cycle lasts 10 minutes');
+  assert.equal(DAY_NIGHT_PHASES.day.durationSeconds, 270, 'day phase lasts 4.5 minutes');
+  assert.equal(DAY_NIGHT_PHASES.dusk.durationSeconds, 30, 'dusk phase lasts 0.5 minutes');
+  assert.equal(DAY_NIGHT_PHASES.night.durationSeconds, 270, 'night phase lasts 4.5 minutes');
+  assert.equal(DAY_NIGHT_PHASES.dawn.durationSeconds, 30, 'dawn phase lasts 0.5 minutes');
+  dayNight.update(271);
+  assert.equal(dayNight.getPhaseId(), 'dusk', 'cycle enters dusk after day duration');
+  dayNight.update(30);
+  assert.equal(dayNight.getPhaseId(), 'night', 'cycle enters night after dusk duration');
+  dayNight.update(270);
+  assert.equal(dayNight.getPhaseId(), 'dawn', 'cycle enters dawn after night duration');
+
+  const { Game } = await import('../src/core/game.js');
+  const storage = createMemoryStorage();
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.dayNightSystem.load(0.73);
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.dayNightSystem.time, 0.73, 'save/load keeps day/night time');
+  assert.equal(loadedGame.dayNightSystem.getPhaseId(), 'night', 'save/load keeps day/night phase');
+}
+
+{
+  const { DayNightSystem } = await import('../src/systems/day-night-system.js');
+  const { BackgroundSystem } = await import('../src/systems/background-system.js');
+  const night = new DayNightSystem(0.7);
+  const dusk = new DayNightSystem(0.47);
+  const dawn = new DayNightSystem(0.97);
+  assert.equal(night.getSkyProfile().starAlpha > 0, true, 'stars appear at night');
+  assert.equal(night.getSkyProfile().top.startsWith('#05'), true, 'night sky becomes very dark');
+  assert.equal(dusk.getSkyProfile().warmOverlay > 0, true, 'dusk uses a warm transition overlay');
+  assert.equal(dawn.getSkyProfile().warmOverlay > 0, true, 'dawn uses a warm transition overlay');
+
+  const context = createDrawContext();
+  const background = new BackgroundSystem();
+  background.render(context, { x: 0, y: 0 }, night);
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.globalAlpha > 0.5), true, 'night background renders star pixels over the dark sky');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.campfire);
+  game.inventory.add('berry', 1);
+  game.player.setHp(4);
+  game.selectHotbarResource('berry');
+  assert.equal(game.tryContextAction(), true, 'action priority uses active food before campfire cooking');
+  assert.equal(game.cookingOpen, false, 'food action does not open cooking menu first');
+  assert.equal(game.player.hp, 5, 'food priority heals the player');
 }
 
 console.log('Gameplay-Basics OK.');

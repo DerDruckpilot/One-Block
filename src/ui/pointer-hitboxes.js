@@ -3,18 +3,23 @@ export class PointerHitboxSystem {
     buildButton,
     buildPanel,
     canvas,
+    cookingPanel,
     craftingButton,
     craftingPanel,
+    getCookingOpen = () => false,
     getCraftingOpen = () => false,
     getInventoryOpen = () => false,
     getBuildOpen = () => false,
     hotbarElement,
     inventoryButton,
     inventoryPanel,
+    onBlockedCook = () => {},
     onBlockedCraft = () => {},
     onBuildItemSelect = () => {},
     onBuildRemoveToggle = () => {},
     onBuildToggle = () => {},
+    onCook = () => {},
+    onCookSelect = () => {},
     onCraft = () => {},
     onCraftSelect = () => {},
     onCraftingToggle = () => {},
@@ -22,23 +27,29 @@ export class PointerHitboxSystem {
     onInventoryItemSelect = () => {},
     onInventoryTabSelect = () => {},
     onInventoryToggle = () => {},
+    onMenuClose = () => {},
     pointerTarget = globalThis.window
   }) {
     this.canvas = canvas;
     this.buildButton = buildButton;
     this.buildPanel = buildPanel;
+    this.cookingPanel = cookingPanel;
     this.craftingButton = craftingButton;
     this.craftingPanel = craftingPanel;
+    this.getCookingOpen = getCookingOpen;
     this.getCraftingOpen = getCraftingOpen;
     this.getInventoryOpen = getInventoryOpen;
     this.getBuildOpen = getBuildOpen;
     this.hotbarElement = hotbarElement;
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
+    this.onBlockedCook = onBlockedCook;
     this.onBlockedCraft = onBlockedCraft;
     this.onBuildItemSelect = onBuildItemSelect;
     this.onBuildRemoveToggle = onBuildRemoveToggle;
     this.onBuildToggle = onBuildToggle;
+    this.onCook = onCook;
+    this.onCookSelect = onCookSelect;
     this.onCraft = onCraft;
     this.onCraftSelect = onCraftSelect;
     this.onCraftingToggle = onCraftingToggle;
@@ -46,6 +57,7 @@ export class PointerHitboxSystem {
     this.onInventoryItemSelect = onInventoryItemSelect;
     this.onInventoryTabSelect = onInventoryTabSelect;
     this.onInventoryToggle = onInventoryToggle;
+    this.onMenuClose = onMenuClose;
     this.hitboxes = [];
 
     pointerTarget?.addEventListener?.('pointerdown', (event) => this.handlePointerDown(event), { capture: true });
@@ -123,6 +135,12 @@ export class PointerHitboxSystem {
     const hitboxes = [];
 
     if (this.getCraftingOpen()) {
+      for (const closeButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-crafting', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
       for (const craftButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-craft]') || [])) {
         if (!craftButton.dataset.craft) continue;
         const craftButtonHitbox = this.createElementHitbox(craftButton, `craft-${craftButton.dataset.craft}`, () => {
@@ -147,7 +165,44 @@ export class PointerHitboxSystem {
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
+    if (this.getCookingOpen()) {
+      for (const closeButton of Array.from(this.cookingPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-cooking', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
+      for (const cookButton of Array.from(this.cookingPanel?.querySelectorAll?.('[data-cook]') || [])) {
+        if (!cookButton.dataset.cook) continue;
+        const cookButtonHitbox = this.createElementHitbox(cookButton, `cook-${cookButton.dataset.cook}`, () => {
+          if (cookButton.disabled) {
+            this.onBlockedCook(cookButton.dataset.cook);
+            return;
+          }
+          this.onCook(cookButton.dataset.cook);
+        });
+        if (cookButtonHitbox) hitboxes.push(cookButtonHitbox);
+      }
+
+      for (const recipeButton of Array.from(this.cookingPanel?.querySelectorAll?.('[data-cook-select]') || [])) {
+        if (!recipeButton.dataset.cookSelect) continue;
+        const recipeHitbox = this.createElementHitbox(recipeButton, `cook-recipe-${recipeButton.dataset.cookSelect}`, () => {
+          this.onCookSelect(recipeButton.dataset.cookSelect);
+        });
+        if (recipeHitbox) hitboxes.push(recipeHitbox);
+      }
+
+      const panelHitbox = this.createElementHitbox(this.cookingPanel, 'cooking-panel', () => {}, { consume: false });
+      if (panelHitbox) hitboxes.push(panelHitbox);
+    }
+
     if (this.getInventoryOpen()) {
+      for (const closeButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-inventory', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
       for (const tabButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-tab]') || [])) {
         if (!tabButton.dataset.inventoryTab) continue;
         const tabHitbox = this.createElementHitbox(tabButton, `inventory-tab-${tabButton.dataset.inventoryTab}`, () => {
@@ -177,6 +232,12 @@ export class PointerHitboxSystem {
     }
 
     if (this.getBuildOpen()) {
+      for (const closeButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-build', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
       for (const buildButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-resource]') || [])) {
         if (!buildButton.dataset.buildResource) continue;
         const buildHitbox = this.createElementHitbox(buildButton, `build-${buildButton.dataset.buildResource}`, () => {
@@ -200,7 +261,7 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
-    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen()) return [];
+    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen()) return [];
 
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(

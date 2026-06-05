@@ -1,4 +1,11 @@
-import { MOVEMENT, PLAYER_FOOT_OFFSET, PLAYER_SIZE, TILE_SIZE } from '../config/constants.js';
+import {
+  MOVEMENT,
+  PLAYER_DAMAGE_COOLDOWN_SECONDS,
+  PLAYER_FOOT_OFFSET,
+  PLAYER_MAX_HP,
+  PLAYER_SIZE,
+  TILE_SIZE
+} from '../config/constants.js';
 
 export class Player {
   constructor(x, y) {
@@ -7,9 +14,14 @@ export class Player {
     this.width = PLAYER_SIZE;
     this.height = PLAYER_SIZE;
     this.facing = { x: 0, y: -1 };
+    this.maxHp = PLAYER_MAX_HP;
+    this.hp = PLAYER_MAX_HP;
+    this.damageCooldownSeconds = 0;
+    this.hitFlashSeconds = 0;
   }
 
   update(deltaSeconds, input, tileMap) {
+    this.updateDamageTimers(deltaSeconds);
     const movement = this.readMovement(input);
     if (movement.x !== 0 || movement.y !== 0) {
       this.facing = this.primaryFacing(movement);
@@ -26,6 +38,44 @@ export class Player {
     if (this.canMoveTo(this.x, nextY, tileMap)) {
       this.y = nextY;
     }
+  }
+
+  updateDamageTimers(deltaSeconds) {
+    this.damageCooldownSeconds = Math.max(0, this.damageCooldownSeconds - deltaSeconds);
+    this.hitFlashSeconds = Math.max(0, this.hitFlashSeconds - deltaSeconds);
+  }
+
+  takeDamage(amount) {
+    if (this.damageCooldownSeconds > 0 || this.hp <= 0) return false;
+    this.hp = Math.max(0, this.hp - amount);
+    this.damageCooldownSeconds = PLAYER_DAMAGE_COOLDOWN_SECONDS;
+    this.hitFlashSeconds = 0.22;
+    return true;
+  }
+
+  heal(amount) {
+    if (this.hp >= this.maxHp) return false;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    return true;
+  }
+
+  restoreHp() {
+    this.hp = this.maxHp;
+    this.damageCooldownSeconds = 0;
+    this.hitFlashSeconds = 0;
+  }
+
+  setHp(value) {
+    this.hp = Math.max(0, Math.min(this.maxHp, Number.isFinite(value) ? value : this.maxHp));
+  }
+
+  getHeartStates() {
+    const hearts = [];
+    for (let index = 0; index < this.maxHp / 2; index += 1) {
+      const hpForHeart = this.hp - index * 2;
+      hearts.push(hpForHeart >= 2 ? 'full' : hpForHeart === 1 ? 'half' : 'empty');
+    }
+    return hearts;
   }
 
   readMovement(input) {
