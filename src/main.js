@@ -11,6 +11,7 @@ const inventoryPanel = document.querySelector('#inventory-panel');
 const craftingPanel = document.querySelector('#crafting-panel');
 const buildPanel = document.querySelector('#build-panel');
 const cookingPanel = document.querySelector('#cooking-panel');
+const furnacePanel = document.querySelector('#furnace-panel');
 const touchControlsElement = document.querySelector('#touch-controls');
 const joystickElement = document.querySelector('#touch-joystick');
 const joystickKnobElement = document.querySelector('#touch-joystick-knob');
@@ -33,6 +34,7 @@ const game = new Game(canvas, hudElement, {
   craftingButton,
   craftingPanel,
   cookingPanel,
+  furnacePanel,
   hotbarElement,
   inventoryButton,
   inventoryPanel,
@@ -44,7 +46,7 @@ const game = new Game(canvas, hudElement, {
 game.start();
 
 const preventGameTouchDefault = (event) => {
-  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel')) return;
+  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel')) return;
   event.preventDefault();
 };
 

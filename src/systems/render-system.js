@@ -20,7 +20,7 @@ export class RenderSystem {
     });
   }
 
-  renderCrystal(tileMap, camera, timeMs) {
+  renderCrystal(tileMap, camera, timeMs, level = 1) {
     const { x, y } = tileMap.crystal;
     const screenX = Math.round(x * TILE_SIZE - camera.x);
     const screenY = Math.round(y * TILE_SIZE - camera.y);
@@ -47,9 +47,10 @@ export class RenderSystem {
     this.context.fillStyle = '#d78cff';
     this.context.fillRect(cx - 4, screenY + 17, 8, 2);
 
-    this.context.globalAlpha = 0.32;
-    this.context.fillStyle = '#d974ff';
-    this.context.fillRect(cx - 17 - pulse, cy - 19 - pulse, 34 + pulse * 2, 34 + pulse * 2);
+    const levelGlow = Math.max(0, level - 1) * 3;
+    this.context.globalAlpha = 0.28 + Math.min(0.18, level * 0.04);
+    this.context.fillStyle = level >= 3 ? '#ff8cff' : level >= 2 ? '#b58cff' : '#d974ff';
+    this.context.fillRect(cx - 17 - pulse - levelGlow, cy - 19 - pulse - levelGlow, 34 + pulse * 2 + levelGlow * 2, 34 + pulse * 2 + levelGlow * 2);
     this.context.globalAlpha = 1;
 
     this.context.fillStyle = '#341b78';
@@ -89,6 +90,18 @@ export class RenderSystem {
       }
       if (object.type === OBJECT_TYPES.bed) {
         this.drawBed(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.chickenNest) {
+        this.drawChickenNest(screenX, screenY);
+      }
+      if (object.type === OBJECT_TYPES.feedTrough) {
+        this.drawFeedTrough(screenX, screenY, object.feed || 0);
+      }
+      if (object.type === OBJECT_TYPES.waterTrough) {
+        this.drawWaterTrough(screenX, screenY, object.filled === true);
+      }
+      if (object.type === OBJECT_TYPES.furnace) {
+        this.drawFurnace(screenX, screenY);
       }
       if (object.type === OBJECT_TYPES.woodWall) {
         const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
@@ -354,6 +367,76 @@ export class RenderSystem {
     this.context.fillStyle = '#2e1d14';
     this.context.fillRect(x + 4, y + 8, 4, 21);
     this.context.fillRect(x + 24, y + 8, 4, 21);
+    this.context.restore();
+  }
+
+  drawChickenNest(x, y) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+    this.context.fillRect(x + 7, y + 23, 18, 4);
+    this.context.fillStyle = '#5d3a20';
+    this.context.fillRect(x + 8, y + 17, 16, 8);
+    this.context.fillStyle = '#9b6a3f';
+    this.context.fillRect(x + 6, y + 14, 20, 5);
+    this.context.fillStyle = '#c49355';
+    this.context.fillRect(x + 9, y + 12, 5, 3);
+    this.context.fillRect(x + 18, y + 13, 5, 3);
+    this.context.fillStyle = '#fff0c8';
+    this.context.fillRect(x + 13, y + 17, 6, 5);
+    this.context.fillStyle = '#d8b878';
+    this.context.fillRect(x + 15, y + 16, 2, 1);
+    this.context.restore();
+  }
+
+  drawFeedTrough(x, y, feed = 0) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    this.context.fillRect(x + 5, y + 23, 22, 5);
+    this.context.fillStyle = '#3a2418';
+    this.context.fillRect(x + 5, y + 15, 22, 10);
+    this.context.fillStyle = '#8a5a35';
+    this.context.fillRect(x + 7, y + 16, 18, 7);
+    this.context.fillStyle = feed > 0 ? '#c9a35e' : '#4d2f1e';
+    this.context.fillRect(x + 9, y + 17, 14, 3);
+    this.context.fillStyle = '#2e1d14';
+    this.context.fillRect(x + 6, y + 24, 3, 5);
+    this.context.fillRect(x + 23, y + 24, 3, 5);
+    this.context.restore();
+  }
+
+  drawWaterTrough(x, y, filled = false) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    this.context.fillRect(x + 5, y + 23, 22, 5);
+    this.context.fillStyle = '#4b3a32';
+    this.context.fillRect(x + 5, y + 14, 22, 11);
+    this.context.fillStyle = '#8d7568';
+    this.context.fillRect(x + 7, y + 16, 18, 7);
+    this.context.fillStyle = filled ? '#4eb3d8' : '#4f3b30';
+    this.context.fillRect(x + 9, y + 17, 14, 4);
+    if (filled) {
+      this.context.fillStyle = '#b9f7ff';
+      this.context.fillRect(x + 11, y + 18, 5, 1);
+    }
+    this.context.restore();
+  }
+
+  drawFurnace(x, y) {
+    this.context.save();
+    this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    this.context.fillRect(x + 5, y + 25, 22, 5);
+    this.context.fillStyle = '#3b302a';
+    this.context.fillRect(x + 7, y + 11, 18, 17);
+    this.context.fillStyle = '#8d7568';
+    this.context.fillRect(x + 8, y + 8, 16, 7);
+    this.context.fillStyle = '#b39a88';
+    this.context.fillRect(x + 10, y + 9, 12, 3);
+    this.context.fillStyle = '#1f1714';
+    this.context.fillRect(x + 11, y + 17, 10, 8);
+    this.context.fillStyle = '#e07a2f';
+    this.context.fillRect(x + 13, y + 20, 6, 4);
+    this.context.fillStyle = '#ffce60';
+    this.context.fillRect(x + 15, y + 18, 2, 5);
     this.context.restore();
   }
 

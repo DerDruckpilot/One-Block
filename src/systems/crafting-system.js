@@ -1,6 +1,6 @@
-import { COOKING_RECIPES, CRAFTING_RECIPES, RESOURCE_LABELS } from '../config/constants.js';
+import { COOKING_RECIPES, CRAFTING_RECIPES, FURNACE_RECIPES, RESOURCE_LABELS } from '../config/constants.js';
 
-const ALL_RECIPES = [...CRAFTING_RECIPES, ...COOKING_RECIPES];
+const ALL_RECIPES = [...CRAFTING_RECIPES, ...COOKING_RECIPES, ...FURNACE_RECIPES];
 
 const getRecipeContext = (recipeId) => (
   ALL_RECIPES.find((recipe) => recipe.id === recipeId)?.craftingContext || 'normal'
