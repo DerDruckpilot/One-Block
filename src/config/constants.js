@@ -209,7 +209,44 @@ export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'sli
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
 export const INVENTORY_RESOURCES = [...WORLD_RESOURCES, 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
-export const DEFAULT_HOTBAR_SLOTS = ['earth', 'rawWood', 'fiber', 'grassSeed'];
+export const HAND_EQUIPMENT_RESOURCES = [
+  'woodenPickaxe',
+  'woodenSpear',
+  'slingshot',
+  'bow',
+  'lasso',
+  'axe',
+  'scythe'
+];
+export const HOTBAR_ALLOWED_RESOURCES = [
+  'earth',
+  'stone',
+  'clay',
+  'grassSeed',
+  'treeSeed',
+  'springDrop',
+  'berry',
+  'rawMeat',
+  'roastedBerries',
+  'cookedSteak',
+  'egg',
+  'friedEgg',
+  'workbench',
+  'torch',
+  'campfire',
+  'woodWall',
+  'door',
+  'fence',
+  'gate',
+  'bed',
+  'chickenNest',
+  'feedTrough',
+  'waterTrough',
+  'furnace',
+  'table',
+  'chair'
+];
+export const DEFAULT_HOTBAR_SLOTS = ['earth', 'grassSeed', null, null];
 
 export const RESOURCE_SHORT_LABELS = {
   earth: 'ER',

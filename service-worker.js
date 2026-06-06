@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-4-9';
+const CACHE_NAME = 'one-block-v0-5-0';
 
 const CORE_ASSETS = [
   './',
@@ -33,6 +33,8 @@ const CORE_ASSETS = [
   './src/systems/background-system.js',
   './src/ui/hotbar.js',
   './src/ui/hud.js',
+  './src/ui/hand-indicator.js',
+  './src/ui/item-icons.js',
   './src/ui/menu-panels.js',
   './src/ui/orientation.js',
   './src/ui/pointer-hitboxes.js',

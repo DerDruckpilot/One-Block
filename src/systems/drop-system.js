@@ -52,22 +52,24 @@ export class DropSystem {
     });
   }
 
-  spawnAtTile(drop, tile) {
+  spawnAtTile(drop, tile, source = null) {
     if (!tile) return null;
     const targetPosition = this.positionWithinTile(tile);
     return this.spawn({
       resource: drop.resource,
       amount: drop.amount,
+      startX: source?.x ?? targetPosition.x,
+      startY: source?.y ?? targetPosition.y,
       x: targetPosition.x,
       y: targetPosition.y,
       tile,
-      age: DROP_ANIMATION_SECONDS
+      age: source ? 0 : DROP_ANIMATION_SECONDS
     });
   }
 
   spawnNearWorld(drop, tileMap, x, y) {
     const fallback = this.findDropTileNearWorld(tileMap, x, y);
-    return fallback ? this.spawnAtTile(drop, fallback) : null;
+    return fallback ? this.spawnAtTile(drop, fallback, { x, y: y - 14 }) : null;
   }
 
   spawn({ resource, amount = 1, x, y, startX = x, startY = y, tile = null, age = DROP_ANIMATION_SECONDS }) {
@@ -95,6 +97,7 @@ export class DropSystem {
 
     for (const drop of this.drops) {
       drop.age = Math.min(drop.duration, drop.age + deltaSeconds);
+      if (drop.age < Math.min(0.18, drop.duration)) continue;
       if (Math.hypot(playerFoot.x - drop.x, playerFoot.y - drop.y) <= DROP_PICKUP_DISTANCE) {
         inventory.add(drop.resource, drop.amount);
         collected.push(drop);

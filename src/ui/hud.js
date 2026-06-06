@@ -1,6 +1,7 @@
 export class Hud {
-  constructor(element) {
+  constructor(element, heartElement = null) {
     this.element = element;
+    this.heartElement = heartElement;
   }
 
   update({ hint, logs = [], debug, debugEnabled, hearts = [], resetHoldSeconds }) {
@@ -18,10 +19,15 @@ export class Hud {
       .map((entry) => `<li>${this.escapeHtml(entry)}</li>`)
       .join('');
 
+    const heartHtml = this.renderHearts(hearts);
+    if (this.heartElement) {
+      this.heartElement.innerHTML = heartHtml;
+    }
+
     this.element.innerHTML = `
       <div><strong>Log:</strong></div>
       <ol class="hud-log">${logHtml}</ol>
-      <div class="heart-hud" aria-label="Lebenspunkte">${this.renderHearts(hearts)}</div>
+      ${this.heartElement ? '' : `<div class="heart-hud" aria-label="Lebenspunkte">${heartHtml}</div>`}
       ${resetHoldSeconds > 0 ? `<div><strong>Reset:</strong> ${this.formatNumber(Math.min(resetHoldSeconds, 2))}/2.0s halten</div>` : ''}
       ${debugEnabled === true ? `<div class="debug-hud">
         <strong>Debug:</strong><br>

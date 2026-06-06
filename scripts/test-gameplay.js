@@ -221,7 +221,7 @@ const map = new TileMap();
   assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
-  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
 {
@@ -639,14 +639,15 @@ const map = new TileMap();
   game.input.pressedThisFrame.add('2');
   game.handleHotbarSelection();
   assert.equal(game.activeHotbarSlot, 1, 'number keys select hotbar slots');
-  assert.equal(game.getActiveHotbarItem(), 'rawWood', 'active hotbar item follows the selected slot');
+  assert.equal(game.getActiveHotbarItem(), 'grassSeed', 'active hotbar item follows the selected slot');
 
-  game.selectHotbarResource('fiber');
-  assert.equal(game.activeHotbarSlot, 2, 'selecting an assigned resource activates its slot');
-  game.hotbarSlots[2] = null;
+  game.selectHotbarResource('earth');
+  assert.equal(game.activeHotbarSlot, 0, 'selecting an assigned resource activates its slot');
+  game.hotbarSlots[0] = null;
   assert.equal(game.getActiveHotbarItem(), null, 'hotbar slots may be empty');
+  assert.equal(game.selectHotbarResource('fiber'), false, 'hotbar selection rejects non-usable inventory resources');
   assert.equal(game.selectHotbarResource('unknown'), false, 'hotbar selection rejects unknown resources');
-  assert.equal(game.activeHotbarSlot, 2, 'invalid hotbar resource does not change selection');
+  assert.equal(game.activeHotbarSlot, 0, 'invalid hotbar resource does not change selection');
 
   game.hotbarSlots = ['torch', 'campfire', 'woodWall', 'table'];
   game.selectInventoryResource('chair');
@@ -1052,7 +1053,7 @@ const map = new TileMap();
 
   game.input.pressedThisFrame.add('i');
   game.input.pressedThisFrame.add('b');
-  game.update(0.016);
+  game.update(0.2);
   assert.equal(game.inventoryOpen, false, 'menu close key closes inventory');
   assert.equal(game.tileMap.getTile(2, 0), null, 'gameplay stays paused for the frame that closes a menu');
 }
@@ -1282,7 +1283,8 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-resource="rawWood"'), true, 'inventory panel exposes clickable item rows');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-tab="tools"'), true, 'inventory panel exposes category tabs');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-filter="true"'), true, 'inventory panel exposes a filter field');
-  assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hotbar-Slot anklicken'), true, 'inventory panel explains hotbar assignment');
+  assert.equal(inventoryPanel.innerHTML.includes('Hand-Slot oder Hotbar-Slot'), true, 'inventory panel explains hand and hotbar assignment');
+  assert.equal(inventoryPanel.innerHTML.includes('data-hand-slot="true"'), true, 'inventory panel exposes a hand equipment slot');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-hotbar-slot="1"'), true, 'inventory panel exposes its own hotbar assignment slots');
   assert.equal(inventoryPanel.innerHTML.includes('Hotbar 2: Stein'), true, 'inventory hotbar shows assigned slot labels');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
@@ -1489,7 +1491,7 @@ const map = new TileMap();
   assert.equal(game.dropSystem.drops.length, 1, 'mobile crystal action spawns a visible drop');
   assert.equal(game.crystalSystem.lastMessage.includes('Kristall wirft'), true, 'mobile crystal action logs visible drop spawn');
   game.player.setPosition(game.dropSystem.drops[0].x - PLAYER_SIZE / 2, game.dropSystem.drops[0].y - PLAYER_SIZE + PLAYER_FOOT_OFFSET);
-  game.update(0.016);
+  game.update(0.2);
   assert.equal(Object.values(game.inventory.resources).reduce((sum, amount) => sum + amount, 0), 1, 'player collects visible crystal drop by proximity');
 }
 
@@ -1514,8 +1516,7 @@ const map = new TileMap();
 
   game.crystalSystem.random = () => 0.1;
   game.inventory.add('woodenPickaxe', 1);
-  game.hotbarSlots[0] = 'woodenPickaxe';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('woodenPickaxe');
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 33 });
   game.update(0.016);
 
@@ -1531,16 +1532,16 @@ const map = new TileMap();
 
   game.crystalSystem.random = () => 0.1;
   game.inventory.add('woodenSpear', 1);
-  game.hotbarSlots[0] = 'woodenSpear';
+  game.equipHandItem('woodenSpear');
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 34 });
   game.update(0.016);
   assert.equal(game.crystalSystem.lastMessage, 'Eine Kreatur erscheint!', 'mobile spear attack at the crystal starts an encounter');
   assert.equal(game.enemySystem.activeCount(), 1, 'mobile spear crystal attack spawns one enemy');
 
-  game.hotbarSlots[0] = 'earth';
+  game.handItem = null;
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 35 });
   game.update(0.016);
-  assert.equal(game.crystalSystem.lastMessage, 'Keine Waffe ausgewählt.', 'mobile attack without weapon reports missing weapon');
+  assert.equal(game.crystalSystem.lastMessage, 'Keine Waffe ausgeruestet.', 'mobile attack without weapon reports missing weapon');
 }
 
 {
@@ -1549,7 +1550,7 @@ const map = new TileMap();
 
   game.crystalSystem.random = () => 0.1;
   game.inventory.add('woodenPickaxe', 1);
-  game.hotbarSlots[0] = 'woodenPickaxe';
+  game.equipHandItem('woodenPickaxe');
   assert.equal(game.tryAttackAction(), true, 'wooden pickaxe attack works at the crystal');
   assert.equal(game.inventory.get('stone'), 0, 'wooden pickaxe attack spawns a visible drop before pickup');
   assert.equal(game.dropSystem.drops[0].resource, 'stone', 'wooden pickaxe attack uses stone drop logic');
@@ -1567,7 +1568,7 @@ const map = new TileMap();
   game.crystalSystem.random = () => 0.1;
 
   game.inventory.add('woodenSpear', 1);
-  game.hotbarSlots[0] = 'woodenSpear';
+  game.equipHandItem('woodenSpear');
   game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
   assert.equal(game.tryAttackAction(), false, 'spear attack without target fails cleanly');
   assert.equal(game.crystalSystem.lastMessage, 'Kein Ziel.', 'spear attack without target writes no-target log');
@@ -1580,7 +1581,7 @@ const map = new TileMap();
   game.crystalSystem.random = () => 0.1;
 
   game.inventory.add('woodenSpear', 1);
-  game.hotbarSlots[0] = 'woodenSpear';
+  game.equipHandItem('woodenSpear');
   assert.equal(game.tryAttackAction(), true, 'spear attack at the crystal starts an encounter');
   assert.equal(game.enemySystem.activeCount(), 1, 'spear crystal encounter spawns one active enemy');
   assert.equal(game.enemySystem.enemies[0].hp, 4, 'enemy starts with four hit points');
@@ -1597,7 +1598,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.inventory.add('woodenSpear', 1);
-  game.hotbarSlots[0] = 'woodenSpear';
+  game.equipHandItem('woodenSpear');
   game.enemySystem.spawnNearCrystal(game.tileMap);
   const enemy = game.enemySystem.enemies[0];
   const startX = enemy.x;
@@ -1667,7 +1668,8 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.inventory.add('earth', 2);
-  game.selectHotbarResource('rawWood');
+  game.inventory.add('roastedBerries', 1);
+  game.selectHotbarResource('roastedBerries');
   game.player.setPosition(
     1 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -1846,10 +1848,9 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.inventory.add('woodenPickaxe', 1);
-  game.selectHotbarResource('woodenPickaxe');
+  assert.equal(game.selectHotbarResource('woodenPickaxe'), false, 'wooden pickaxe cannot be assigned to the hotbar');
 
-  assert.equal(game.tryPlaceSelectedItem(), false, 'wooden pickaxe cannot be placed in this slice');
-  assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'wooden pickaxe writes a non-placeable log message');
+  assert.equal(game.equipHandItem('woodenPickaxe'), true, 'wooden pickaxe can be equipped in the hand slot');
 }
 
 {
@@ -1857,10 +1858,9 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.inventory.add('woodenSpear', 1);
-  game.selectHotbarResource('woodenSpear');
+  assert.equal(game.selectHotbarResource('woodenSpear'), false, 'wooden spear cannot be assigned to the hotbar');
 
-  assert.equal(game.tryPlaceSelectedItem(), false, 'wooden spear cannot be placed in this slice');
-  assert.equal(game.crystalSystem.lastMessage, 'Dieses Item kann noch nicht platziert werden.', 'wooden spear writes a non-placeable log message');
+  assert.equal(game.equipHandItem('woodenSpear'), true, 'wooden spear can be equipped in the hand slot');
 }
 
 {
@@ -1970,7 +1970,7 @@ const map = new TileMap();
     game.dropSystem.drops[0].x - PLAYER_SIZE / 2,
     game.dropSystem.drops[0].y - PLAYER_SIZE + PLAYER_FOOT_OFFSET
   );
-  game.update(0.016);
+  game.update(0.2);
   assert.equal(game.dropSystem.drops.length, 0, 'nearby player automatically picks up a visible drop');
   assert.equal(game.inventory.get('earth'), 1, 'pickup adds dropped resource to inventory');
   assert.equal(game.crystalSystem.lastMessage, 'Erde eingesammelt.', 'pickup writes a clear log message');
@@ -2085,12 +2085,14 @@ const map = new TileMap();
   assert.equal(loadedGame.logSystem.toJSON().includes('Log 6'), true, 'saved log entries load from local storage');
 
   loadedGame.hotbarSlots = ['earth', 'stone', 'woodenPickaxe', null];
+  loadedGame.inventory.add('woodenPickaxe', 1);
   loadedGame.selectHotbarSlot(2);
   loadedGame.saveGame();
   const reloadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
-  assert.deepEqual(reloadedGame.hotbarSlots, ['earth', 'stone', 'woodenPickaxe', null], 'hotbar assignments load from local storage');
+  assert.deepEqual(reloadedGame.hotbarSlots, ['earth', 'stone', null, null], 'weapon hotbar assignments are removed while loading old saves');
   assert.equal(reloadedGame.activeHotbarSlot, 2, 'active hotbar slot loads from local storage');
-  assert.equal(reloadedGame.getActiveHotbarItem(), 'woodenPickaxe', 'active hotbar item is restored from slot assignment');
+  assert.equal(reloadedGame.getActiveHotbarItem(), null, 'active hotbar item is empty after weapon migration');
+  assert.equal(reloadedGame.getEquippedHandItem(), 'woodenPickaxe', 'migrated weapon is restored in the hand slot');
 }
 
 {
@@ -2104,6 +2106,27 @@ const map = new TileMap();
   assert.equal(saveSystem.clear(), true, 'save system clears storage');
   assert.equal(storage.calls.removeItem, 1, 'save system uses storage.removeItem');
   assert.equal(saveSystem.load(), null, 'cleared save returns null');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+
+  game.inventory.add('earth', 3);
+  game.player.hp = 4;
+  assert.equal(game.saveManualSaveSlot(1), true, 'manual save slot writes the full game state');
+  game.inventory.remove('earth', 3);
+  game.player.hp = 1;
+  assert.equal(game.loadManualSaveSlot(1), true, 'manual save slot loads the saved game state');
+  assert.equal(game.inventory.get('earth'), 3, 'manual save slot restores inventory');
+  assert.equal(game.player.hp, 4, 'manual save slot restores player HP');
+  assert.equal(game.deleteManualSaveSlot(1), true, 'manual save slot can be deleted');
+  assert.equal(game.saveSystem.listSlots()[0].occupied, false, 'deleted manual save slot is empty');
+
+  game.saveManualSaveSlot(2);
+  game.resetGame({ keepManualSlots: true });
+  assert.equal(game.saveSystem.listSlots()[1].occupied, true, 'reset does not delete manual save slots');
 }
 
 {
@@ -2185,7 +2208,9 @@ const map = new TileMap();
 
 {
   const element = { innerHTML: '' };
+  const heartElement = { innerHTML: '' };
   const hud = new Hud(element);
+  const detachedHud = new Hud(element, heartElement);
   const debug = {
     playerX: 0,
     playerY: 0,
@@ -2219,6 +2244,17 @@ const map = new TileMap();
   });
   assert.equal(element.innerHTML.includes('<strong>Debug:</strong>'), true, 'HUD shows debug information when enabled');
   assert.equal(element.innerHTML.includes('save: saved'), true, 'debug HUD shows save status');
+
+  detachedHud.update({
+    inventory: {},
+    hint: 'Neues Spiel gestartet.',
+    debug,
+    debugEnabled: true,
+    hearts: ['full', 'half', 'empty'],
+    resetHoldSeconds: 0
+  });
+  assert.equal(element.innerHTML.includes('heart-hud'), false, 'detached heart HUD is not nested in the log panel');
+  assert.equal(heartElement.innerHTML.includes('heart-full'), true, 'detached heart HUD receives heart markup');
 }
 
 {
@@ -2279,8 +2315,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.crystalSystem.random = () => 0.1;
   game.inventory.add('woodenPickaxe', 1);
-  game.hotbarSlots[0] = 'woodenPickaxe';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('woodenPickaxe');
 
   game.tryAttackAction();
 
@@ -2373,8 +2408,9 @@ const map = new TileMap();
   assert.equal(loadedGame.inventory.get('bow'), 1, 'saved bow loads from storage');
   assert.equal(loadedGame.inventory.get('arrow'), 7, 'saved arrows load from storage');
   assert.equal(loadedGame.inventory.get('stoneBall'), 5, 'saved stone balls load from storage');
-  assert.deepEqual(loadedGame.hotbarSlots, ['slingshot', 'bow', 'arrow', 'stoneBall'], 'new items can be assigned to the four-slot hotbar');
-  assert.equal(loadedGame.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar remains capped at four slots with new items');
+  assert.deepEqual(loadedGame.hotbarSlots, [null, null, null, null], 'weapons and ammo are removed from hotbar when loading old saves');
+  assert.equal(loadedGame.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar remains capped at four slots after migration');
+  assert.equal(loadedGame.getEquippedHandItem(), 'slingshot', 'first migrated hand item is equipped');
 }
 
 {
@@ -2382,7 +2418,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.crystalSystem.random = () => 0.9;
   game.inventory.add('slingshot', 1);
-  game.selectHotbarResource('slingshot');
+  game.equipHandItem('slingshot');
   game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
 
   assert.equal(game.tryAttackAction(), false, 'slingshot does not shoot without stone balls');
@@ -2398,7 +2434,7 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.inventory.add('bow', 1);
-  game.selectHotbarResource('bow');
+  game.equipHandItem('bow');
   game.player.setPosition(6 * TILE_SIZE, 6 * TILE_SIZE);
 
   assert.equal(game.tryAttackAction(), false, 'bow does not shoot without arrows');
@@ -2430,7 +2466,7 @@ const map = new TileMap();
   game.enemySystem.enemies.push(enemy);
   game.inventory.add('slingshot', 1);
   game.inventory.add('stoneBall', 1);
-  game.selectHotbarResource('slingshot');
+  game.equipHandItem('slingshot');
   game.player.setPosition(
     5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -2451,7 +2487,7 @@ const map = new TileMap();
   game.enemySystem.enemies.push(enemy);
   game.inventory.add('bow', 1);
   game.inventory.add('arrow', 1);
-  game.selectHotbarResource('bow');
+  game.equipHandItem('bow');
   game.player.setPosition(
     5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -2472,7 +2508,7 @@ const map = new TileMap();
   game.flyingEnemySystem.enemies.push(flying);
   game.inventory.add('bow', 1);
   game.inventory.add('arrow', 1);
-  game.selectHotbarResource('bow');
+  game.equipHandItem('bow');
   game.player.setPosition(
     5 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -2491,7 +2527,7 @@ const map = new TileMap();
   game.crystalSystem.random = () => 0.9;
   game.inventory.add('slingshot', 1);
   game.inventory.add('stoneBall', 1);
-  game.selectHotbarResource('slingshot');
+  game.equipHandItem('slingshot');
 
   assert.equal(game.tryAttackAction(), true, 'slingshot attack at crystal starts flying encounter');
   assert.equal(game.flyingEnemySystem.activeCount(), 1, 'crystal ranged encounter spawns one flying enemy');
@@ -2540,7 +2576,7 @@ const map = new TileMap();
   game.enemySystem.enemies.push(enemy);
   game.inventory.add('bow', 1);
   game.inventory.add('arrow', 2);
-  game.selectHotbarResource('bow');
+  game.equipHandItem('bow');
   game.player.setPosition(
     2 * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
     0 * TILE_SIZE + TILE_SIZE / 2 - (PLAYER_SIZE - PLAYER_FOOT_OFFSET)
@@ -2643,8 +2679,7 @@ const map = new TileMap();
   game.dayNightSystem.load(0.3);
   game.crystalSystem.random = () => 0.91;
   game.inventory.add('woodenPickaxe', 1);
-  game.hotbarSlots[0] = 'woodenPickaxe';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('woodenPickaxe');
 
   game.tryAttackAction();
 
@@ -2684,7 +2719,7 @@ const map = new TileMap();
   pickaxeGame.dayNightSystem.load(0.9);
   pickaxeGame.crystalSystem.random = () => 0.01;
   pickaxeGame.inventory.add('woodenPickaxe', 1);
-  pickaxeGame.hotbarSlots[0] = 'woodenPickaxe';
+  pickaxeGame.equipHandItem('woodenPickaxe');
   pickaxeGame.tryAttackAction();
   assert.equal(pickaxeGame.dropSystem.drops[0].resource, 'springDrop', 'night pickaxe crystal action can create a spring drop');
 }
@@ -2855,8 +2890,9 @@ const map = new TileMap();
   assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.tree, 'saved grown tree loads');
   assert.equal(loadedGame.tileMap.getObject(-1, 1), OBJECT_TYPES.berryBush, 'saved berry bush loads');
   assert.equal(loadedGame.dropSystem.drops[0].resource, 'springDrop', 'saved visible spring drops load');
-  assert.deepEqual(loadedGame.hotbarSlots, ['clay', 'springDrop', 'axe', 'scythe'], 'new items can be assigned to the four-slot hotbar');
+  assert.deepEqual(loadedGame.hotbarSlots, ['clay', 'springDrop', null, null], 'new usable items stay in hotbar while tools migrate out');
   assert.equal(loadedGame.hotbarSlots.length, HOTBAR_SLOT_COUNT, 'hotbar stays capped at four slots after new item save/load');
+  assert.equal(loadedGame.getEquippedHandItem(), 'axe', 'first migrated tool is equipped after save/load');
 }
 
 {
@@ -3148,8 +3184,7 @@ const map = new TileMap();
 
   game.tryContextAction();
   assert.equal(spawn.animal.tethered, false, 'chicken stays free while lasso is not active');
-  game.hotbarSlots[0] = 'lasso';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('lasso');
   assert.equal(game.tryContextAction(), true, 'active lasso can catch a nearby chicken through context action');
   assert.equal(spawn.animal.tethered, true, 'caught chicken becomes tethered');
   assert.equal(game.crystalSystem.lastMessage, 'Huhn eingefangen.', 'catching chicken writes a clear log');
@@ -3219,8 +3254,7 @@ const map = new TileMap();
   const chicken = game.animalSystem.spawn(game.tileMap).animal;
   chicken.setTilePosition({ x: -1, y: 1 });
   game.inventory.add('lasso', 1);
-  game.hotbarSlots[0] = 'lasso';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('lasso');
   game.tileMap.setObject(1, 1, OBJECT_TYPES.gate);
   setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
 
@@ -3458,8 +3492,7 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.inventory.add('lasso', 1);
-  game.hotbarSlots[0] = 'lasso';
-  game.activeHotbarSlot = 0;
+  game.equipHandItem('lasso');
   const chicken = game.animalSystem.spawn(game.tileMap).animal;
   chicken.setTilePosition({ x: -1, y: 1 });
   game.tileMap.setObject(1, 1, OBJECT_TYPES.door);
@@ -4006,7 +4039,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.inventory.add('bow', 1);
   game.inventory.add('arrow', 2);
-  game.selectHotbarResource('bow');
+  game.equipHandItem('bow');
   for (let x = 2; x <= 5; x += 1) game.tileMap.setEarth(x, 0);
   const enemy = Enemy.fromTile({ x: 5, y: 0 });
   enemy.hp = 2;

@@ -3,15 +3,19 @@ import { updateOrientationState } from './ui/orientation.js';
 
 const canvas = document.querySelector('#game');
 const hudElement = document.querySelector('#hud-content');
+const heartElement = document.querySelector('#heart-hud');
 const hotbarElement = document.querySelector('#hotbar');
+const handIndicatorElement = document.querySelector('#hand-indicator');
 const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
 const buildButton = document.querySelector('#build-button');
+const settingsButton = document.querySelector('#settings-button');
 const inventoryPanel = document.querySelector('#inventory-panel');
 const craftingPanel = document.querySelector('#crafting-panel');
 const buildPanel = document.querySelector('#build-panel');
 const cookingPanel = document.querySelector('#cooking-panel');
 const furnacePanel = document.querySelector('#furnace-panel');
+const settingsPanel = document.querySelector('#settings-panel');
 const touchControlsElement = document.querySelector('#touch-controls');
 const joystickElement = document.querySelector('#touch-joystick');
 const joystickKnobElement = document.querySelector('#touch-joystick-knob');
@@ -35,18 +39,22 @@ const game = new Game(canvas, hudElement, {
   craftingPanel,
   cookingPanel,
   furnacePanel,
+  handIndicatorElement,
+  heartElement,
   hotbarElement,
   inventoryButton,
   inventoryPanel,
   joystickElement,
   joystickKnobElement,
+  settingsButton,
+  settingsPanel,
   storage: getLocalStorage(),
   touchControlsElement
 });
 game.start();
 
 const preventGameTouchDefault = (event) => {
-  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel')) return;
+  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')) return;
   event.preventDefault();
 };
 
