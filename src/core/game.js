@@ -12,6 +12,8 @@ import {
   FURNACE_INTERACTION_DISTANCE,
   GATE_INTERACTION_DISTANCE,
   GAME_VIEW,
+  HAND_EQUIPMENT_RESOURCES,
+  HOTBAR_ALLOWED_RESOURCES,
   HUSBANDRY_INTERACTION_DISTANCE,
   HUSBANDRY_PRODUCTION_DISTANCE,
   HOTBAR_SLOT_COUNT,
@@ -51,6 +53,7 @@ import { PlantSystem } from '../systems/plant-system.js';
 import { LogSystem } from '../systems/log-system.js';
 import { Hud } from '../ui/hud.js';
 import { Hotbar } from '../ui/hotbar.js';
+import { HandIndicator } from '../ui/hand-indicator.js';
 import { MenuPanels } from '../ui/menu-panels.js';
 import { PointerHitboxSystem } from '../ui/pointer-hitboxes.js';
 
@@ -72,6 +75,8 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
 ]);
 
 const REMOVABLE_OBJECT_ITEMS = new Set(REMOVABLE_OBJECT_TYPES);
+const HAND_EQUIPMENT_ITEMS = new Set(HAND_EQUIPMENT_RESOURCES);
+const HOTBAR_ALLOWED_ITEMS = new Set(HOTBAR_ALLOWED_RESOURCES);
 const FOOD_HEALING = {
   berry: 1,
   roastedBerries: 2,
@@ -111,19 +116,22 @@ export class Game {
     this.backgroundSystem = new BackgroundSystem();
     this.renderSystem = new RenderSystem(this.context);
     this.saveSystem = new SaveSystem(options.storage);
-    this.hud = new Hud(hudElement);
+    this.hud = new Hud(hudElement, options.heartElement);
     this.hotbar = new Hotbar(options.hotbarElement);
+    this.handIndicator = new HandIndicator(options.handIndicatorElement);
     this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({
       buildPanel: options.buildPanel,
       cookingPanel: options.cookingPanel,
       craftingPanel: options.craftingPanel,
       furnacePanel: options.furnacePanel,
-      inventoryPanel: options.inventoryPanel
+      inventoryPanel: options.inventoryPanel,
+      settingsPanel: options.settingsPanel
     });
     this.buildButton = options.buildButton;
     this.inventoryButton = options.inventoryButton;
     this.craftingButton = options.craftingButton;
+    this.settingsButton = options.settingsButton;
     this.pointerHitboxes = new PointerHitboxSystem({
       buildButton: options.buildButton,
       buildPanel: options.buildPanel,
@@ -136,6 +144,7 @@ export class Game {
       getCookingOpen: () => this.cookingOpen,
       getCraftingOpen: () => this.craftingOpen,
       getFurnaceOpen: () => this.furnaceOpen,
+      getSettingsOpen: () => this.settingsOpen,
       getInventoryOpen: () => this.inventoryOpen,
       hotbarElement: options.hotbarElement,
       inventoryButton: options.inventoryButton,
@@ -159,12 +168,20 @@ export class Game {
       onCraftingToggle: () => this.toggleCraftingMenu(),
       onFurnace: (recipeId) => this.tryFurnace(recipeId),
       onFurnaceSelect: (recipeId) => this.menuPanels.selectFurnaceRecipe(recipeId),
+      onHandSlotSelect: () => this.handleHandSlotClick(),
       onHotbarSelect: (slotIndex) => this.handleHotbarSlotClick(slotIndex),
       onInventoryItemSelect: (resource) => this.selectInventoryResource(resource),
       onInventoryTabSelect: (tabId) => this.menuPanels.selectInventoryTab(tabId),
       onInventoryToggle: () => this.toggleInventoryMenu(),
       onMenuClose: (menuId) => this.closeMenu(menuId),
-      pointerTarget: options.pointerTarget
+      onSettingsDeleteSlot: (slotIndex) => this.deleteManualSaveSlot(slotIndex),
+      onSettingsLoadSlot: (slotIndex) => this.loadManualSaveSlot(slotIndex),
+      onSettingsReset: () => this.resetGame({ keepManualSlots: true }),
+      onSettingsSaveSlot: (slotIndex) => this.saveManualSaveSlot(slotIndex),
+      onSettingsToggle: () => this.toggleSettingsMenu(),
+      pointerTarget: options.pointerTarget,
+      settingsButton: options.settingsButton,
+      settingsPanel: options.settingsPanel
     });
 
     this.lastTimestamp = 0;
@@ -178,7 +195,9 @@ export class Game {
     this.buildOpen = false;
     this.cookingOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.craftingContext = 'normal';
+    this.handItem = null;
     this.crystalLevel = 1;
     this.crystalXp = 0;
     this.pendingCrystalLevelUp = null;
@@ -292,6 +311,7 @@ export class Game {
       activeSlot: this.activeHotbarSlot,
       slots: this.hotbarSlots
     });
+    this.handIndicator.update(this.getHandIndicatorState());
     this.menuPanels.update({
       buildOpen: this.buildOpen,
       buildRemoveMode: this.removeMode,
@@ -303,6 +323,7 @@ export class Game {
       furnaceOpen: this.furnaceOpen,
       furnaceRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'furnace' }),
       activeHotbarSlot: this.activeHotbarSlot,
+      handItem: this.handItem,
       hasWorkbenchAccess: this.hasWorkbenchAccess(),
       hotbarSlots: this.hotbarSlots,
       inventory: this.inventory,
@@ -311,7 +332,9 @@ export class Game {
         craftingContext: this.craftingContext,
         hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false
       }),
-      selectedInventoryResource: this.selectedInventoryResource
+      selectedInventoryResource: this.selectedInventoryResource,
+      settingsOpen: this.settingsOpen,
+      saveSlots: this.saveSystem.listSlots()
     });
     this.updateMenuButtonStates();
     this.updateInteractiveUiState();
@@ -414,7 +437,7 @@ export class Game {
   tryAttackAction() {
     if (this.isGamePaused()) return false;
 
-    const activeItem = this.getActiveHotbarItem();
+    const activeItem = this.getEquippedHandItem();
 
     if (activeItem === 'woodenPickaxe' && this.inventory.get('woodenPickaxe') > 0) {
       return this.usePickaxeAttack();
@@ -454,7 +477,7 @@ export class Game {
       return this.tryUseLasso({ requireActive: true });
     }
 
-    this.setLog('Keine Waffe ausgewählt.');
+    this.setLog(activeItem ? 'Damit kannst du nicht angreifen.' : 'Keine Waffe ausgeruestet.');
     return false;
   }
 
@@ -1196,7 +1219,7 @@ export class Game {
   }
 
   tryUseLasso({ requireActive = false } = {}) {
-    const activeItem = this.getActiveHotbarItem();
+    const activeItem = this.getEquippedHandItem();
     if (activeItem !== 'lasso') return false;
     if (this.inventory.get('lasso') <= 0) {
       if (requireActive) {
@@ -1413,6 +1436,7 @@ export class Game {
     this.buildOpen = false;
     this.cookingOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.selectedInventoryResource = null;
     return true;
   }
@@ -1559,7 +1583,7 @@ export class Game {
   }
 
   isMenuOpen() {
-    return this.inventoryOpen || this.craftingOpen || this.buildOpen || this.cookingOpen || this.furnaceOpen;
+    return this.inventoryOpen || this.craftingOpen || this.buildOpen || this.cookingOpen || this.furnaceOpen || this.settingsOpen;
   }
 
   isGamePaused() {
@@ -1573,6 +1597,7 @@ export class Game {
       this.buildOpen = false;
       this.cookingOpen = false;
       this.furnaceOpen = false;
+      this.settingsOpen = false;
     } else {
       this.selectedInventoryResource = null;
     }
@@ -1594,6 +1619,7 @@ export class Game {
     this.buildOpen = false;
     this.cookingOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('workbench');
     return true;
@@ -1611,6 +1637,7 @@ export class Game {
     this.buildOpen = false;
     this.cookingOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCraftingRecipe('woodenPickaxe');
     this.setLog('Werkbank geöffnet.');
@@ -1622,6 +1649,19 @@ export class Game {
     if (this.buildOpen) {
       this.inventoryOpen = false;
       this.craftingOpen = false;
+      this.cookingOpen = false;
+      this.furnaceOpen = false;
+      this.settingsOpen = false;
+      this.selectedInventoryResource = null;
+    }
+  }
+
+  toggleSettingsMenu() {
+    this.settingsOpen = !this.settingsOpen;
+    if (this.settingsOpen) {
+      this.inventoryOpen = false;
+      this.craftingOpen = false;
+      this.buildOpen = false;
       this.cookingOpen = false;
       this.furnaceOpen = false;
       this.selectedInventoryResource = null;
@@ -1650,11 +1690,15 @@ export class Game {
       this.furnaceOpen = false;
       return true;
     }
+    if (menuId === 'settings') {
+      this.settingsOpen = false;
+      return true;
+    }
     return false;
   }
 
   selectBuildResource(resource) {
-    if (!this.isKnownInventoryResource(resource)) return false;
+    if (!this.isKnownInventoryResource(resource) || !this.isHotbarAllowed(resource)) return false;
     this.removeMode = false;
     this.buildSelectedResource = resource;
     this.selectHotbarResource(resource);
@@ -1776,6 +1820,7 @@ export class Game {
     this.craftingOpen = false;
     this.buildOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectCookingRecipe('roastedBerries');
     this.setLog('Koch-Menü geöffnet.');
@@ -1811,6 +1856,7 @@ export class Game {
     this.inventoryOpen = false;
     this.craftingOpen = false;
     this.buildOpen = false;
+    this.settingsOpen = false;
     this.selectedInventoryResource = null;
     this.menuPanels.selectFurnaceRecipe('clayBrick');
     this.setLog('Ofen geoeffnet.');
@@ -1839,6 +1885,28 @@ export class Game {
     return this.hotbarSlots[this.activeHotbarSlot] || null;
   }
 
+  getEquippedHandItem() {
+    return this.isHandEquipment(this.handItem) && this.inventory.get(this.handItem) > 0 ? this.handItem : null;
+  }
+
+  getHandIndicatorState() {
+    const handItem = this.getEquippedHandItem();
+    const ammoResource = handItem === 'bow' ? 'arrow' : handItem === 'slingshot' ? 'stoneBall' : null;
+    return {
+      handItem,
+      ammoResource,
+      ammoCount: ammoResource ? this.inventory.get(ammoResource) : 0
+    };
+  }
+
+  isHandEquipment(resource) {
+    return HAND_EQUIPMENT_ITEMS.has(resource);
+  }
+
+  isHotbarAllowed(resource) {
+    return HOTBAR_ALLOWED_ITEMS.has(resource);
+  }
+
   selectHotbarSlot(slotIndex) {
     if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= HOTBAR_SLOT_COUNT) return false;
 
@@ -1847,7 +1915,7 @@ export class Game {
   }
 
   selectHotbarResource(resource) {
-    if (!this.isKnownInventoryResource(resource)) return false;
+    if (!this.isKnownInventoryResource(resource) || !this.isHotbarAllowed(resource)) return false;
 
     const existingIndex = this.hotbarSlots.indexOf(resource);
     if (existingIndex >= 0) {
@@ -1863,6 +1931,16 @@ export class Game {
     if (!this.selectHotbarSlot(slotIndex)) return false;
 
     if (this.selectedInventoryResource) {
+      if (!this.isHotbarAllowed(this.selectedInventoryResource)) {
+        if (this.isHandEquipment(this.selectedInventoryResource)) {
+          this.equipHandItem(this.selectedInventoryResource);
+          this.setLog('Dieses Item wird in der Hand ausgeruestet.');
+          this.saveGame();
+          return true;
+        }
+        this.setLog('Dieses Item passt nicht in die Schnellleiste.');
+        return true;
+      }
       this.hotbarSlots[slotIndex] = this.selectedInventoryResource;
       this.setLog(`${RESOURCE_LABELS[this.selectedInventoryResource]} in Hotbar-Slot ${slotIndex + 1}.`);
     }
@@ -1876,6 +1954,31 @@ export class Game {
 
     this.selectedInventoryResource = resource;
     this.setLog(`${RESOURCE_LABELS[resource]} für Hotbar ausgewählt.`);
+    return true;
+  }
+
+  handleHandSlotClick() {
+    if (!this.selectedInventoryResource) {
+      const equipped = this.getEquippedHandItem();
+      this.setLog(equipped ? `${RESOURCE_LABELS[equipped]} ist ausgeruestet.` : 'Kein Hand-Item ausgewaehlt.');
+      return true;
+    }
+
+    if (!this.isHandEquipment(this.selectedInventoryResource)) {
+      this.setLog('Dieses Item gehoert in die Schnellleiste.');
+      return true;
+    }
+
+    this.equipHandItem(this.selectedInventoryResource);
+    this.setLog(`${RESOURCE_LABELS[this.selectedInventoryResource]} ausgeruestet.`);
+    this.saveGame();
+    return true;
+  }
+
+  equipHandItem(resource) {
+    if (!this.isHandEquipment(resource) || this.inventory.get(resource) <= 0) return false;
+    this.handItem = resource;
+    this.hotbarSlots = this.normalizeHotbarSlots(this.hotbarSlots);
     return true;
   }
 
@@ -1918,7 +2021,9 @@ export class Game {
     this.buildOpen = false;
     this.cookingOpen = false;
     this.furnaceOpen = false;
+    this.settingsOpen = false;
     this.craftingContext = 'normal';
+    this.handItem = null;
     this.crystalLevel = 1;
     this.crystalXp = 0;
     this.pendingCrystalLevelUp = null;
@@ -2021,7 +2126,13 @@ export class Game {
   }
 
   saveGame() {
-    const saved = this.saveSystem.save({
+    const saved = this.saveSystem.save(this.createSaveState());
+    this.saveStatus = saved ? 'saved' : 'error';
+    return saved;
+  }
+
+  createSaveState() {
+    return {
       tiles: this.tileMap.toJSON(),
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
@@ -2038,6 +2149,7 @@ export class Game {
       logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
       activeHotbarSlot: this.activeHotbarSlot,
+      handItem: this.getEquippedHandItem(),
       buildSelectedResource: this.buildSelectedResource,
       removeMode: this.removeMode,
       respawnTarget: this.respawnTarget,
@@ -2048,9 +2160,31 @@ export class Game {
         maxHp: this.player.maxHp,
         facing: this.player.facing
       }
-    });
-    this.saveStatus = saved ? 'saved' : 'error';
+    };
+  }
+
+  saveManualSaveSlot(slotIndex) {
+    const saved = this.saveSystem.saveSlot(slotIndex, this.createSaveState());
+    this.setLog(saved ? 'Spiel gespeichert.' : 'Speichern fehlgeschlagen.');
     return saved;
+  }
+
+  loadManualSaveSlot(slotIndex) {
+    const save = this.saveSystem.loadSlot(slotIndex);
+    if (!this.isValidSave(save)) {
+      this.setLog('Speicherslot ist leer.');
+      return false;
+    }
+    this.saveSystem.save(save);
+    const loaded = this.loadGame();
+    this.setLog(loaded ? 'Speicherstand geladen.' : 'Laden fehlgeschlagen.');
+    return loaded;
+  }
+
+  deleteManualSaveSlot(slotIndex) {
+    const deleted = this.saveSystem.clearSlot(slotIndex);
+    this.setLog(deleted ? 'Speicherstand geloescht.' : 'Loeschen fehlgeschlagen.');
+    return deleted;
   }
 
   render() {
@@ -2092,6 +2226,7 @@ export class Game {
     this.buildButton?.classList?.toggle('is-active', this.buildOpen);
     this.inventoryButton?.classList?.toggle('is-active', this.inventoryOpen);
     this.craftingButton?.classList?.toggle('is-active', this.craftingOpen);
+    this.settingsButton?.classList?.toggle('is-active', this.settingsOpen);
   }
 
   updateInteractiveUiState() {
@@ -2101,6 +2236,9 @@ export class Game {
     }
     if (this.touchControlsElement) {
       this.touchControlsElement.hidden = menuOpen;
+    }
+    if (this.handIndicator.element) {
+      this.handIndicator.element.hidden = menuOpen;
     }
   }
 
@@ -2136,13 +2274,16 @@ export class Game {
         ? 'cooking'
         : this.furnaceOpen
           ? 'furnace'
-          : this.craftingOpen
-            ? `crafting:${this.craftingContext}`
-            : this.inventoryOpen
-              ? 'inventory'
-              : this.buildOpen
-                ? 'build'
-                : 'none',
+          : this.settingsOpen
+            ? 'settings'
+            : this.craftingOpen
+              ? `crafting:${this.craftingContext}`
+              : this.inventoryOpen
+                ? 'inventory'
+                : this.buildOpen
+                  ? 'build'
+                  : 'none',
+      handItem: this.getEquippedHandItem() || 'leer',
       crystalLevel: this.crystalLevel,
       crystalXp: this.crystalXp,
       buildOpen: this.buildOpen,
@@ -2161,10 +2302,15 @@ export class Game {
   }
 
   loadHotbarState(save) {
+    this.handItem = this.isHandEquipment(save.handItem) && this.inventory.get(save.handItem) > 0 ? save.handItem : null;
+
     if (Array.isArray(save.hotbarSlots)) {
       this.hotbarSlots = this.normalizeHotbarSlots(save.hotbarSlots);
     } else {
       this.hotbarSlots = [...DEFAULT_HOTBAR_SLOTS];
+      if (this.isHandEquipment(save.activeHotbarResource) && this.inventory.get(save.activeHotbarResource) > 0) {
+        this.handItem = save.activeHotbarResource;
+      }
       if (this.isKnownInventoryResource(save.activeHotbarResource)) {
         const index = this.hotbarSlots.indexOf(save.activeHotbarResource);
         this.activeHotbarSlot = index >= 0 ? index : 0;
@@ -2180,7 +2326,10 @@ export class Game {
     const normalized = [];
     for (let index = 0; index < HOTBAR_SLOT_COUNT; index += 1) {
       const resource = slots[index] || null;
-      normalized.push(this.isKnownInventoryResource(resource) ? resource : null);
+      if (this.isHandEquipment(resource) && !this.handItem && this.inventory.get(resource) > 0) {
+        this.handItem = resource;
+      }
+      normalized.push(this.isKnownInventoryResource(resource) && this.isHotbarAllowed(resource) ? resource : null);
     }
     return normalized;
   }

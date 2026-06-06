@@ -1,8 +1,8 @@
 import {
-  RESOURCE_ICONS,
   RESOURCE_LABELS,
   RESOURCE_SHORT_LABELS
 } from '../config/constants.js';
+import { renderItemIcon } from './item-icons.js';
 
 export class Hotbar {
   constructor(element) {
@@ -18,7 +18,7 @@ export class Hotbar {
       const isEmpty = !resource;
       const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
       const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
-      const icon = isEmpty ? '--' : RESOURCE_ICONS[resource];
+      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource);
       const amount = isEmpty ? 0 : inventory[resource] || 0;
 
       return `

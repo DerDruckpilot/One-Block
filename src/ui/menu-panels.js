@@ -4,23 +4,25 @@ import {
   INVENTORY_RESOURCES,
   INVENTORY_TABS,
   RESOURCE_CATEGORIES,
-  RESOURCE_ICONS,
   RESOURCE_LABELS,
   RESOURCE_SHORT_LABELS
 } from '../config/constants.js';
+import { renderItemIcon } from './item-icons.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel }) {
+  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
     this.buildPanel = buildPanel;
     this.cookingPanel = cookingPanel;
     this.furnacePanel = furnacePanel;
+    this.settingsPanel = settingsPanel;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
     this.lastBuildHtml = '';
     this.lastCookingHtml = '';
     this.lastFurnaceHtml = '';
+    this.lastSettingsHtml = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
@@ -52,17 +54,21 @@ export class MenuPanels {
     furnaceOpen = false,
     furnaceRecipeStates = [],
     hotbarSlots = [],
+    handItem = null,
     activeHotbarSlot = 0,
     inventory,
     inventoryOpen,
     recipeStates,
-    selectedInventoryResource
+    selectedInventoryResource,
+    settingsOpen = false,
+    saveSlots = []
   }) {
-    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot);
+    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
     this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
     this.renderFurnace(inventory, furnaceOpen, furnaceRecipeStates);
     this.renderBuildMenu(inventory, buildOpen, buildSelectedResource, buildRemoveMode);
+    this.renderSettings(settingsOpen, saveSlots);
   }
 
   selectInventoryTab(tabId) {
@@ -96,7 +102,7 @@ export class MenuPanels {
     return `<button class="menu-close-button" type="button" data-menu-close="${menuId}" aria-label="Menue schliessen">x</button>`;
   }
 
-  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0) {
+  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
 
@@ -121,7 +127,7 @@ export class MenuPanels {
           data-inventory-resource="${resource}"
           aria-pressed="${selectedInventoryResource === resource ? 'true' : 'false'}"
         >
-          <span class="inventory-slot-icon">${RESOURCE_ICONS[resource]}</span>
+          <span class="inventory-slot-icon">${renderItemIcon(resource)}</span>
           <span class="inventory-slot-name">${RESOURCE_LABELS[resource]}</span>
           <strong class="inventory-slot-count">${inventory.get(resource)}</strong>
         </button>
@@ -134,16 +140,78 @@ export class MenuPanels {
 
     this.setInventoryHtml(`
       ${this.renderCloseButton('inventory')}
-      <div class="menu-frame-title">Inventar</div>
-      <div class="menu-tabs">${tabs}</div>
-      <label class="menu-search">
-        <span>Suche</span>
-        <input data-inventory-filter="true" type="search" value="${this.escapeAttribute(this.inventoryFilter)}" placeholder="Filter..." />
-      </label>
-      <div class="menu-note">${selectedText}</div>
-      <div class="inventory-grid">${rows}</div>
-      <div class="menu-note">Item anklicken, dann Hotbar-Slot anklicken.</div>
-      ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
+      <div class="menu-frame-title inventory-title">Inventar</div>
+      <div class="inventory-layout">
+        <aside class="inventory-character-panel">
+          <div class="inventory-character-name">Abenteurer</div>
+          <div class="inventory-equipment-grid">
+            <button
+              class="equipment-slot hand-slot${handItem ? '' : ' is-empty'}"
+              type="button"
+              data-hand-slot="true"
+              aria-label="Hand-Slot"
+            >
+              <span class="equipment-label">Hand</span>
+              ${handItem ? renderItemIcon(handItem, 'equipment-icon item-pixel-icon') : '<span class="equipment-icon item-pixel-icon item-icon-fallback">--</span>'}
+              <strong>${handItem ? RESOURCE_LABELS[handItem] : 'Leer'}</strong>
+            </button>
+            <div class="equipment-slot equipment-slot-placeholder equip-clothing" aria-hidden="true">
+              <span class="equipment-label">Kleidung</span>
+              <span class="equipment-icon equipment-placeholder-icon">T</span>
+            </div>
+            <div class="inventory-character-scene" aria-hidden="true">
+              <div class="inventory-character-sprite">
+                <span class="character-hair"></span>
+                <span class="character-face"></span>
+                <span class="character-shirt"></span>
+                <span class="character-legs"></span>
+              </div>
+              <div class="character-island">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            <div class="equipment-slot equipment-slot-placeholder equip-jewelry" aria-hidden="true">
+              <span class="equipment-label">Schmuck</span>
+              <span class="equipment-icon equipment-placeholder-icon">o</span>
+            </div>
+            <div class="equipment-slot equipment-slot-placeholder equip-offhand" aria-hidden="true">
+              <span class="equipment-label">Nebenhand</span>
+              <span class="equipment-icon equipment-placeholder-icon">O</span>
+            </div>
+            <div class="equipment-slot equipment-slot-placeholder equip-shoes" aria-hidden="true">
+              <span class="equipment-label">Schuhe</span>
+              <span class="equipment-icon equipment-placeholder-icon">U</span>
+            </div>
+          </div>
+          <div class="inventory-character-stats" aria-hidden="true">
+            <span><strong>Gesundheit</strong><i class="stat-bar stat-health"></i></span>
+            <span><strong>Ausdauer</strong><i class="stat-bar stat-stamina"></i></span>
+            <span><strong>Angriff</strong><b>10</b></span>
+            <span><strong>Bewegung</strong><b>100%</b></span>
+          </div>
+        </aside>
+        <section class="inventory-items-panel">
+          <div class="inventory-tabs-row">
+            <div class="menu-tabs">${tabs}</div>
+          </div>
+          <div class="inventory-search-row">
+            <label class="menu-search">
+              <span>Suche</span>
+              <input data-inventory-filter="true" type="search" value="${this.escapeAttribute(this.inventoryFilter)}" placeholder="Filter..." />
+            </label>
+            <span class="inventory-filter-button" aria-hidden="true">v</span>
+          </div>
+          <div class="menu-note">${selectedText}</div>
+          <div class="inventory-grid">${rows}</div>
+        </section>
+      </div>
+      <div class="inventory-hotbar-dock">
+        <div class="inventory-hotbar-title">Schnellleiste</div>
+        <div class="menu-note">Item anklicken, dann Hand-Slot oder Hotbar-Slot anklicken.</div>
+        ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
+      </div>
     `);
   }
 
@@ -153,7 +221,7 @@ export class MenuPanels {
       const resource = hotbarSlots[index] || null;
       const isActive = index === activeHotbarSlot;
       const isEmpty = !resource;
-      const icon = isEmpty ? '--' : RESOURCE_ICONS[resource];
+      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource);
       const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
       const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
       const amount = isEmpty ? 0 : inventory.get(resource);
@@ -282,7 +350,7 @@ export class MenuPanels {
         data-${dataset}="${recipe.id}"
         aria-pressed="${isSelected ? 'true' : 'false'}"
       >
-        <span class="menu-icon">${RESOURCE_ICONS[recipe.result]}</span>
+        <span class="menu-icon">${renderItemIcon(recipe.result)}</span>
         <span>${recipe.name}</span>
       </button>
     `;
@@ -296,7 +364,7 @@ export class MenuPanels {
         const isMissing = available < amount;
         return `
           <div class="material-card${isMissing ? ' is-missing' : ''}">
-            <span class="menu-icon">${RESOURCE_ICONS[resource]}</span>
+            <span class="menu-icon">${renderItemIcon(resource)}</span>
             <span>${RESOURCE_LABELS[resource]}</span>
             <strong>${available}/${amount}</strong>
           </div>
@@ -310,7 +378,7 @@ export class MenuPanels {
 
     return `
       <h3>${recipe.name}</h3>
-      <div class="recipe-result"><span class="menu-icon">${RESOURCE_ICONS[recipe.result]}</span> ${RESOURCE_LABELS[recipe.result]}</div>
+      <div class="recipe-result"><span class="menu-icon">${renderItemIcon(recipe.result)}</span> ${RESOURCE_LABELS[recipe.result]}</div>
       <div class="material-grid">${costs}</div>
       ${lockedText}
       ${missingText}
@@ -340,7 +408,7 @@ export class MenuPanels {
             data-build-resource="${resource}"
             aria-pressed="${isSelected ? 'true' : 'false'}"
           >
-            <span class="menu-icon">${RESOURCE_ICONS[resource]}</span>
+            <span class="menu-icon">${renderItemIcon(resource)}</span>
             <span>${RESOURCE_LABELS[resource]}</span>
             <strong>${amount}</strong>
           </button>
@@ -365,6 +433,51 @@ export class MenuPanels {
       >Entfernen</button>
       <div class="menu-note">${removeMode ? 'Entfernen aktiv: Ziel markieren und Aktion druecken.' : 'Item waehlen, dann mit B oder Aktion platzieren.'}</div>
       <div class="build-menu-scroll">${categories}</div>
+    `);
+  }
+
+  renderSettings(isOpen, saveSlots = []) {
+    if (!this.settingsPanel) return;
+    this.settingsPanel.hidden = !isOpen;
+
+    if (!isOpen) {
+      this.setSettingsHtml('');
+      return;
+    }
+
+    const rows = saveSlots.map((slot) => {
+      const state = slot.occupied
+        ? `Belegt${slot.savedAt ? ` · ${new Date(slot.savedAt).toLocaleString('de-DE')}` : ''}`
+        : 'Leer';
+      return `
+        <div class="settings-save-slot">
+          <div>
+            <strong>Slot ${slot.index}</strong>
+            <span>${state}</span>
+          </div>
+          <div class="settings-slot-actions">
+            <button type="button" data-save-slot="${slot.index}">Speichern</button>
+            <button type="button" data-load-slot="${slot.index}" ${slot.occupied ? '' : 'disabled'}>Laden</button>
+            <button type="button" data-delete-slot="${slot.index}" ${slot.occupied ? '' : 'disabled'}>Loeschen</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.setSettingsHtml(`
+      ${this.renderCloseButton('settings')}
+      <div class="menu-frame-title">Einstellungen</div>
+      <div class="settings-panel-content">
+        <section>
+          <h3>Manuelle Speicherstaende</h3>
+          <div class="settings-save-grid">${rows}</div>
+        </section>
+        <section class="settings-danger-zone">
+          <h3>Spielstand</h3>
+          <button class="settings-reset-button" type="button" data-settings-reset="true">Aktuellen Spielstand zuruecksetzen</button>
+          <div class="menu-note">Manuelle Save-Slots bleiben erhalten.</div>
+        </section>
+      </div>
     `);
   }
 
@@ -428,6 +541,13 @@ export class MenuPanels {
       if (nextList?.dataset?.craftScroll) {
         nextList.scrollTop = this.craftingScrollTop[nextList.dataset.craftScroll] || 0;
       }
+    }
+  }
+
+  setSettingsHtml(html) {
+    if (html !== this.lastSettingsHtml) {
+      this.settingsPanel.innerHTML = html;
+      this.lastSettingsHtml = html;
     }
   }
 }

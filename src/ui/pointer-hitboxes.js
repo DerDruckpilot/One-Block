@@ -9,6 +9,7 @@ export class PointerHitboxSystem {
     getCookingOpen = () => false,
     getCraftingOpen = () => false,
     getFurnaceOpen = () => false,
+    getSettingsOpen = () => false,
     getInventoryOpen = () => false,
     getBuildOpen = () => false,
     furnacePanel,
@@ -28,12 +29,20 @@ export class PointerHitboxSystem {
     onCraftingToggle = () => {},
     onFurnace = () => {},
     onFurnaceSelect = () => {},
+    onHandSlotSelect = () => {},
     onHotbarSelect = () => {},
     onInventoryItemSelect = () => {},
     onInventoryTabSelect = () => {},
     onInventoryToggle = () => {},
     onMenuClose = () => {},
-    pointerTarget = globalThis.window
+    onSettingsDeleteSlot = () => {},
+    onSettingsLoadSlot = () => {},
+    onSettingsReset = () => {},
+    onSettingsSaveSlot = () => {},
+    onSettingsToggle = () => {},
+    pointerTarget = globalThis.window,
+    settingsButton,
+    settingsPanel
   }) {
     this.canvas = canvas;
     this.buildButton = buildButton;
@@ -44,12 +53,15 @@ export class PointerHitboxSystem {
     this.getCookingOpen = getCookingOpen;
     this.getCraftingOpen = getCraftingOpen;
     this.getFurnaceOpen = getFurnaceOpen;
+    this.getSettingsOpen = getSettingsOpen;
     this.getInventoryOpen = getInventoryOpen;
     this.getBuildOpen = getBuildOpen;
     this.furnacePanel = furnacePanel;
     this.hotbarElement = hotbarElement;
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
+    this.settingsButton = settingsButton;
+    this.settingsPanel = settingsPanel;
     this.onBlockedCook = onBlockedCook;
     this.onBlockedCraft = onBlockedCraft;
     this.onBlockedFurnace = onBlockedFurnace;
@@ -63,11 +75,17 @@ export class PointerHitboxSystem {
     this.onCraftingToggle = onCraftingToggle;
     this.onFurnace = onFurnace;
     this.onFurnaceSelect = onFurnaceSelect;
+    this.onHandSlotSelect = onHandSlotSelect;
     this.onHotbarSelect = onHotbarSelect;
     this.onInventoryItemSelect = onInventoryItemSelect;
     this.onInventoryTabSelect = onInventoryTabSelect;
     this.onInventoryToggle = onInventoryToggle;
     this.onMenuClose = onMenuClose;
+    this.onSettingsDeleteSlot = onSettingsDeleteSlot;
+    this.onSettingsLoadSlot = onSettingsLoadSlot;
+    this.onSettingsReset = onSettingsReset;
+    this.onSettingsSaveSlot = onSettingsSaveSlot;
+    this.onSettingsToggle = onSettingsToggle;
     this.hitboxes = [];
 
     pointerTarget?.addEventListener?.('pointerdown', (event) => this.handlePointerDown(event), { capture: true });
@@ -137,7 +155,8 @@ export class PointerHitboxSystem {
     return [
       this.createElementHitbox(this.buildButton, 'top-build', () => this.onBuildToggle()),
       this.createElementHitbox(this.inventoryButton, 'top-inventory', () => this.onInventoryToggle()),
-      this.createElementHitbox(this.craftingButton, 'top-crafting', () => this.onCraftingToggle())
+      this.createElementHitbox(this.craftingButton, 'top-crafting', () => this.onCraftingToggle()),
+      this.createElementHitbox(this.settingsButton, 'top-settings', () => this.onSettingsToggle())
     ].filter(Boolean);
   }
 
@@ -279,6 +298,13 @@ export class PointerHitboxSystem {
         if (closeHitbox) hitboxes.push(closeHitbox);
       }
 
+      for (const handSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-hand-slot]') || [])) {
+        const handHitbox = this.createElementHitbox(handSlot, 'inventory-hand-slot', () => {
+          this.onHandSlotSelect();
+        });
+        if (handHitbox) hitboxes.push(handHitbox);
+      }
+
       for (const buildButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-resource]') || [])) {
         if (!buildButton.dataset.buildResource) continue;
         const buildHitbox = this.createElementHitbox(buildButton, `build-${buildButton.dataset.buildResource}`, () => {
@@ -298,11 +324,48 @@ export class PointerHitboxSystem {
       if (panelHitbox) hitboxes.push(panelHitbox);
     }
 
+    if (this.getSettingsOpen()) {
+      for (const closeButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+        if (!closeButton.dataset.menuClose) continue;
+        const closeHitbox = this.createElementHitbox(closeButton, 'close-settings', () => this.onMenuClose(closeButton.dataset.menuClose));
+        if (closeHitbox) hitboxes.push(closeHitbox);
+      }
+
+      for (const saveButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-save-slot]') || [])) {
+        const saveHitbox = this.createElementHitbox(saveButton, `save-slot-${saveButton.dataset.saveSlot}`, () => {
+          this.onSettingsSaveSlot(Number(saveButton.dataset.saveSlot));
+        });
+        if (saveHitbox) hitboxes.push(saveHitbox);
+      }
+
+      for (const loadButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-load-slot]') || [])) {
+        const loadHitbox = this.createElementHitbox(loadButton, `load-slot-${loadButton.dataset.loadSlot}`, () => {
+          if (!loadButton.disabled) this.onSettingsLoadSlot(Number(loadButton.dataset.loadSlot));
+        });
+        if (loadHitbox) hitboxes.push(loadHitbox);
+      }
+
+      for (const deleteButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-delete-slot]') || [])) {
+        const deleteHitbox = this.createElementHitbox(deleteButton, `delete-slot-${deleteButton.dataset.deleteSlot}`, () => {
+          if (!deleteButton.disabled) this.onSettingsDeleteSlot(Number(deleteButton.dataset.deleteSlot));
+        });
+        if (deleteHitbox) hitboxes.push(deleteHitbox);
+      }
+
+      for (const resetButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-settings-reset]') || [])) {
+        const resetHitbox = this.createElementHitbox(resetButton, 'settings-reset', () => this.onSettingsReset());
+        if (resetHitbox) hitboxes.push(resetHitbox);
+      }
+
+      const panelHitbox = this.createElementHitbox(this.settingsPanel, 'settings-panel', () => {}, { consume: false });
+      if (panelHitbox) hitboxes.push(panelHitbox);
+    }
+
     return hitboxes;
   }
 
   getHotbarHitboxes() {
-    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen() || this.getFurnaceOpen()) return [];
+    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen() || this.getFurnaceOpen() || this.getSettingsOpen()) return [];
 
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(
