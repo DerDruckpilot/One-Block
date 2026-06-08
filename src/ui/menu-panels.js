@@ -209,7 +209,6 @@ export class MenuPanels {
       </div>
       <div class="inventory-hotbar-dock">
         <div class="inventory-hotbar-title">Schnellleiste</div>
-        <div class="menu-note">Item anklicken, dann Hand-Slot oder Hotbar-Slot anklicken.</div>
         ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
       </div>
     `);
