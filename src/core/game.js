@@ -119,6 +119,10 @@ export class Game {
     this.hud = new Hud(hudElement, options.heartElement);
     this.hotbar = new Hotbar(options.hotbarElement);
     this.handIndicator = new HandIndicator(options.handIndicatorElement);
+    this.hudContainerElement = options.hudContainerElement || hudElement?.closest?.('#hud') || null;
+    this.heartElement = options.heartElement || null;
+    this.topMenuElement = options.topMenuElement || options.inventoryButton?.parentElement || null;
+    this.helpElement = options.helpElement || null;
     this.touchControlsElement = options.touchControlsElement;
     this.menuPanels = new MenuPanels({
       buildPanel: options.buildPanel,
@@ -2233,6 +2237,21 @@ export class Game {
     const menuOpen = this.isMenuOpen();
     if (this.hotbar.element) {
       this.hotbar.element.hidden = menuOpen;
+    }
+    if (this.hudContainerElement) {
+      this.hudContainerElement.hidden = menuOpen;
+    }
+    if (this.heartElement) {
+      this.heartElement.hidden = menuOpen;
+    }
+    if (this.topMenuElement) {
+      this.topMenuElement.hidden = menuOpen;
+    }
+    if (this.settingsButton) {
+      this.settingsButton.hidden = menuOpen && !this.settingsOpen;
+    }
+    if (this.helpElement) {
+      this.helpElement.hidden = menuOpen;
     }
     if (this.touchControlsElement) {
       this.touchControlsElement.hidden = menuOpen;

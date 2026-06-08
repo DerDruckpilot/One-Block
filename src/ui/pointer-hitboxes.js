@@ -87,8 +87,13 @@ export class PointerHitboxSystem {
     this.onSettingsSaveSlot = onSettingsSaveSlot;
     this.onSettingsToggle = onSettingsToggle;
     this.hitboxes = [];
+    this.pendingTap = null;
+    this.tapMoveThreshold = 8;
 
     pointerTarget?.addEventListener?.('pointerdown', (event) => this.handlePointerDown(event), { capture: true });
+    pointerTarget?.addEventListener?.('pointermove', (event) => this.handlePointerMove(event), { capture: true });
+    pointerTarget?.addEventListener?.('pointerup', (event) => this.handlePointerUp(event), { capture: true });
+    pointerTarget?.addEventListener?.('pointercancel', (event) => this.cancelPendingTap(event), { capture: true });
   }
 
   updateHitboxes() {
@@ -114,11 +119,55 @@ export class PointerHitboxSystem {
       return false;
     }
 
+    if (hitbox.deferTap) {
+      this.pendingTap = {
+        hitbox,
+        pointerId: event.pointerId,
+        startX: point.clientX,
+        startY: point.clientY,
+        moved: false
+      };
+      return true;
+    }
+
     if (hitbox.consume !== false) {
       this.consumeEvent(event);
     }
     hitbox.action(point);
     return true;
+  }
+
+  handlePointerMove(event) {
+    if (!this.pendingTap || this.pendingTap.pointerId !== event.pointerId) return false;
+    const point = this.getPointerPoint(event);
+    const distance = Math.hypot(point.clientX - this.pendingTap.startX, point.clientY - this.pendingTap.startY);
+    if (distance > this.tapMoveThreshold) {
+      this.pendingTap.moved = true;
+    }
+    return false;
+  }
+
+  handlePointerUp(event) {
+    if (!this.pendingTap || this.pendingTap.pointerId !== event.pointerId) return false;
+
+    const pending = this.pendingTap;
+    this.pendingTap = null;
+    if (pending.moved) return false;
+
+    const point = this.getPointerPoint(event);
+    if (!this.contains(pending.hitbox.rect, point.clientX, point.clientY)) return false;
+
+    if (pending.hitbox.consume !== false) {
+      this.consumeEvent(event);
+    }
+    pending.hitbox.action(point);
+    return true;
+  }
+
+  cancelPendingTap(event) {
+    if (!this.pendingTap || this.pendingTap.pointerId === event.pointerId) {
+      this.pendingTap = null;
+    }
   }
 
   getPointerPoint(event) {
@@ -275,8 +324,15 @@ export class PointerHitboxSystem {
         if (!itemButton.dataset.inventoryResource) continue;
         const itemHitbox = this.createElementHitbox(itemButton, `inventory-${itemButton.dataset.inventoryResource}`, () => {
           this.onInventoryItemSelect(itemButton.dataset.inventoryResource);
-        });
+        }, { deferTap: true });
         if (itemHitbox) hitboxes.push(itemHitbox);
+      }
+
+      for (const handSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-hand-slot]') || [])) {
+        const handHitbox = this.createElementHitbox(handSlot, 'inventory-hand-slot', () => {
+          this.onHandSlotSelect();
+        });
+        if (handHitbox) hitboxes.push(handHitbox);
       }
 
       for (const hotbarSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-hotbar-slot]') || [])) {
@@ -296,13 +352,6 @@ export class PointerHitboxSystem {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-build', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
-      }
-
-      for (const handSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-hand-slot]') || [])) {
-        const handHitbox = this.createElementHitbox(handSlot, 'inventory-hand-slot', () => {
-          this.onHandSlotSelect();
-        });
-        if (handHitbox) hitboxes.push(handHitbox);
       }
 
       for (const buildButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-resource]') || [])) {
@@ -392,7 +441,8 @@ export class PointerHitboxSystem {
         bottom: rect.bottom
       },
       action,
-      consume: options.consume
+      consume: options.consume,
+      deferTap: options.deferTap === true
     };
   }
 

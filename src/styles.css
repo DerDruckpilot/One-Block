@@ -13,6 +13,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   width: 100%;
@@ -1042,7 +1046,7 @@ button.menu-row:hover {
 #inventory-panel .inventory-character-sprite {
   position: absolute;
   left: 50%;
-  top: clamp(12px, 7%, 28px);
+  top: clamp(24px, 12%, 36px);
   z-index: 2;
   width: 104px;
   height: 154px;
@@ -1172,8 +1176,13 @@ button.menu-row:hover {
   max-width: 100%;
   color: #fff4d2;
   font-size: 11px;
+  line-height: 1.05;
   text-align: center;
   text-shadow: 0 2px 0 #2b1a11;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 #inventory-panel .equipment-icon {
@@ -1297,6 +1306,8 @@ button.menu-row:hover {
 
 #inventory-panel .inventory-grid {
   grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  grid-auto-rows: minmax(86px, max-content);
+  align-content: start;
   gap: 8px;
   max-height: none;
   min-height: 0;
@@ -1321,6 +1332,7 @@ button.menu-row:hover {
   box-shadow:
     inset 0 0 0 2px #8d653e,
     0 3px 0 rgba(43, 26, 17, 0.5);
+  touch-action: pan-y;
 }
 
 #inventory-panel .inventory-slot:hover,
@@ -1347,6 +1359,11 @@ button.menu-row:hover {
   color: #f8e2b2;
   font-size: 11px;
   line-height: 1.05;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 #inventory-panel .inventory-slot-count {
@@ -1400,6 +1417,13 @@ button.menu-row:hover {
     linear-gradient(180deg, rgba(255, 219, 146, 0.08), rgba(25, 14, 9, 0.12)),
     #3a2418;
   box-shadow: inset 0 0 0 2px #7a5d3e, 0 3px 0 rgba(43, 26, 17, 0.5);
+}
+
+#inventory-panel .inventory-hotbar-slot .hotbar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #help {
@@ -1714,7 +1738,7 @@ button.menu-row:hover {
 
 @media (max-height: 560px) and (orientation: landscape) {
   #inventory-panel {
-    top: max(42px, calc(env(safe-area-inset-top) + 42px));
+    top: max(22px, calc(env(safe-area-inset-top) + 22px));
     width: min(940px, calc(100vw - 14px - env(safe-area-inset-left) - env(safe-area-inset-right)));
     max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: 7px 9px 8px;
@@ -1795,7 +1819,7 @@ button.menu-row:hover {
   #inventory-panel .inventory-character-sprite {
     width: 68px;
     height: 100px;
-    top: 4px;
+    top: 30px;
   }
 
   #inventory-panel .character-hair {
@@ -1943,6 +1967,8 @@ button.menu-row:hover {
 
   #inventory-panel .inventory-grid {
     grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+    grid-auto-rows: 52px;
+    align-content: start;
     gap: 4px;
     padding: 5px;
     border-width: 3px;
