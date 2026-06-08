@@ -1711,3 +1711,317 @@ button.menu-row:hover {
     padding: 5px 7px;
   }
 }
+
+@media (max-height: 560px) and (orientation: landscape) {
+  #inventory-panel {
+    top: max(42px, calc(env(safe-area-inset-top) + 42px));
+    width: min(940px, calc(100vw - 14px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 7px 9px 8px;
+    border-radius: 8px;
+    box-shadow:
+      inset 0 0 0 3px #2b1a11,
+      inset 0 0 0 6px #7a5d3e,
+      0 10px 26px rgba(0, 0, 0, 0.44);
+    font-size: 11px;
+  }
+
+  #inventory-panel::before {
+    height: 7px;
+    margin: -2px 42px 0;
+    border-width: 2px;
+  }
+
+  #inventory-panel::after {
+    display: none;
+  }
+
+  #inventory-panel .menu-close-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    margin: -2px -1px 0 5px;
+    border-width: 3px;
+    border-radius: 7px;
+    font-size: 17px;
+  }
+
+  #inventory-panel .inventory-title {
+    min-width: 150px;
+    margin: -14px auto 6px;
+    padding: 4px 22px;
+    border-width: 2px;
+    font-size: 18px;
+    box-shadow: inset 0 2px 0 #d59a55, 0 2px 0 rgba(43, 26, 17, 0.55);
+  }
+
+  #inventory-panel .inventory-layout {
+    grid-template-columns: minmax(198px, 0.76fr) minmax(318px, 1.24fr);
+    gap: 8px;
+    height: min(270px, calc(100dvh - 126px));
+    min-height: 228px;
+  }
+
+  #inventory-panel .inventory-character-panel,
+  #inventory-panel .inventory-items-panel {
+    border-width: 3px;
+    border-radius: 8px;
+    box-shadow:
+      inset 0 0 0 2px #e5b978,
+      inset 0 0 0 4px rgba(70, 42, 25, 0.16),
+      0 2px 0 rgba(43, 26, 17, 0.36);
+  }
+
+  #inventory-panel .inventory-character-panel {
+    gap: 5px;
+    padding: 7px;
+  }
+
+  #inventory-panel .inventory-character-name {
+    font-size: 11px;
+  }
+
+  #inventory-panel .inventory-equipment-grid {
+    grid-template-columns: 50px minmax(72px, 1fr) 50px;
+    grid-template-rows: minmax(48px, 0.82fr) minmax(76px, 1fr) minmax(48px, 0.82fr);
+    gap: 5px;
+  }
+
+  #inventory-panel .inventory-character-scene {
+    min-height: 160px;
+  }
+
+  #inventory-panel .inventory-character-sprite {
+    width: 68px;
+    height: 100px;
+    top: 4px;
+  }
+
+  #inventory-panel .character-hair {
+    left: 19px;
+    top: 5px;
+    width: 31px;
+    height: 16px;
+    box-shadow: -6px 6px 0 #6b3b20, 6px 5px 0 #3b2417, 0 -3px 0 #3b2417;
+  }
+
+  #inventory-panel .character-face {
+    left: 21px;
+    top: 19px;
+    width: 26px;
+    height: 25px;
+    box-shadow:
+      inset 5px 10px 0 -4px #2b1a11,
+      inset -5px 10px 0 -4px #2b1a11,
+      0 20px 0 -12px #8a4e33;
+  }
+
+  #inventory-panel .character-shirt {
+    left: 17px;
+    top: 45px;
+    width: 35px;
+    height: 39px;
+    box-shadow:
+      inset 13px 0 0 #fff0cf,
+      -5px 7px 0 -4px #c98b5e,
+      5px 7px 0 -4px #c98b5e,
+      0 36px 0 -12px #8a5a35;
+  }
+
+  #inventory-panel .character-legs {
+    left: 23px;
+    top: 81px;
+    width: 8px;
+    height: 16px;
+    box-shadow: 16px 0 0 #c98b5e, 0 13px 0 -4px #5b331c, 16px 13px 0 -4px #5b331c;
+  }
+
+  #inventory-panel .character-island {
+    bottom: 18px;
+    width: 102px;
+    height: 34px;
+    border-width: 3px;
+    border-radius: 22px 22px 12px 12px;
+    box-shadow: inset 0 3px 0 #8dc365, 0 4px 0 #2b1a11;
+  }
+
+  #inventory-panel .character-island span {
+    width: 8px;
+    height: 5px;
+    bottom: 7px;
+  }
+
+  #inventory-panel .character-island span:nth-child(1) { left: 15px; }
+  #inventory-panel .character-island span:nth-child(2) { left: 68px; bottom: 11px; }
+  #inventory-panel .character-island span:nth-child(3) { left: 82px; bottom: 7px; }
+
+  #inventory-panel .equipment-slot {
+    min-height: 48px;
+    padding: 3px;
+    border-width: 3px;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
+  }
+
+  #inventory-panel .equipment-label,
+  #inventory-panel .equipment-slot strong {
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  #inventory-panel .equipment-icon {
+    width: 22px;
+    height: 22px;
+    margin: 2px auto;
+  }
+
+  #inventory-panel .inventory-character-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 6px;
+    padding: 5px;
+    border-width: 2px;
+    border-radius: 6px;
+    font-size: 9px;
+  }
+
+  #inventory-panel .inventory-character-stats span {
+    gap: 2px;
+  }
+
+  #inventory-panel .stat-bar {
+    height: 7px;
+    border-width: 1px;
+  }
+
+  #inventory-panel .inventory-items-panel {
+    padding: 7px;
+  }
+
+  #inventory-panel .menu-tabs {
+    gap: 4px;
+    padding-bottom: 4px;
+  }
+
+  #inventory-panel .menu-tab {
+    min-width: 70px;
+    min-height: 32px;
+    padding: 4px 7px;
+    border-width: 3px;
+    border-radius: 7px 7px 4px 4px;
+    font-size: 10px;
+  }
+
+  #inventory-panel .inventory-search-row {
+    grid-template-columns: 1fr 32px;
+    gap: 5px;
+  }
+
+  #inventory-panel .menu-search {
+    gap: 5px;
+    font-size: 10px;
+  }
+
+  #inventory-panel .menu-search input {
+    min-height: 32px;
+    padding: 4px 7px;
+    border-width: 3px;
+    border-radius: 6px;
+    font-size: 10px;
+  }
+
+  #inventory-panel .inventory-filter-button {
+    min-height: 32px;
+    border-width: 3px;
+    border-radius: 6px;
+  }
+
+  #inventory-panel .menu-note {
+    margin-top: 4px;
+    font-size: 9px;
+  }
+
+  #inventory-panel .inventory-grid {
+    grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+    gap: 4px;
+    padding: 5px;
+    border-width: 3px;
+    border-radius: 7px;
+  }
+
+  #inventory-panel .inventory-slot {
+    grid-template-rows: 24px 1fr;
+    min-height: 52px;
+    padding: 3px 3px 4px;
+    border-width: 3px;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
+  }
+
+  #inventory-panel .inventory-slot-icon .item-pixel-icon,
+  #inventory-panel .hotbar-icon .item-pixel-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  #inventory-panel .inventory-slot-name {
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  #inventory-panel .inventory-slot-count {
+    right: 4px;
+    bottom: 4px;
+    min-width: 14px;
+    font-size: 10px;
+  }
+
+  #inventory-panel .inventory-hotbar-dock {
+    bottom: -8px;
+    width: min(360px, 96%);
+    margin: 7px auto -5px;
+    padding: 6px 8px 7px;
+    border-width: 3px;
+    border-radius: 9px;
+    box-shadow: inset 0 0 0 2px #8d7354, 0 -2px 0 rgba(43, 26, 17, 0.24);
+  }
+
+  #inventory-panel .inventory-hotbar-title {
+    margin: -17px auto 3px;
+    padding: 2px 16px;
+    border-width: 2px;
+    border-radius: 5px;
+    font-size: 12px;
+  }
+
+  #inventory-panel .inventory-hotbar-assignment {
+    grid-template-columns: repeat(4, minmax(48px, 62px));
+    gap: 5px;
+    margin-top: 0;
+  }
+
+  #inventory-panel .inventory-hotbar-slot {
+    grid-template-columns: 20px 1fr;
+    grid-template-rows: 20px 13px;
+    height: 42px;
+    min-height: 42px;
+    padding: 3px;
+    border-width: 3px;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px #7a5d3e, 0 2px 0 rgba(43, 26, 17, 0.36);
+  }
+
+  #inventory-panel .inventory-hotbar-slot .hotbar-key {
+    left: 3px;
+    top: 1px;
+    font-size: 9px;
+  }
+
+  #inventory-panel .inventory-hotbar-slot .hotbar-label {
+    font-size: 9px;
+  }
+
+  #inventory-panel .inventory-hotbar-slot .hotbar-count {
+    font-size: 10px;
+  }
+}
