@@ -216,11 +216,15 @@ const map = new TileMap();
 
   assert.equal(indexHtml.includes('maximum-scale=1'), true, 'mobile viewport caps pinch and double-tap zoom scale');
   assert.equal(indexHtml.includes('user-scalable=no'), true, 'mobile viewport disables browser double-tap zoom');
+  assert.equal(styles.includes('[hidden]'), true, 'hidden UI elements cannot be overridden by explicit display rules');
   assert.equal(styles.includes('touch-action: pan-y'), true, 'menu panels keep vertical touch scrolling enabled');
   assert.equal(styles.includes('-webkit-overflow-scrolling: touch'), true, 'menu panels keep momentum scrolling on mobile Safari');
   assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
+  assert.equal(styles.includes('#inventory-panel .inventory-slot-name'), true, 'inventory item labels have dedicated compact styling');
+  assert.equal(styles.includes('-webkit-line-clamp: 2'), true, 'long inventory labels are clamped to avoid slot overflow');
+  assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
@@ -684,9 +688,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointermove = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointermove') pointermove = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   let selectedSlot = null;
@@ -732,9 +740,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointermove = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointermove') pointermove = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const canvas = {
@@ -810,9 +822,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointermove = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointermove') pointermove = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const canvas = {
@@ -857,11 +873,19 @@ const map = new TileMap();
   game.inventoryOpen = true;
 
   pointerdown(createPointerEvent(330, 160));
-  assert.equal(game.selectedInventoryResource, 'stone', 'inventory item click selects an item for hotbar assignment');
+  assert.equal(game.selectedInventoryResource, null, 'inventory item waits for tap release before selection');
+  pointerup(createPointerEvent(330, 160));
+  assert.equal(game.selectedInventoryResource, 'stone', 'inventory item tap selects an item for hotbar assignment');
 
   pointerdown(createPointerEvent(430, 270));
   assert.equal(game.hotbarSlots[1], 'stone', 'clicking the inventory hotbar assigns the selected inventory item');
   assert.equal(game.activeHotbarSlot, 1, 'assigned hotbar slot becomes active');
+
+  game.selectedInventoryResource = null;
+  pointerdown(createPointerEvent(330, 160));
+  pointermove(createPointerEvent(330, 182));
+  pointerup(createPointerEvent(330, 182));
+  assert.equal(game.selectedInventoryResource, null, 'dragging on an inventory item does not accidentally select it');
 }
 
 {
@@ -1060,24 +1084,56 @@ const map = new TileMap();
 
 {
   const hotbarElement = { hidden: false, innerHTML: '' };
+  const heartElement = { hidden: false };
+  const helpElement = { hidden: false };
+  const hudContainerElement = { hidden: false };
+  const settingsButton = { hidden: false, classList: { toggle() {} } };
+  const topMenuElement = { hidden: false };
   const touchControlsElement = { hidden: false };
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, {
+    heartElement,
+    helpElement,
     hotbarElement,
+    hudContainerElement,
+    settingsButton,
+    topMenuElement,
     touchControlsElement
   });
 
   game.inventoryOpen = true;
   game.update(0.016);
+  assert.equal(hudContainerElement.hidden, true, 'log HUD is hidden while inventory is open');
+  assert.equal(heartElement.hidden, true, 'heart HUD is hidden while inventory is open');
+  assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while inventory is open');
+  assert.equal(settingsButton.hidden, true, 'settings button is hidden while inventory is open');
+  assert.equal(helpElement.hidden, true, 'help HUD is hidden while inventory is open');
   assert.equal(hotbarElement.hidden, true, 'normal hotbar is hidden while a menu is open');
   assert.equal(touchControlsElement.hidden, true, 'touch controls are hidden while a menu is open');
   assert.equal(game.getDebugState().paused, true, 'debug state exposes the pause state');
 
   game.inventoryOpen = false;
   game.update(0.016);
+  assert.equal(hudContainerElement.hidden, false, 'log HUD returns when menus close');
+  assert.equal(heartElement.hidden, false, 'heart HUD returns when menus close');
+  assert.equal(topMenuElement.hidden, false, 'top menu buttons return when menus close');
+  assert.equal(settingsButton.hidden, false, 'settings button returns when menus close');
+  assert.equal(helpElement.hidden, false, 'help HUD returns when menus close');
   assert.equal(hotbarElement.hidden, false, 'normal hotbar returns when menus close');
   assert.equal(touchControlsElement.hidden, false, 'touch controls return when menus close');
   assert.equal(game.getDebugState().paused, false, 'debug state updates after unpausing');
+
+  game.settingsOpen = true;
+  game.update(0.016);
+  assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while settings is open');
+  assert.equal(settingsButton.hidden, false, 'settings button remains available for the settings menu state');
+
+  game.settingsOpen = false;
+  game.craftingOpen = true;
+  game.update(0.016);
+  assert.equal(hudContainerElement.hidden, true, 'log HUD is hidden while crafting is open');
+  assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while crafting is open');
+  assert.equal(settingsButton.hidden, true, 'settings button is hidden while crafting is open');
 }
 
 {
@@ -1340,6 +1396,52 @@ const map = new TileMap();
   assert.equal(craftingPanel.innerHTML.includes('Tisch'), true, 'workbench crafting shows table recipe');
   assert.equal(craftingPanel.innerHTML.includes('Stuhl'), true, 'workbench crafting shows chair recipe');
   assert.equal(craftingPanel.innerHTML.includes('data-craft-select="woodenPickaxe"'), true, 'crafting list exposes selectable recipes');
+}
+
+{
+  const activeFilter = {
+    dataset: { inventoryFilter: 'true' },
+    selectionStart: 2,
+    selectionEnd: 2
+  };
+  let focused = false;
+  let selectionRange = null;
+  let grid = { scrollTop: 34 };
+  const nextFilter = {
+    dataset: { inventoryFilter: 'true' },
+    value: 'sp',
+    focus(options) {
+      focused = options?.preventScroll === true;
+    },
+    setSelectionRange(start, end) {
+      selectionRange = { start, end };
+    }
+  };
+  const inventoryPanel = {
+    ownerDocument: { activeElement: activeFilter },
+    html: 'old',
+    hidden: false,
+    get innerHTML() {
+      return this.html;
+    },
+    set innerHTML(value) {
+      this.html = value;
+      grid = { scrollTop: 0 };
+    },
+    querySelector(selector) {
+      if (selector === '.inventory-grid') return grid;
+      if (selector === '[data-inventory-filter="true"]') return nextFilter;
+      return null;
+    }
+  };
+
+  const menus = new MenuPanels({ inventoryPanel });
+  menus.lastInventoryHtml = 'old';
+  menus.setInventoryHtml('new');
+
+  assert.equal(focused, true, 'inventory filter focus is restored after live rerender');
+  assert.deepEqual(selectionRange, { start: 2, end: 2 }, 'inventory filter cursor position is restored after live rerender');
+  assert.equal(grid.scrollTop, 34, 'inventory grid scroll position survives live filter rerender');
 }
 
 {

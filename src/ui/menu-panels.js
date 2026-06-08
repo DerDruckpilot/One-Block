@@ -486,8 +486,30 @@ export class MenuPanels {
 
   setInventoryHtml(html) {
     if (html !== this.lastInventoryHtml) {
+      const activeElement = this.inventoryPanel.ownerDocument?.activeElement || null;
+      const restoreFilterFocus = activeElement?.dataset?.inventoryFilter === 'true';
+      const selectionStart = Number.isInteger(activeElement?.selectionStart) ? activeElement.selectionStart : null;
+      const selectionEnd = Number.isInteger(activeElement?.selectionEnd) ? activeElement.selectionEnd : selectionStart;
+      const previousGrid = this.inventoryPanel.querySelector?.('.inventory-grid');
+      const previousScrollTop = Number.isFinite(previousGrid?.scrollTop) ? previousGrid.scrollTop : 0;
+
       this.inventoryPanel.innerHTML = html;
       this.lastInventoryHtml = html;
+
+      const nextGrid = this.inventoryPanel.querySelector?.('.inventory-grid');
+      if (nextGrid && previousScrollTop > 0) {
+        nextGrid.scrollTop = previousScrollTop;
+      }
+
+      if (restoreFilterFocus) {
+        const nextFilter = this.inventoryPanel.querySelector?.('[data-inventory-filter="true"]');
+        nextFilter?.focus?.({ preventScroll: true });
+        if (Number.isInteger(selectionStart) && nextFilter?.setSelectionRange) {
+          const cursorStart = Math.min(selectionStart, nextFilter.value?.length ?? selectionStart);
+          const cursorEnd = Math.min(selectionEnd, nextFilter.value?.length ?? selectionEnd);
+          nextFilter.setSelectionRange(cursorStart, cursorEnd);
+        }
+      }
     }
   }
 

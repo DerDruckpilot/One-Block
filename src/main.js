@@ -2,10 +2,13 @@ import { Game } from './core/game.js';
 import { updateOrientationState } from './ui/orientation.js';
 
 const canvas = document.querySelector('#game');
+const hudContainerElement = document.querySelector('#hud');
 const hudElement = document.querySelector('#hud-content');
 const heartElement = document.querySelector('#heart-hud');
 const hotbarElement = document.querySelector('#hotbar');
 const handIndicatorElement = document.querySelector('#hand-indicator');
+const topMenuElement = document.querySelector('#top-menu');
+const helpElement = document.querySelector('#help');
 const inventoryButton = document.querySelector('#inventory-button');
 const craftingButton = document.querySelector('#crafting-button');
 const buildButton = document.querySelector('#build-button');
@@ -41,7 +44,9 @@ const game = new Game(canvas, hudElement, {
   furnacePanel,
   handIndicatorElement,
   heartElement,
+  helpElement,
   hotbarElement,
+  hudContainerElement,
   inventoryButton,
   inventoryPanel,
   joystickElement,
@@ -49,6 +54,7 @@ const game = new Game(canvas, hudElement, {
   settingsButton,
   settingsPanel,
   storage: getLocalStorage(),
+  topMenuElement,
   touchControlsElement
 });
 game.start();
