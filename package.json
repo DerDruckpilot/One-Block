@@ -16,5 +16,8 @@
     "pixel-art",
     "one-block"
   ],
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "serve": "^14.2.6"
+  }
 }
