@@ -1,6 +1,6 @@
 import { DROP_ANIMATION_SECONDS, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 import { TerrainRenderer } from './terrain-renderer.js';
-import { drawItemIcon } from '../ui/item-icons.js';
+import { drawItemIcon, getLoadedItemIconImage } from '../ui/item-icons.js';
 
 export class RenderSystem {
   constructor(context, terrainRenderer = new TerrainRenderer()) {
@@ -168,10 +168,14 @@ export class RenderSystem {
 
       this.context.save();
       this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
-      this.context.fillRect(x - 7, Math.round(drop.y - camera.y) + 8, 14, 4);
-      this.context.fillStyle = '#f7d979';
-      this.context.fillRect(x - 6, y - 8, 12, 12);
-      drawItemIcon(this.context, drop.resource, x, y - 2, 16);
+      this.context.fillRect(x - 11, Math.round(drop.y - camera.y) + 9, 22, 5);
+      if (getLoadedItemIconImage(drop.resource)) {
+        drawItemIcon(this.context, drop.resource, x, y - 4, 28);
+      } else {
+        this.context.fillStyle = '#f7d979';
+        this.context.fillRect(x - 6, y - 8, 12, 12);
+        drawItemIcon(this.context, drop.resource, x, y - 2, 16);
+      }
       this.context.restore();
     }
   }

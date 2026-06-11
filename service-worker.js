@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-1';
+const CACHE_NAME = 'one-block-v0-5-2';
 
 const CORE_ASSETS = [
   './',
@@ -38,6 +38,21 @@ const CORE_ASSETS = [
   './src/ui/menu-panels.js',
   './src/ui/orientation.js',
   './src/ui/pointer-hitboxes.js',
+  './assets/generated/icons/inventory_96/clay.png',
+  './assets/generated/icons/inventory_96/grass_block.png',
+  './assets/generated/icons/inventory_96/grass_seeds.png',
+  './assets/generated/icons/inventory_96/grass_tuft.png',
+  './assets/generated/icons/inventory_96/plant_fiber_rope.png',
+  './assets/generated/icons/inventory_96/raw_wood_log.png',
+  './assets/generated/icons/inventory_96/small_rock.png',
+  './assets/generated/icons/inventory_96/stone.png',
+  './assets/generated/icons/inventory_96/wooden_arrows.png',
+  './assets/generated/icons/inventory_96/wooden_bow.png',
+  './assets/generated/icons/inventory_96/wooden_pickaxe.png',
+  './assets/generated/icons/inventory_96/wooden_slingshot.png',
+  './assets/generated/icons/inventory_96/wooden_spear.png',
+  './assets/generated/icons/inventory_96/workbench.png',
+  './assets/generated/icons/inventory_96/yellow_ore_or_clay_lump.png',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'
 ];
