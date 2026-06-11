@@ -1,0 +1,50 @@
+{
+  "tileSize": 96,
+  "sheetGrid": {
+    "columns": 4,
+    "rows": 4
+  },
+  "materials": [
+    "grass",
+    "earth",
+    "stone",
+    "clay",
+    "farmland"
+  ],
+  "materialSheetTileOrder": [
+    "full_01",
+    "full_02",
+    "full_03",
+    "full_04",
+    "edge_top",
+    "edge_bottom",
+    "edge_left",
+    "edge_right",
+    "outer_corner_tl",
+    "outer_corner_tr",
+    "outer_corner_bl",
+    "outer_corner_br",
+    "inner_corner_tl",
+    "inner_corner_tr",
+    "inner_corner_bl",
+    "inner_corner_br"
+  ],
+  "transitionSheetRows": [
+    "grass_to_earth",
+    "earth_to_stone",
+    "earth_to_clay",
+    "earth_to_farmland",
+    "grass_to_stone"
+  ],
+  "transitionSheetColumns": [
+    "to_second_material_right",
+    "to_second_material_left",
+    "to_second_material_bottom",
+    "to_second_material_top"
+  ],
+  "notes": [
+    "Center tiles avoid hard borders so repeated areas read as continuous ground.",
+    "Edge and corner tiles include visible depth only where an autotile boundary would exist.",
+    "Transition tiles are first-pass blend assets for later autotile logic and are not integrated into gameplay."
+  ]
+}
