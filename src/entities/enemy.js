@@ -12,6 +12,8 @@ export class Enemy {
     type = 'groundling',
     hp = ENEMY_MAX_HP,
     maxHp = ENEMY_MAX_HP,
+    speed = ENEMY_SPEED,
+    damage = 1,
     healthVisible = false,
     knockback = { x: 0, y: 0, seconds: 0 },
     lastGroundTile = null
@@ -23,6 +25,8 @@ export class Enemy {
     this.type = type;
     this.hp = hp;
     this.maxHp = maxHp;
+    this.speed = Number.isFinite(speed) ? speed : ENEMY_SPEED;
+    this.damage = Number.isFinite(damage) ? damage : 1;
     this.healthVisible = healthVisible;
     this.knockback = {
       x: Number(knockback?.x || 0),
@@ -33,10 +37,11 @@ export class Enemy {
     this.hitFlashSeconds = 0;
   }
 
-  static fromTile(tile) {
+  static fromTile(tile, options = {}) {
     return new Enemy({
       x: tile.x * TILE_SIZE + TILE_SIZE / 2 - ENEMY_SIZE / 2,
-      y: tile.y * TILE_SIZE + TILE_SIZE / 2 - ENEMY_SIZE / 2
+      y: tile.y * TILE_SIZE + TILE_SIZE / 2 - ENEMY_SIZE / 2,
+      ...options
     });
   }
 
@@ -58,8 +63,8 @@ export class Enemy {
     const distance = Math.hypot(dx, dy);
     if (distance <= 1) return;
 
-    const stepX = (dx / distance) * ENEMY_SPEED * deltaSeconds;
-    const stepY = (dy / distance) * ENEMY_SPEED * deltaSeconds;
+    const stepX = (dx / distance) * this.speed * deltaSeconds;
+    const stepY = (dy / distance) * this.speed * deltaSeconds;
 
     if (this.canStandAt(this.x + stepX, this.y, tileMap)) {
       this.x += stepX;
@@ -140,6 +145,8 @@ export class Enemy {
       y: this.y,
       hp: this.hp,
       maxHp: this.maxHp,
+      speed: this.speed,
+      damage: this.damage,
       healthVisible: this.healthVisible,
       knockback: { ...this.knockback },
       lastGroundTile: this.lastGroundTile ? { ...this.lastGroundTile } : null

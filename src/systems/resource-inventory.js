@@ -1,3 +1,5 @@
+import { AMMO_CAP_UPGRADES, AMMO_CAPS } from '../config/constants.js';
+
 export class ResourceInventory {
   constructor() {
     this.resources = {
@@ -13,6 +15,7 @@ export class ResourceInventory {
       egg: 0,
       friedEgg: 0,
       rawMeat: 0,
+      wool: 0,
       roastedBerries: 0,
       cookedSteak: 0,
       clayBrick: 0,
@@ -42,12 +45,21 @@ export class ResourceInventory {
       waterTrough: 0,
       furnace: 0,
       table: 0,
-      chair: 0
+      chair: 0,
+      ammoPouch: 0,
+      quiver: 0,
+      linenTunic: 0,
+      travelBoots: 0
     };
   }
 
   add(resource, amount = 1) {
-    this.resources[resource] = this.get(resource) + amount;
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const capacity = this.getCapacity(resource);
+    const current = this.get(resource);
+    const added = Math.min(safeAmount, Math.max(0, capacity - current));
+    this.resources[resource] = current + added;
+    return added;
   }
 
   remove(resource, amount = 1) {
@@ -62,9 +74,26 @@ export class ResourceInventory {
     return this.resources[resource] || 0;
   }
 
+  getCapacity(resource) {
+    const baseCap = AMMO_CAPS[resource];
+    if (!Number.isFinite(baseCap)) return Infinity;
+    const upgrade = AMMO_CAP_UPGRADES[resource];
+    if (upgrade && this.get(upgrade.item) > 0) return upgrade.cap;
+    return baseCap;
+  }
+
+  getRemainingCapacity(resource) {
+    const capacity = this.getCapacity(resource);
+    if (!Number.isFinite(capacity)) return Infinity;
+    return Math.max(0, capacity - this.get(resource));
+  }
+
   load(resources) {
     for (const resource of Object.keys(this.resources)) {
       this.resources[resource] = Number(resources?.[resource] || 0);
+    }
+    for (const resource of Object.keys(AMMO_CAPS)) {
+      this.resources[resource] = Math.min(this.resources[resource], this.getCapacity(resource));
     }
   }
 

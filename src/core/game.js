@@ -9,6 +9,9 @@ import {
   CRYSTAL_LEVEL_THRESHOLDS,
   DEFAULT_HOTBAR_SLOTS,
   EGG_PRODUCTION_SECONDS,
+  ACCESSORY_EQUIPMENT_RESOURCES,
+  CLOTHING_EQUIPMENT_RESOURCES,
+  SHOE_EQUIPMENT_RESOURCES,
   FURNACE_INTERACTION_DISTANCE,
   GATE_INTERACTION_DISTANCE,
   GAME_VIEW,
@@ -28,6 +31,10 @@ import {
   PLAYER_SPAWN_TILE,
   REMOVABLE_OBJECT_TYPES,
   RESOURCE_LABELS,
+  SHEEP_WOOL_PRODUCTION_SECONDS,
+  SPEAR_ATTACK_DOT,
+  SPEAR_ATTACK_RANGE,
+  SPEAR_DAMAGE,
   TILE_TYPES,
   TILE_SIZE,
   WORKBENCH_INTERACTION_DISTANCE
@@ -76,7 +83,12 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
 
 const REMOVABLE_OBJECT_ITEMS = new Set(REMOVABLE_OBJECT_TYPES);
 const HAND_EQUIPMENT_ITEMS = new Set(HAND_EQUIPMENT_RESOURCES);
+const CLOTHING_EQUIPMENT_ITEMS = new Set(CLOTHING_EQUIPMENT_RESOURCES);
+const SHOE_EQUIPMENT_ITEMS = new Set(SHOE_EQUIPMENT_RESOURCES);
+const ACCESSORY_EQUIPMENT_ITEMS = new Set(ACCESSORY_EQUIPMENT_RESOURCES);
 const HOTBAR_ALLOWED_ITEMS = new Set(HOTBAR_ALLOWED_RESOURCES);
+const CRYSTAL_DROP_MIN_MISSES = 2;
+const CRYSTAL_DROP_FORCE_AFTER = 10;
 const FOOD_HEALING = {
   berry: 1,
   roastedBerries: 2,
@@ -173,6 +185,7 @@ export class Game {
       onFurnace: (recipeId) => this.tryFurnace(recipeId),
       onFurnaceSelect: (recipeId) => this.menuPanels.selectFurnaceRecipe(recipeId),
       onHandSlotSelect: () => this.handleHandSlotClick(),
+      onEquipmentSlotSelect: (slotType) => this.handleEquipmentSlotClick(slotType),
       onHotbarSelect: (slotIndex) => this.handleHotbarSlotClick(slotIndex),
       onInventoryItemSelect: (resource) => this.selectInventoryResource(resource),
       onInventoryTabSelect: (tabId) => this.menuPanels.selectInventoryTab(tabId),
@@ -202,8 +215,12 @@ export class Game {
     this.settingsOpen = false;
     this.craftingContext = 'normal';
     this.handItem = null;
+    this.clothingItem = null;
+    this.shoeItem = null;
+    this.accessoryItem = null;
     this.crystalLevel = 1;
     this.crystalXp = 0;
+    this.crystalDropMisses = 0;
     this.pendingCrystalLevelUp = null;
     this.buildSelectedResource = null;
     this.removeMode = false;
@@ -259,7 +276,7 @@ export class Game {
     this.input.setVirtualMovement(gameplayPaused ? { x: 0, y: 0 } : this.touchInput.getMovementVector());
 
     if (!gameplayPaused) {
-      this.player.update(deltaSeconds, this.input, this.tileMap);
+      this.player.update(deltaSeconds, this.input, this.tileMap, this.getMovementMultiplier());
       this.handleVoidFall();
       this.camera.centerOn(this.player.getCenterPosition());
       this.backgroundSystem.update(deltaSeconds);
@@ -268,7 +285,7 @@ export class Game {
       this.updateHusbandry(deltaSeconds);
       this.flyingEnemySystem.update(deltaSeconds, this.tileMap, this.player);
       this.handlePlayerContactDamage();
-      this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem));
+      this.handleProjectileEvents(this.projectileSystem.update(deltaSeconds, this.enemySystem, this.flyingEnemySystem, this.animalSystem));
       this.plantSystem.update(deltaSeconds, this.tileMap);
       this.handleDropCollections(this.dropSystem.update(deltaSeconds, this.player, this.inventory, this.tileMap));
       this.dayNightSystem.update(deltaSeconds);
@@ -333,6 +350,8 @@ export class Game {
       inventory: this.inventory,
       inventoryOpen: this.inventoryOpen,
       playerHearts: this.player.getHeartStates(),
+      equipment: this.getEquipmentState(),
+      characterStats: this.getCharacterStats(),
       recipeStates: this.craftingSystem.getRecipeStates({
         craftingContext: this.craftingContext,
         hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false
@@ -358,16 +377,19 @@ export class Game {
 
     if (isCloseToCrystal) {
       this.setCrystalHitFeedback('activate');
-      if (this.trySpawnNightSpringDrop()) {
-        this.saveGame();
-        return true;
+      this.advanceCrystalProgress(1);
+      if (this.shouldCreateCrystalDrop()) {
+        if (!this.trySpawnNightSpringDrop()) {
+          const drop = this.rollCrystalDrop();
+          this.spawnVisibleDrop(drop, `Kristall wirft ${RESOURCE_LABELS[drop.resource]} aus.`);
+        }
+      } else {
+        this.setLog('Der Kristall sammelt Energie.');
+        this.consumeCrystalLevelUpMessage();
       }
-
-      const drop = this.rollCrystalDrop();
-      this.spawnVisibleDrop(drop, `Kristall wirft ${RESOURCE_LABELS[drop.resource]} aus.`);
       const animalSpawn = this.animalSystem.maybeSpawn(
         this.tileMap,
-        this.crystalSystem.hitCounter % 5 === 0 ? 1 : 0
+        this.crystalSystem.hitCounter % 25 === 0 ? 0.35 : 0
       );
       if (animalSpawn.spawned && animalSpawn.message) {
         this.setLog(animalSpawn.message);
@@ -495,13 +517,14 @@ export class Game {
 
     this.setCrystalHitFeedback('attack');
     this.setLog('Du schlägst Splitter aus dem Kristall.');
-    if (this.trySpawnNightSpringDrop()) {
-      this.saveGame();
-      return true;
+    this.advanceCrystalProgress(1);
+    if (this.shouldCreateCrystalDrop()) {
+      const drop = this.rollCrystalDrop(this.getPickaxeDropTable());
+      this.spawnVisibleDrop(drop, `${RESOURCE_LABELS[drop.resource]} splittert heraus.`);
+    } else {
+      this.setLog('Der Kristall widersteht dem Schlag.');
+      this.consumeCrystalLevelUpMessage();
     }
-
-    const drop = this.rollCrystalDrop(this.getPickaxeDropTable());
-    this.spawnVisibleDrop(drop, `${RESOURCE_LABELS[drop.resource]} splittert heraus.`);
     this.saveGame();
     return true;
   }
@@ -514,6 +537,16 @@ export class Game {
         this.spawnEnemyLoot(hit.enemy.lastGroundTile, hit.enemy);
       }
       this.setLog(hit.message);
+      this.saveGame();
+      return true;
+    }
+
+    const animalHit = this.attackAnimalWithSpear();
+    if (animalHit.hit) {
+      if (animalHit.defeated) {
+        this.spawnAnimalLoot(animalHit.animal);
+      }
+      this.setLog(animalHit.message);
       this.saveGame();
       return true;
     }
@@ -565,9 +598,21 @@ export class Game {
   }
 
   rollCrystalDrop(dropTable = undefined) {
-    this.advanceCrystalProgress(1);
     const randomValue = this.crystalSystem.random();
     return chooseWeightedDrop(dropTable || this.getCrystalDropTable(), randomValue);
+  }
+
+  shouldCreateCrystalDrop() {
+    this.crystalDropMisses += 1;
+    if (this.crystalDropMisses <= CRYSTAL_DROP_MIN_MISSES) return false;
+
+    const missWindow = Math.max(1, CRYSTAL_DROP_FORCE_AFTER - CRYSTAL_DROP_MIN_MISSES);
+    const chance = Math.min(1, (this.crystalDropMisses - CRYSTAL_DROP_MIN_MISSES) / missWindow);
+    if (this.crystalDropMisses >= CRYSTAL_DROP_FORCE_AFTER || this.crystalSystem.random() < chance) {
+      this.crystalDropMisses = 0;
+      return true;
+    }
+    return false;
   }
 
   advanceCrystalProgress(amount = 1) {
@@ -621,7 +666,6 @@ export class Game {
     const chance = this.crystalLevel >= 3 ? 0.28 : this.crystalLevel >= 2 ? 0.16 : 0.08;
     if (this.crystalSystem.random() >= chance) return false;
 
-    this.advanceCrystalProgress(1);
     this.spawnVisibleDrop({ resource: 'springDrop', amount: 1 }, 'Ein Quelltropfen erscheint.');
     return true;
   }
@@ -672,18 +716,27 @@ export class Game {
         this.setLog(hit.message);
         this.saveGame();
       }
+
+      if (event.targetType === 'animal') {
+        const hit = this.animalSystem.applyDamage(event.target, event.projectile.damage, source);
+        if (hit.defeated) {
+          this.spawnAnimalLoot(event.target);
+        }
+        this.setLog(hit.message);
+        this.saveGame();
+      }
     }
   }
 
   handlePlayerContactDamage() {
     const contacts = [
-      ...this.enemySystem.enemies.map((enemy) => ({ enemy, damage: 1 })),
-      ...this.flyingEnemySystem.enemies.map((enemy) => ({ enemy, damage: 1 }))
+      ...this.enemySystem.enemies.map((enemy) => ({ enemy, damage: enemy.damage || 1 })),
+      ...this.flyingEnemySystem.enemies.map((enemy) => ({ enemy, damage: enemy.damage || 1 }))
     ];
 
     for (const contact of contacts) {
       if (!this.isEntityTouchingPlayer(contact.enemy)) continue;
-      if (!this.player.takeDamage(contact.damage)) return false;
+      if (!this.player.takeDamage(this.getIncomingDamage(contact.damage))) return false;
       this.setLog('Du wurdest getroffen.');
       if (this.player.hp <= 0) {
         this.handlePlayerDeath('Du bist gestorben.');
@@ -700,6 +753,52 @@ export class Game {
     const entityCenter = entity.getCenterPosition();
     const radius = (this.player.width + entity.width) * 0.28;
     return Math.hypot(playerCenter.x - entityCenter.x, playerCenter.y - entityCenter.y) <= radius;
+  }
+
+  attackAnimalWithSpear() {
+    const animal = this.findAnimalInSpearArc();
+    if (!animal) {
+      return {
+        hit: false,
+        defeated: false,
+        animal: null,
+        message: 'Kein Ziel.'
+      };
+    }
+
+    return this.animalSystem.applyDamage(animal, SPEAR_DAMAGE, this.player.getCenterPosition());
+  }
+
+  findAnimalInSpearArc() {
+    const origin = this.player.getFootPosition();
+    const facing = this.player.facing || { x: 0, y: -1 };
+    const facingLength = Math.hypot(facing.x, facing.y) || 1;
+    const facingX = facing.x / facingLength;
+    const facingY = facing.y / facingLength;
+
+    return this.animalSystem.animals.find((animal) => {
+      const center = animal.getCenterPosition();
+      const dx = center.x - origin.x;
+      const dy = center.y - origin.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > SPEAR_ATTACK_RANGE || distance <= 0) return false;
+
+      const dot = (dx / distance) * facingX + (dy / distance) * facingY;
+      return dot >= SPEAR_ATTACK_DOT;
+    }) || null;
+  }
+
+  spawnAnimalLoot(animal) {
+    const center = animal.getCenterPosition();
+    const meatAmount = animal.type === 'sheep' ? 2 : 1;
+    this.dropSystem.spawnNearWorld({ resource: 'rawMeat', amount: meatAmount }, this.tileMap, center.x, center.y);
+    if (animal.type === 'sheep') {
+      this.dropSystem.spawnNearWorld({ resource: 'wool', amount: 1 }, this.tileMap, center.x, center.y);
+    }
+  }
+
+  getIncomingDamage(amount) {
+    return Math.max(1, Math.round(amount) - this.getDefenseBonus());
   }
 
   spawnEnemyLoot(tile, enemy) {
@@ -1323,15 +1422,26 @@ export class Game {
 
   trySpawnCrystalEncounter() {
     this.setCrystalHitFeedback('attack');
+    this.advanceCrystalProgress(1);
+
+    const friendlyChance = Math.min(0.05, 0.01 + this.crystalLevel * 0.008);
+    if (this.crystalSystem.random() < friendlyChance) {
+      const type = this.crystalLevel >= 2 && this.crystalSystem.random() < 0.45 ? 'sheep' : 'chicken';
+      const animalSpawn = this.animalSystem.spawn(this.tileMap, type);
+      this.setLog(animalSpawn.message);
+      this.consumeCrystalLevelUpMessage();
+      this.saveGame();
+      return animalSpawn.spawned;
+    }
+
     const encounterDrops = CRYSTAL_ENCOUNTER_DROPS_BY_LEVEL[this.crystalLevel] || CRYSTAL_ENCOUNTER_DROPS;
     const choice = chooseWeightedDrop(encounterDrops, this.crystalSystem.random()).encounter;
     const spawn = choice === 'flying'
       ? this.flyingEnemySystem.spawnNearCrystal(this.tileMap)
-      : this.enemySystem.spawnNearCrystal(this.tileMap);
+      : this.enemySystem.spawnNearCrystal(this.tileMap, this.crystalLevel, () => this.crystalSystem.random());
     this.setLog(spawn.message);
-    if (spawn.spawned) {
-      this.saveGame();
-    }
+    this.consumeCrystalLevelUpMessage();
+    this.saveGame();
     return spawn.spawned;
   }
 
@@ -1481,18 +1591,55 @@ export class Game {
       changed = true;
     });
 
+    this.tileMap.forEachObject((object) => {
+      if (object.type !== OBJECT_TYPES.feedTrough) return;
+      if (Number(object.feed || 0) <= 0) return;
+      if (!this.hasSheepNearObject(object, HUSBANDRY_PRODUCTION_DISTANCE)) return;
+      const waterTrough = this.findNearbyObject(object, OBJECT_TYPES.waterTrough, HUSBANDRY_PRODUCTION_DISTANCE, (candidate) =>
+        this.isWaterTroughFilled(candidate)
+      );
+      if (!waterTrough) return;
+
+      const nextTimer = Number(object.woolTimer || 0) + deltaSeconds;
+      if (nextTimer < SHEEP_WOOL_PRODUCTION_SECONDS) {
+        this.tileMap.setObjectState(object.x, object.y, { woolTimer: nextTimer });
+        return;
+      }
+
+      const centerX = object.x * TILE_SIZE + TILE_SIZE / 2;
+      const centerY = object.y * TILE_SIZE + TILE_SIZE / 2;
+      const drop = this.dropSystem.spawnNearWorld({ resource: 'wool', amount: 1 }, this.tileMap, centerX, centerY);
+      this.setLog(drop ? 'Ein Schaf hat Wolle geliefert.' : 'Wolle eingesammelt.');
+      if (!drop) {
+        this.inventory.add('wool', 1);
+      }
+      this.tileMap.setObjectState(object.x, object.y, {
+        woolTimer: nextTimer - SHEEP_WOOL_PRODUCTION_SECONDS,
+        feed: Math.max(0, Number(object.feed || 0) - 1)
+      });
+      changed = true;
+    });
+
     if (changed) {
       this.saveGame();
     }
   }
 
   hasChickenNearObject(object, maxDistance) {
+    return this.hasAnimalNearObject(object, maxDistance, 'chicken');
+  }
+
+  hasSheepNearObject(object, maxDistance) {
+    return this.hasAnimalNearObject(object, maxDistance, 'sheep');
+  }
+
+  hasAnimalNearObject(object, maxDistance, type) {
     const center = {
       x: object.x * TILE_SIZE + TILE_SIZE / 2,
       y: object.y * TILE_SIZE + TILE_SIZE / 2
     };
     return this.animalSystem.animals.some((animal) => {
-      if (animal.type !== 'chicken') return false;
+      if (animal.type !== type) return false;
       const foot = animal.getFootPosition();
       return Math.hypot(foot.x - center.x, foot.y - center.y) <= maxDistance;
     });
@@ -1911,6 +2058,96 @@ export class Game {
     return HAND_EQUIPMENT_ITEMS.has(resource);
   }
 
+  isClothingEquipment(resource) {
+    return CLOTHING_EQUIPMENT_ITEMS.has(resource);
+  }
+
+  isShoeEquipment(resource) {
+    return SHOE_EQUIPMENT_ITEMS.has(resource);
+  }
+
+  isAccessoryEquipment(resource) {
+    return ACCESSORY_EQUIPMENT_ITEMS.has(resource);
+  }
+
+  isEquipmentResource(resource) {
+    return this.isClothingEquipment(resource) ||
+      this.isShoeEquipment(resource) ||
+      this.isAccessoryEquipment(resource);
+  }
+
+  getEquipmentSlotForResource(resource) {
+    if (this.isClothingEquipment(resource)) return 'clothing';
+    if (this.isShoeEquipment(resource)) return 'shoes';
+    if (this.isAccessoryEquipment(resource)) return 'accessory';
+    return null;
+  }
+
+  equipEquipmentItem(resource, preferredSlot = null) {
+    const slot = preferredSlot || this.getEquipmentSlotForResource(resource);
+    if (!slot || this.inventory.get(resource) <= 0) return false;
+    if (slot === 'clothing' && this.isClothingEquipment(resource)) {
+      this.clothingItem = resource;
+      return true;
+    }
+    if (slot === 'shoes' && this.isShoeEquipment(resource)) {
+      this.shoeItem = resource;
+      return true;
+    }
+    if (slot === 'accessory' && this.isAccessoryEquipment(resource)) {
+      this.accessoryItem = resource;
+      return true;
+    }
+    return false;
+  }
+
+  handleEquipmentSlotClick(slotType) {
+    if (!this.selectedInventoryResource) {
+      const equipped = this.getEquipmentState()[`${slotType}Item`];
+      this.setLog(equipped ? `${RESOURCE_LABELS[equipped]} ist ausgeruestet.` : 'Ausrüstungsslot ist leer.');
+      return true;
+    }
+
+    if (!this.equipEquipmentItem(this.selectedInventoryResource, slotType)) {
+      this.setLog('Dieses Item passt nicht in diesen Ausrüstungsslot.');
+      return true;
+    }
+
+    this.setLog(`${RESOURCE_LABELS[this.selectedInventoryResource]} ausgeruestet.`);
+    this.saveGame();
+    return true;
+  }
+
+  getEquipmentState() {
+    const shoeItem = this.inventory.get(this.shoeItem) > 0 ? this.shoeItem : null;
+    return {
+      clothingItem: this.inventory.get(this.clothingItem) > 0 ? this.clothingItem : null,
+      shoeItem,
+      shoesItem: shoeItem,
+      accessoryItem: this.inventory.get(this.accessoryItem) > 0 ? this.accessoryItem : null
+    };
+  }
+
+  getDefenseBonus() {
+    return this.getEquipmentState().clothingItem === 'linenTunic' ? 1 : 0;
+  }
+
+  getMovementMultiplier() {
+    return this.getEquipmentState().shoesItem === 'travelBoots' ? 1.12 : 1;
+  }
+
+  getAttackBonus() {
+    return 0;
+  }
+
+  getCharacterStats() {
+    return {
+      attack: 10 + this.getAttackBonus(),
+      defense: this.getDefenseBonus(),
+      movement: Math.round(this.getMovementMultiplier() * 100)
+    };
+  }
+
   isHotbarAllowed(resource) {
     return HOTBAR_ALLOWED_ITEMS.has(resource);
   }
@@ -1946,6 +2183,12 @@ export class Game {
           this.saveGame();
           return true;
         }
+        if (this.isEquipmentResource(this.selectedInventoryResource)) {
+          this.equipEquipmentItem(this.selectedInventoryResource);
+          this.setLog('Dieses Item wird ausgeruestet.');
+          this.saveGame();
+          return true;
+        }
         this.setLog('Dieses Item passt nicht in die Schnellleiste.');
         return true;
       }
@@ -1961,7 +2204,10 @@ export class Game {
     if (!this.isKnownInventoryResource(resource)) return false;
 
     this.selectedInventoryResource = resource;
-    this.setLog(`${RESOURCE_LABELS[resource]} für Hotbar ausgewählt.`);
+    const target = this.isHandEquipment(resource) || this.isEquipmentResource(resource)
+      ? 'Ausrüstung'
+      : 'Hotbar';
+    this.setLog(`${RESOURCE_LABELS[resource]} für ${target} ausgewählt.`);
     return true;
   }
 
@@ -1973,7 +2219,9 @@ export class Game {
     }
 
     if (!this.isHandEquipment(this.selectedInventoryResource)) {
-      this.setLog('Dieses Item gehoert in die Schnellleiste.');
+      this.setLog(this.isEquipmentResource(this.selectedInventoryResource)
+        ? 'Dieses Item gehoert in einen Ausruestungsslot.'
+        : 'Dieses Item gehoert in die Schnellleiste.');
       return true;
     }
 
@@ -2032,8 +2280,12 @@ export class Game {
     this.settingsOpen = false;
     this.craftingContext = 'normal';
     this.handItem = null;
+    this.clothingItem = null;
+    this.shoeItem = null;
+    this.accessoryItem = null;
     this.crystalLevel = 1;
     this.crystalXp = 0;
+    this.crystalDropMisses = 0;
     this.pendingCrystalLevelUp = null;
     this.buildSelectedResource = null;
     this.removeMode = false;
@@ -2102,9 +2354,13 @@ export class Game {
     this.projectileSystem.clear();
     this.dropSystem.load(save.drops, this.tileMap);
     this.dayNightSystem.load(save.dayNightTime);
-    this.crystalLevel = Number.isInteger(save.crystalLevel) ? Math.max(1, Math.min(3, save.crystalLevel)) : 1;
+    this.crystalLevel = Number.isInteger(save.crystalLevel) ? Math.max(1, Math.min(5, save.crystalLevel)) : 1;
     this.crystalXp = Number.isFinite(save.crystalXp) ? Math.max(0, save.crystalXp) : 0;
     this.crystalSystem.hitCounter = Number.isFinite(save.crystalInteractions) ? Math.max(0, save.crystalInteractions) : this.crystalXp;
+    this.crystalDropMisses = Number.isFinite(save.crystalDropMisses) ? Math.max(0, save.crystalDropMisses) : 0;
+    this.clothingItem = this.isClothingEquipment(save.clothingItem) && this.inventory.get(save.clothingItem) > 0 ? save.clothingItem : null;
+    this.shoeItem = this.isShoeEquipment(save.shoeItem) && this.inventory.get(save.shoeItem) > 0 ? save.shoeItem : null;
+    this.accessoryItem = this.isAccessoryEquipment(save.accessoryItem) && this.inventory.get(save.accessoryItem) > 0 ? save.accessoryItem : null;
 
     this.setLog('Speicherstand geladen.');
     this.saveStatus = 'loaded';
@@ -2154,10 +2410,14 @@ export class Game {
       crystalLevel: this.crystalLevel,
       crystalXp: this.crystalXp,
       crystalInteractions: this.crystalSystem.hitCounter,
+      crystalDropMisses: this.crystalDropMisses,
       logs: this.logSystem.toJSON(),
       hotbarSlots: [...this.hotbarSlots],
       activeHotbarSlot: this.activeHotbarSlot,
       handItem: this.getEquippedHandItem(),
+      clothingItem: this.getEquipmentState().clothingItem,
+      shoeItem: this.getEquipmentState().shoeItem,
+      accessoryItem: this.getEquipmentState().accessoryItem,
       buildSelectedResource: this.buildSelectedResource,
       removeMode: this.removeMode,
       respawnTarget: this.respawnTarget,

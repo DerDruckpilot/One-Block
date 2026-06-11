@@ -38,7 +38,8 @@ export const FLYING_ENEMY_SPEED = 42;
 export const FLYING_ENEMY_MAX_TILE_DISTANCE = 3;
 export const ANIMAL_SIZE = 24;
 export const ANIMAL_SPEED = 18;
-export const ANIMAL_MAX_COUNT = 2;
+export const ANIMAL_MAX_COUNT = 4;
+export const SHEEP_WOOL_PRODUCTION_SECONDS = 36;
 export const SPEAR_ATTACK_RANGE = TILE_SIZE * 1.75;
 export const SPEAR_ATTACK_DOT = 0.25;
 export const SPEAR_DAMAGE = 1;
@@ -49,6 +50,17 @@ export const BOW_RANGE = TILE_SIZE * 4;
 export const BOW_DAMAGE = 2;
 export const PROJECTILE_SPEED = 240;
 export const PROJECTILE_HIT_RADIUS = 18;
+export const AMMO_CAPS = {
+  stoneBall: 10,
+  arrow: 10
+};
+export const AMMO_CAP_UPGRADES = {
+  stoneBall: { item: 'ammoPouch', cap: 20 },
+  arrow: { item: 'quiver', cap: 20 }
+};
+export const CLOTHING_EQUIPMENT_RESOURCES = ['linenTunic'];
+export const SHOE_EQUIPMENT_RESOURCES = ['travelBoots'];
+export const ACCESSORY_EQUIPMENT_RESOURCES = ['ammoPouch', 'quiver'];
 export const SAPLING_GROW_SECONDS = 24;
 export const BERRY_BUSH_GROW_SECONDS = 18;
 export const GRASS_HARVEST_COOLDOWN_SECONDS = 16;
@@ -191,6 +203,7 @@ export const RESOURCE_LABELS = {
   waterTrough: 'Wassertrug',
   furnace: 'Ofen',
   rawMeat: 'Rohes Fleisch',
+  wool: 'Wolle',
   roastedBerries: 'Geröstete Beeren',
   cookedSteak: 'Gebratenes Steak',
   egg: 'Ei',
@@ -199,7 +212,11 @@ export const RESOURCE_LABELS = {
   unfiredBowl: 'Ungebrannte Tonschale',
   bowl: 'Tonschale',
   unfiredJug: 'Ungebrannter Tonkrug',
-  jug: 'Tonkrug'
+  jug: 'Tonkrug',
+  ammoPouch: 'Munitionsbeutel',
+  quiver: 'Köcher',
+  linenTunic: 'Leinentunika',
+  travelBoots: 'Reisestiefel'
 };
 
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
@@ -207,7 +224,9 @@ export const WORLD_RESOURCES = ['earth', 'stone', 'clay', 'clayBrick', 'unfiredB
 export const FOOD_RESOURCES = ['berry', 'rawMeat', 'roastedBerries', 'cookedSteak', 'egg', 'friedEgg'];
 export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'furnace', 'woodWall', 'door', 'fence', 'gate', 'bed', 'chickenNest', 'feedTrough', 'waterTrough', 'table', 'chair'];
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
-export const INVENTORY_RESOURCES = [...WORLD_RESOURCES, 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES];
+export const ANIMAL_PRODUCT_RESOURCES = ['wool'];
+export const EQUIPMENT_RESOURCES = ['ammoPouch', 'quiver', 'linenTunic', 'travelBoots'];
+export const INVENTORY_RESOURCES = [...WORLD_RESOURCES, 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...ANIMAL_PRODUCT_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES, ...EQUIPMENT_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
 export const HAND_EQUIPMENT_RESOURCES = [
   'woodenPickaxe',
@@ -284,13 +303,18 @@ export const RESOURCE_SHORT_LABELS = {
   rawMeat: 'RF',
   roastedBerries: 'RB',
   cookedSteak: 'CS',
+  wool: 'WO',
   egg: 'EI',
   friedEgg: 'GE',
   clayBrick: 'LZ',
   unfiredBowl: 'US',
   bowl: 'TS',
   unfiredJug: 'UK',
-  jug: 'TK'
+  jug: 'TK',
+  ammoPouch: 'MB',
+  quiver: 'KO',
+  linenTunic: 'LT',
+  travelBoots: 'RS'
 };
 
 export const RESOURCE_ICONS = {
@@ -329,13 +353,18 @@ export const RESOURCE_ICONS = {
   rawMeat: 'rm',
   roastedBerries: 'rb',
   cookedSteak: 'cs',
+  wool: 'wo',
   egg: 'eg',
   friedEgg: 'fe',
   clayBrick: 'lz',
   unfiredBowl: 'ub',
   bowl: 'tb',
   unfiredJug: 'uj',
-  jug: 'tj'
+  jug: 'tj',
+  ammoPouch: 'mb',
+  quiver: 'ko',
+  linenTunic: 'lt',
+  travelBoots: 'rs'
 };
 
 export const INVENTORY_TABS = [
@@ -343,6 +372,7 @@ export const INVENTORY_TABS = [
   { id: 'resources', label: 'Rohstoffe' },
   { id: 'tools', label: 'Werkzeuge' },
   { id: 'ammo', label: 'Munition' },
+  { id: 'equipment', label: 'Ausrüstung' },
   { id: 'building', label: 'Bauelemente' },
   { id: 'seeds', label: 'Samen' },
   { id: 'food', label: 'Nahrung' }
@@ -361,6 +391,7 @@ export const RESOURCE_CATEGORIES = {
   rawMeat: ['resources', 'food'],
   roastedBerries: ['food'],
   cookedSteak: ['food'],
+  wool: ['resources'],
   egg: ['food'],
   friedEgg: ['food'],
   clayBrick: ['resources', 'building'],
@@ -377,6 +408,10 @@ export const RESOURCE_CATEGORIES = {
   scythe: ['tools'],
   arrow: ['ammo'],
   stoneBall: ['ammo'],
+  ammoPouch: ['equipment', 'ammo'],
+  quiver: ['equipment', 'ammo'],
+  linenTunic: ['equipment'],
+  travelBoots: ['equipment'],
   torch: ['building'],
   campfire: ['building'],
   woodWall: ['building'],
@@ -403,74 +438,84 @@ export const BUILD_MENU_CATEGORIES = [
 ];
 
 export const BASIC_RESOURCE_DROPS = [
-  { resource: 'earth', amount: 1, weight: 50 },
-  { resource: 'rawWood', amount: 1, weight: 20 },
-  { resource: 'fiber', amount: 1, weight: 20 },
-  { resource: 'grassSeed', amount: 1, weight: 10 }
+  { resource: 'earth', amount: 1, weight: 34 },
+  { resource: 'rawWood', amount: 1, weight: 18 },
+  { resource: 'fiber', amount: 1, weight: 18 },
+  { resource: 'grassSeed', amount: 1, weight: 12 },
+  { resource: 'treeSeed', amount: 1, weight: 7 },
+  { resource: 'berry', amount: 1, weight: 7 },
+  { resource: 'springDrop', amount: 1, weight: 4 }
 ];
 
 export const PICKAXE_RESOURCE_DROPS = [
-  { resource: 'stone', amount: 1, weight: 40 },
-  { resource: 'earth', amount: 1, weight: 23 },
-  { resource: 'rawWood', amount: 1, weight: 10 },
-  { resource: 'fiber', amount: 1, weight: 10 },
-  { resource: 'grassSeed', amount: 1, weight: 5 },
-  { resource: 'clay', amount: 1, weight: 8 },
-  { resource: 'treeSeed', amount: 1, weight: 2 },
-  { resource: 'berry', amount: 1, weight: 2 }
+  { resource: 'stone', amount: 1, weight: 72 },
+  { resource: 'clay', amount: 1, weight: 28 }
 ];
 
 export const CRYSTAL_LEVEL_THRESHOLDS = [
-  { level: 2, xp: 25 },
-  { level: 3, xp: 75 }
+  { level: 2, xp: 150 },
+  { level: 3, xp: 750 },
+  { level: 4, xp: 1350 },
+  { level: 5, xp: 2200 }
 ];
 
 export const CRYSTAL_DROP_TABLES = {
   1: BASIC_RESOURCE_DROPS,
   2: [
-    { resource: 'earth', amount: 1, weight: 38 },
-    { resource: 'rawWood', amount: 1, weight: 16 },
-    { resource: 'fiber', amount: 1, weight: 14 },
-    { resource: 'grassSeed', amount: 1, weight: 8 },
-    { resource: 'stone', amount: 1, weight: 14 },
-    { resource: 'clay', amount: 1, weight: 7 },
-    { resource: 'treeSeed', amount: 1, weight: 3 }
+    { resource: 'earth', amount: 1, weight: 28 },
+    { resource: 'rawWood', amount: 1, weight: 18 },
+    { resource: 'fiber', amount: 1, weight: 15 },
+    { resource: 'grassSeed', amount: 1, weight: 12 },
+    { resource: 'treeSeed', amount: 1, weight: 10 },
+    { resource: 'berry', amount: 1, weight: 9 },
+    { resource: 'springDrop', amount: 1, weight: 8 }
   ],
   3: [
-    { resource: 'earth', amount: 1, weight: 34 },
-    { resource: 'rawWood', amount: 1, weight: 14 },
-    { resource: 'fiber', amount: 1, weight: 12 },
-    { resource: 'grassSeed', amount: 1, weight: 7 },
-    { resource: 'stone', amount: 1, weight: 14 },
-    { resource: 'clay', amount: 1, weight: 8 },
-    { resource: 'treeSeed', amount: 1, weight: 5 },
-    { resource: 'springDrop', amount: 1, weight: 4 },
-    { resource: 'berry', amount: 1, weight: 2 }
+    { resource: 'earth', amount: 1, weight: 23 },
+    { resource: 'rawWood', amount: 1, weight: 17 },
+    { resource: 'fiber', amount: 1, weight: 14 },
+    { resource: 'grassSeed', amount: 1, weight: 12 },
+    { resource: 'treeSeed', amount: 1, weight: 12 },
+    { resource: 'berry', amount: 1, weight: 10 },
+    { resource: 'springDrop', amount: 1, weight: 12 }
+  ],
+  4: [
+    { resource: 'earth', amount: 1, weight: 18 },
+    { resource: 'rawWood', amount: 2, weight: 16 },
+    { resource: 'fiber', amount: 2, weight: 14 },
+    { resource: 'grassSeed', amount: 1, weight: 10 },
+    { resource: 'treeSeed', amount: 1, weight: 14 },
+    { resource: 'berry', amount: 2, weight: 12 },
+    { resource: 'springDrop', amount: 1, weight: 16 }
+  ],
+  5: [
+    { resource: 'earth', amount: 2, weight: 16 },
+    { resource: 'rawWood', amount: 2, weight: 17 },
+    { resource: 'fiber', amount: 2, weight: 16 },
+    { resource: 'grassSeed', amount: 2, weight: 10 },
+    { resource: 'treeSeed', amount: 2, weight: 14 },
+    { resource: 'berry', amount: 2, weight: 12 },
+    { resource: 'springDrop', amount: 1, weight: 15 }
   ]
 };
 
 export const PICKAXE_RESOURCE_DROPS_BY_LEVEL = {
   1: PICKAXE_RESOURCE_DROPS,
   2: [
-    { resource: 'stone', amount: 1, weight: 42 },
-    { resource: 'clay', amount: 1, weight: 14 },
-    { resource: 'earth', amount: 1, weight: 20 },
-    { resource: 'rawWood', amount: 1, weight: 8 },
-    { resource: 'fiber', amount: 1, weight: 8 },
-    { resource: 'grassSeed', amount: 1, weight: 4 },
-    { resource: 'treeSeed', amount: 1, weight: 3 },
-    { resource: 'berry', amount: 1, weight: 1 }
+    { resource: 'stone', amount: 1, weight: 64 },
+    { resource: 'clay', amount: 1, weight: 36 }
   ],
   3: [
-    { resource: 'stone', amount: 1, weight: 38 },
-    { resource: 'clay', amount: 1, weight: 18 },
-    { resource: 'earth', amount: 1, weight: 17 },
-    { resource: 'rawWood', amount: 1, weight: 7 },
-    { resource: 'fiber', amount: 1, weight: 7 },
-    { resource: 'grassSeed', amount: 1, weight: 4 },
-    { resource: 'treeSeed', amount: 1, weight: 4 },
-    { resource: 'springDrop', amount: 1, weight: 4 },
-    { resource: 'berry', amount: 1, weight: 1 }
+    { resource: 'stone', amount: 1, weight: 55 },
+    { resource: 'clay', amount: 1, weight: 45 }
+  ],
+  4: [
+    { resource: 'stone', amount: 2, weight: 50 },
+    { resource: 'clay', amount: 2, weight: 50 }
+  ],
+  5: [
+    { resource: 'stone', amount: 2, weight: 45 },
+    { resource: 'clay', amount: 2, weight: 55 }
   ]
 };
 
@@ -480,6 +525,14 @@ export const CRYSTAL_ENCOUNTER_DROPS_BY_LEVEL = {
   3: [
     { encounter: 'ground', weight: 70 },
     { encounter: 'flying', weight: 30 }
+  ],
+  4: [
+    { encounter: 'ground', weight: 58 },
+    { encounter: 'flying', weight: 42 }
+  ],
+  5: [
+    { encounter: 'ground', weight: 50 },
+    { encounter: 'flying', weight: 50 }
   ]
 };
 
@@ -544,6 +597,59 @@ export const STONE_BALL_RECIPE = {
   requiresWorkbench: false,
   costs: {
     stone: 1
+  }
+};
+
+export const AMMO_POUCH_RECIPE = {
+  id: 'ammoPouch',
+  name: 'Munitionsbeutel',
+  result: 'ammoPouch',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    fiber: 10,
+    rawWood: 2
+  }
+};
+
+export const QUIVER_RECIPE = {
+  id: 'quiver',
+  name: 'Koecher',
+  result: 'quiver',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    fiber: 8,
+    rawWood: 4
+  }
+};
+
+export const LINEN_TUNIC_RECIPE = {
+  id: 'linenTunic',
+  name: 'Leinentunika',
+  result: 'linenTunic',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    fiber: 14,
+    wool: 2
+  }
+};
+
+export const TRAVEL_BOOTS_RECIPE = {
+  id: 'travelBoots',
+  name: 'Reisestiefel',
+  result: 'travelBoots',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  costs: {
+    rawWood: 2,
+    fiber: 8,
+    wool: 2
   }
 };
 
@@ -888,6 +994,10 @@ export const CRAFTING_RECIPES = [
   STONE_BALL_RECIPE,
   UNFIRED_BOWL_RECIPE,
   UNFIRED_JUG_RECIPE,
+  AMMO_POUCH_RECIPE,
+  QUIVER_RECIPE,
+  LINEN_TUNIC_RECIPE,
+  TRAVEL_BOOTS_RECIPE,
   WOODEN_PICKAXE_RECIPE,
   WOODEN_SPEAR_RECIPE,
   SLINGSHOT_RECIPE,

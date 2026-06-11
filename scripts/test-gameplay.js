@@ -26,6 +26,7 @@ import {
   PLAYER_SPAWN_TILE,
   RESOURCE_LABELS,
   SAPLING_GROW_SECONDS,
+  SHEEP_WOOL_PRODUCTION_SECONDS,
   SLINGSHOT_RANGE,
   TILE_TYPES,
   TILE_SIZE
@@ -1786,6 +1787,7 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { actionButton });
 
+  game.crystalDropMisses = 9;
   actionButton.listeners.pointerdown({ ...createPointerEvent(820, 420), pointerId: 32 });
   game.update(0.016);
 
@@ -1818,6 +1820,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { attackButton });
 
   game.crystalSystem.random = () => 0.1;
+  game.crystalDropMisses = 9;
   game.inventory.add('woodenPickaxe', 1);
   game.equipHandItem('woodenPickaxe');
   attackButton.listeners.pointerdown({ ...createPointerEvent(740, 420), pointerId: 33 });
@@ -1852,6 +1855,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.crystalSystem.random = () => 0.1;
+  game.crystalDropMisses = 9;
   game.inventory.add('woodenPickaxe', 1);
   game.equipHandItem('woodenPickaxe');
   assert.equal(game.tryAttackAction(), true, 'wooden pickaxe attack works at the crystal');
@@ -2260,6 +2264,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
 
   game.crystalSystem.random = () => 0.1;
+  game.crystalDropMisses = 9;
   assert.equal(game.tryUseCrystal(), true, 'crystal interaction spawns a visible drop');
   assert.equal(game.attackFeedback.kind, 'activate', 'normal crystal interaction uses the activation flash kind');
   assert.equal(game.inventory.get('earth'), 0, 'crystal interaction does not add resources directly');
@@ -2582,24 +2587,24 @@ const map = new TileMap();
 
 {
   assert.equal(chooseWeightedDrop(0).resource, 'earth', 'weighted drops start with earth');
-  assert.equal(chooseWeightedDrop(0.49).resource, 'earth', 'earth covers the first 50 percent');
-  assert.equal(chooseWeightedDrop(0.50).resource, 'rawWood', 'raw wood starts after earth weight');
-  assert.equal(chooseWeightedDrop(0.69).resource, 'rawWood', 'raw wood covers the next 20 percent');
-  assert.equal(chooseWeightedDrop(0.70).resource, 'fiber', 'fiber starts after raw wood weight');
-  assert.equal(chooseWeightedDrop(0.89).resource, 'fiber', 'fiber covers the next 20 percent');
-  assert.equal(chooseWeightedDrop(0.90).resource, 'grassSeed', 'grass seed covers the final 10 percent');
+  assert.equal(chooseWeightedDrop(0.33).resource, 'earth', 'earth covers the first basic drop band');
+  assert.equal(chooseWeightedDrop(0.34).resource, 'rawWood', 'raw wood starts after earth weight');
+  assert.equal(chooseWeightedDrop(0.51).resource, 'rawWood', 'raw wood covers the next basic band');
+  assert.equal(chooseWeightedDrop(0.52).resource, 'fiber', 'fiber starts after raw wood weight');
+  assert.equal(chooseWeightedDrop(0.69).resource, 'fiber', 'fiber covers the fiber band');
+  assert.equal(chooseWeightedDrop(0.70).resource, 'grassSeed', 'grass seeds follow early resources');
+  assert.equal(chooseWeightedDrop(0.83).resource, 'treeSeed', 'tree seeds appear after grass seeds');
+  assert.equal(chooseWeightedDrop(0.91).resource, 'berry', 'berries are uncommon action drops');
+  assert.equal(chooseWeightedDrop(0.98).resource, 'springDrop', 'spring drops are rare action drops');
   assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0).resource, 'stone', 'pickaxe crystal drops start with stone');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.39).resource, 'stone', 'stone stays the frequent pickaxe drop');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.40).resource, 'earth', 'earth follows stone in pickaxe drops');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.65).resource, 'rawWood', 'raw wood follows earth in pickaxe drops');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.91).resource, 'clay', 'clay is an uncommon pickaxe progress drop');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.97).resource, 'treeSeed', 'tree seeds are rare pickaxe progress drops');
-  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.99).resource, 'berry', 'berries are rare pickaxe progress drops for berry bushes');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.71).resource, 'stone', 'stone stays the frequent pickaxe drop');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.72).resource, 'clay', 'clay follows stone in pickaxe drops');
+  assert.equal(chooseWeightedDrop(PICKAXE_RESOURCE_DROPS, 0.99).resource, 'clay', 'pickaxe drops do not include action-only resources');
 
   const inventory = new ResourceInventory();
-  const randomValues = [0.10, 0.55, 0.75, 0.95];
+  const randomValues = [0.10, 0.40, 0.60, 0.75];
   const crystal = new CrystalSystem(inventory, () => randomValues.shift());
-  const allowedResources = new Set(['earth', 'rawWood', 'fiber', 'grassSeed']);
+  const allowedResources = new Set(['earth', 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'berry', 'springDrop']);
 
   for (let i = 0; i < 4; i += 1) {
     const drop = crystal.use();
@@ -2618,6 +2623,7 @@ const map = new TileMap();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.crystalSystem.random = () => 0.1;
+  game.crystalDropMisses = 9;
   game.inventory.add('woodenPickaxe', 1);
   game.equipHandItem('woodenPickaxe');
 
@@ -2918,6 +2924,7 @@ const map = new TileMap();
   assert.equal(gameWithWorkbench.craftingContext, 'workbench', 'Space key opens workbench context when near workbench');
 
   const gameWithCrystal = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  gameWithCrystal.crystalDropMisses = 9;
   gameWithCrystal.input.pressedThisFrame.add('e');
   gameWithCrystal.update(0.016);
   assert.equal(gameWithCrystal.dropSystem.drops.length, 1, 'E key activates crystal through context action');
@@ -2983,6 +2990,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.dayNightSystem.load(0.3);
   game.crystalSystem.random = () => 0.91;
+  game.crystalDropMisses = 9;
   game.inventory.add('woodenPickaxe', 1);
   game.equipHandItem('woodenPickaxe');
 
@@ -3010,12 +3018,14 @@ const map = new TileMap();
   const dayGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   dayGame.dayNightSystem.load(0.3);
   dayGame.crystalSystem.random = () => 0.01;
+  dayGame.crystalDropMisses = 9;
   dayGame.tryUseCrystal();
   assert.notEqual(dayGame.dropSystem.drops[0].resource, 'springDrop', 'spring drops do not appear during day crystal interactions');
 
   const nightGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   nightGame.dayNightSystem.load(0.9);
   nightGame.crystalSystem.random = () => 0.01;
+  nightGame.crystalDropMisses = 9;
   nightGame.tryUseCrystal();
   assert.equal(nightGame.dropSystem.drops[0].resource, 'springDrop', 'spring drops can appear during night crystal interactions');
   assert.equal(nightGame.crystalSystem.lastMessage, 'Ein Quelltropfen erscheint.', 'night spring drop writes a clear log');
@@ -3023,10 +3033,11 @@ const map = new TileMap();
   const pickaxeGame = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   pickaxeGame.dayNightSystem.load(0.9);
   pickaxeGame.crystalSystem.random = () => 0.01;
+  pickaxeGame.crystalDropMisses = 9;
   pickaxeGame.inventory.add('woodenPickaxe', 1);
   pickaxeGame.equipHandItem('woodenPickaxe');
   pickaxeGame.tryAttackAction();
-  assert.equal(pickaxeGame.dropSystem.drops[0].resource, 'springDrop', 'night pickaxe crystal action can create a spring drop');
+  assert.equal(pickaxeGame.dropSystem.drops[0].resource, 'stone', 'night pickaxe crystal action keeps tool drops on higher-value resources');
 }
 
 {
@@ -3597,6 +3608,7 @@ const map = new TileMap();
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
   game.dropSystem.random = () => 0.75;
   game.crystalSystem.random = () => 0;
+  game.crystalDropMisses = 9;
   setGamePlayerOnTile(game, 0, 1, { x: 0, y: -1 });
   assert.equal(game.tryUseCrystal(), true, 'crystal interaction uses visible drop logic');
   const crystalDrop = game.dropSystem.drops[0];
@@ -4763,7 +4775,7 @@ const map = new TileMap();
   assert.equal(game.crystalLevel, 1, 'crystal stays level 1 before threshold');
   game.advanceCrystalProgress(1);
   assert.equal(game.crystalLevel, 2, 'crystal reaches level 2 at threshold');
-  assert.equal(game.getCrystalDropTable().some((drop) => drop.resource === 'clay'), true, 'level 2 crystal drop table includes clay');
+  assert.equal(game.getPickaxeDropTable().some((drop) => drop.resource === 'clay'), true, 'level 2 pickaxe crystal table includes clay');
   game.advanceCrystalProgress(CRYSTAL_LEVEL_THRESHOLDS[1].xp - CRYSTAL_LEVEL_THRESHOLDS[0].xp);
   assert.equal(game.crystalLevel, 3, 'crystal reaches level 3 at threshold');
   assert.equal(game.getCrystalDropTable().some((drop) => drop.resource === 'springDrop'), true, 'level 3 crystal drop table includes spring drops');
@@ -4775,14 +4787,111 @@ const map = new TileMap();
   const storage = createMemoryStorage();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
-  game.advanceCrystalProgress(80);
+  game.advanceCrystalProgress(CRYSTAL_LEVEL_THRESHOLDS[1].xp);
   game.saveGame();
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
   assert.equal(loadedGame.crystalLevel, 3, 'crystal level saves and loads');
-  assert.equal(loadedGame.crystalXp, 80, 'crystal XP saves and loads');
+  assert.equal(loadedGame.crystalXp, CRYSTAL_LEVEL_THRESHOLDS[1].xp, 'crystal XP saves and loads');
   loadedGame.resetGame();
   assert.equal(loadedGame.crystalLevel, 1, 'reset restores crystal level 1');
   assert.equal(loadedGame.crystalXp, 0, 'reset clears crystal XP');
+}
+
+{
+  const inventory = new ResourceInventory();
+  inventory.add('arrow', 99);
+  inventory.add('stoneBall', 99);
+  assert.equal(inventory.get('arrow'), 10, 'arrows respect the base ammo cap');
+  assert.equal(inventory.get('stoneBall'), 10, 'stone balls respect the base ammo cap');
+  inventory.add('quiver', 1);
+  inventory.add('ammoPouch', 1);
+  inventory.add('arrow', 99);
+  inventory.add('stoneBall', 99);
+  assert.equal(inventory.get('arrow'), 20, 'quiver raises arrow capacity');
+  assert.equal(inventory.get('stoneBall'), 20, 'ammo pouch raises stone ball capacity');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  inventory.add('arrow', 9);
+  inventory.add('rawWood', 4);
+  inventory.add('stone', 4);
+  assert.equal(crafting.craft('arrow').crafted, true, 'arrow crafting can fill remaining ammo capacity');
+  assert.equal(inventory.get('arrow'), 10, 'arrow crafting stops at the ammo cap');
+  assert.equal(crafting.craft('arrow').crafted, false, 'arrow crafting is blocked at full capacity');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.inventory.add('stoneBall', 9);
+  const foot = game.player.getFootPosition();
+  game.dropSystem.spawn({ resource: 'stoneBall', amount: 5, x: foot.x, y: foot.y });
+  game.update(0.2);
+  assert.equal(game.inventory.get('stoneBall'), 10, 'pickup respects ammo capacity');
+  assert.equal(game.dropSystem.drops[0].amount, 4, 'pickup leaves overflow ammo on the ground');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalSystem.random = () => 0;
+  assert.equal(game.tryUseCrystal(), true, 'first crystal interaction is handled');
+  assert.equal(game.dropSystem.drops.length, 0, 'first crystal interaction does not always drop');
+  game.tryUseCrystal();
+  game.tryUseCrystal();
+  assert.equal(game.dropSystem.drops.length, 1, 'crystal drops after a short random buildup');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('linenTunic', 1);
+  game.inventory.add('travelBoots', 1);
+  game.inventory.add('quiver', 1);
+  assert.equal(game.equipEquipmentItem('linenTunic'), true, 'linen tunic can be equipped');
+  assert.equal(game.equipEquipmentItem('travelBoots'), true, 'travel boots can be equipped');
+  assert.equal(game.equipEquipmentItem('quiver'), true, 'quiver can be equipped as accessory');
+  assert.equal(game.getDefenseBonus(), 1, 'linen tunic adds defense');
+  assert.equal(game.getMovementMultiplier() > 1, true, 'travel boots increase movement speed');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.getEquipmentState().clothingItem, 'linenTunic', 'clothing equipment saves and loads');
+  assert.equal(loadedGame.getEquipmentState().shoeItem, 'travelBoots', 'shoe equipment saves and loads');
+  assert.equal(loadedGame.getEquipmentState().accessoryItem, 'quiver', 'accessory equipment saves and loads');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  game.inventory.add('woodenSpear', 1);
+  game.equipHandItem('woodenSpear');
+  const sheep = Animal.fromTileWithType({ x: 1, y: 1 }, 'sheep');
+  game.animalSystem.animals.push(sheep);
+  assert.equal(game.tryAttackAction(), true, 'spear can hit a sheep');
+  sheep.setTilePosition({ x: 1, y: 1 });
+  assert.equal(game.tryAttackAction(), true, 'spear can hit a wounded sheep');
+  sheep.setTilePosition({ x: 1, y: 1 });
+  assert.equal(game.tryAttackAction(), true, 'spear can kill a sheep');
+  assert.equal(game.animalSystem.activeCount(), 0, 'killed sheep is removed');
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'rawMeat'), true, 'killed sheep drops meat');
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'wool'), true, 'killed sheep drops wool');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setObject(0, 1, OBJECT_TYPES.feedTrough);
+  game.tileMap.setObjectState(0, 1, { feed: 2 });
+  game.tileMap.setObject(1, 1, OBJECT_TYPES.waterTrough);
+  game.tileMap.setObjectState(1, 1, { filled: true });
+  game.animalSystem.animals.push(Animal.fromTileWithType({ x: 0, y: 1 }, 'sheep'));
+  game.updateHusbandry(SHEEP_WOOL_PRODUCTION_SECONDS + 0.1);
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'wool'), true, 'supplied sheep produces wool over time');
+  assert.equal(game.tileMap.objectsToJSON().find((object) => object.x === 0 && object.y === 1).feed, 1, 'wool production consumes feed');
 }
 
 console.log('Gameplay-Basics OK.');

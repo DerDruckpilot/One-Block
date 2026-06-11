@@ -27,7 +27,7 @@ export class EnemySystem {
     return events;
   }
 
-  spawnNearCrystal(tileMap) {
+  spawnNearCrystal(tileMap, level = 1, random = Math.random) {
     if (this.enemies.length >= 1) {
       return {
         spawned: false,
@@ -43,14 +43,21 @@ export class EnemySystem {
       };
     }
 
-    const enemy = Enemy.fromTile(tile);
+    const elite = level >= 4 && random() < 0.35;
+    const enemy = Enemy.fromTile(tile, {
+      type: elite ? 'brute' : 'groundling',
+      hp: elite ? 7 : level >= 3 ? 5 : 4,
+      maxHp: elite ? 7 : level >= 3 ? 5 : 4,
+      speed: elite ? 28 : level >= 5 ? 42 : level >= 3 ? 38 : 34,
+      damage: elite ? 2 : 1
+    });
     enemy.lastGroundTile = { x: tile.x, y: tile.y };
     this.enemies.push(enemy);
 
     return {
       spawned: true,
       enemy,
-      message: 'Eine Kreatur erscheint!'
+      message: elite ? 'Ein schwerer Brocken erscheint!' : 'Eine Kreatur erscheint!'
     };
   }
 
@@ -142,6 +149,8 @@ export class EnemySystem {
         type: saved.type || 'groundling',
         hp: Number.isFinite(saved.hp) ? Math.max(0, saved.hp) : 4,
         maxHp: Number.isFinite(saved.maxHp) ? Math.max(1, saved.maxHp) : 4,
+        speed: Number.isFinite(saved.speed) ? Math.max(1, saved.speed) : undefined,
+        damage: Number.isFinite(saved.damage) ? Math.max(1, saved.damage) : 1,
         healthVisible: saved.healthVisible === true,
         knockback: saved.knockback,
         lastGroundTile: saved.lastGroundTile

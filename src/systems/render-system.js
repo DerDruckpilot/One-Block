@@ -8,6 +8,7 @@ import {
   preloadWorldObjectAssets
 } from './world-object-assets.js';
 import { getLoadedCrystalImage, preloadCrystalAssets } from './crystal-assets.js';
+import { getLoadedAnimalImage, preloadAnimalAssets } from './animal-assets.js';
 
 export class RenderSystem {
   constructor(context, terrainRenderer = new TerrainRenderer()) {
@@ -15,6 +16,7 @@ export class RenderSystem {
     this.terrainRenderer = terrainRenderer;
     preloadWorldObjectAssets();
     preloadCrystalAssets();
+    preloadAnimalAssets();
   }
 
   renderWorld(tileMap, camera) {
@@ -334,21 +336,46 @@ export class RenderSystem {
     for (const animal of animals) {
       const x = Math.round(animal.x - camera.x);
       const y = Math.round(animal.y - camera.y);
+      const image = getLoadedAnimalImage(animal.type);
 
       this.context.save();
-      this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
-      this.context.fillRect(x + 5, y + 20, 15, 4);
-      this.context.fillStyle = '#f5e6ba';
-      this.context.fillRect(x + 6, y + 8, 13, 11);
-      this.context.fillStyle = '#fff7d6';
-      this.context.fillRect(x + 10, y + 4, 9, 8);
-      this.context.fillStyle = '#d8792b';
-      this.context.fillRect(x + 18, y + 8, 4, 3);
-      this.context.fillStyle = '#3b2a1d';
-      this.context.fillRect(x + 14, y + 7, 2, 2);
-      this.context.fillStyle = '#d8792b';
-      this.context.fillRect(x + 9, y + 19, 2, 4);
-      this.context.fillRect(x + 16, y + 19, 2, 4);
+      this.context.imageSmoothingEnabled = false;
+      if (image) {
+        const width = animal.type === 'sheep' ? 36 : 28;
+        const height = animal.type === 'sheep' ? 34 : 28;
+        const drawX = Math.round(x + animal.width / 2 - width / 2);
+        const drawY = Math.round(y + animal.height - height);
+        this.context.globalAlpha = animal.hitFlashSeconds > 0 ? 0.68 : 1;
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+        this.context.fillRect(drawX + 5, drawY + height - 4, width - 10, 4);
+        this.context.drawImage(image, drawX, drawY, width, height);
+      } else if (animal.type === 'sheep') {
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+        this.context.fillRect(x + 3, y + 21, 20, 5);
+        this.context.fillStyle = animal.hitFlashSeconds > 0 ? '#fff6f6' : '#f2ead0';
+        this.context.fillRect(x + 3, y + 8, 18, 13);
+        this.context.fillStyle = '#7b5940';
+        this.context.fillRect(x + 15, y + 7, 8, 8);
+        this.context.fillStyle = '#3b2a1d';
+        this.context.fillRect(x + 19, y + 10, 2, 2);
+        this.context.fillStyle = '#5a3a25';
+        this.context.fillRect(x + 6, y + 20, 3, 5);
+        this.context.fillRect(x + 16, y + 20, 3, 5);
+      } else {
+        this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
+        this.context.fillRect(x + 5, y + 20, 15, 4);
+        this.context.fillStyle = animal.hitFlashSeconds > 0 ? '#fff6f6' : '#f5e6ba';
+        this.context.fillRect(x + 6, y + 8, 13, 11);
+        this.context.fillStyle = '#fff7d6';
+        this.context.fillRect(x + 10, y + 4, 9, 8);
+        this.context.fillStyle = '#d8792b';
+        this.context.fillRect(x + 18, y + 8, 4, 3);
+        this.context.fillStyle = '#3b2a1d';
+        this.context.fillRect(x + 14, y + 7, 2, 2);
+        this.context.fillStyle = '#d8792b';
+        this.context.fillRect(x + 9, y + 19, 2, 4);
+        this.context.fillRect(x + 16, y + 19, 2, 4);
+      }
       this.context.restore();
     }
   }
