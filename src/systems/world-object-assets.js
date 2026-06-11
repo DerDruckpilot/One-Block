@@ -33,8 +33,13 @@ const worldObjectImages = new Map();
 
 export function stableVariantIndex(x, y, salt, count) {
   if (count <= 1) return 0;
-  const value = Math.abs((x * 7349 + y * 9151 + salt * 1013) % count);
-  return value;
+  let value = Math.imul(x | 0, 374761393) ^
+    Math.imul(y | 0, 668265263) ^
+    Math.imul(salt | 0, 1442695041);
+  value ^= value >>> 13;
+  value = Math.imul(value, 1274126177);
+  value ^= value >>> 16;
+  return Math.abs(value) % count;
 }
 
 function collectAssetPaths() {
@@ -75,6 +80,27 @@ export function getTreeAssetPath(stage = 3, x = 0, y = 0) {
 
   const index = stableVariantIndex(x, y, 17, TREE_ASSET_PATHS.mature.length);
   return TREE_ASSET_PATHS.mature[index];
+}
+
+export function getTreeAssetSpec(stage = 3, x = 0, y = 0) {
+  if (stage <= 1) {
+    return { path: TREE_ASSET_PATHS.sapling, width: 34, height: 34 };
+  }
+  if (stage === 2) {
+    return { path: TREE_ASSET_PATHS.young, width: 54, height: 54 };
+  }
+
+  const index = stableVariantIndex(x, y, 17, TREE_ASSET_PATHS.mature.length);
+  const sizes = [
+    { width: 118, height: 126 },
+    { width: 130, height: 132 },
+    { width: 124, height: 138 },
+    { width: 136, height: 130 }
+  ];
+  return {
+    path: TREE_ASSET_PATHS.mature[index],
+    ...sizes[index]
+  };
 }
 
 export function getBerryBushAssetPath(stage = 3, ready = true, x = 0, y = 0) {

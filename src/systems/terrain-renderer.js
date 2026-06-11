@@ -358,11 +358,26 @@ export class TerrainRenderer {
     for (const direction of directions) {
       const neighborType = tileMap.getTile(tile.x + direction.x, tile.y + direction.y);
       if (!neighborType || neighborType === tile.type || neighborType === TILE_TYPES.crystal) continue;
+      if (!this.shouldRenderTransitionForBoundary(tile, tileMap, direction.x, direction.y)) continue;
       const transition = this.resolveTransition(tile.type, neighborType, direction.name, direction.opposite);
       if (transition) return transition;
     }
 
     return null;
+  }
+
+  shouldRenderTransitionForBoundary(tile, tileMap, offsetX, offsetY) {
+    const neighborX = tile.x + offsetX;
+    const neighborY = tile.y + offsetY;
+    const currentOrder = tileMap.getTileRenderOrder?.(tile.x, tile.y);
+    const neighborOrder = tileMap.getTileRenderOrder?.(neighborX, neighborY);
+
+    if (Number.isFinite(currentOrder) && Number.isFinite(neighborOrder) && currentOrder !== neighborOrder) {
+      return currentOrder > neighborOrder;
+    }
+
+    if (tile.x !== neighborX) return tile.x > neighborX;
+    return tile.y > neighborY;
   }
 
   resolveTransition(currentType, neighborType, direction, oppositeDirection) {
