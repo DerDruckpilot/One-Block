@@ -29,6 +29,7 @@ export class PointerHitboxSystem {
     onCraftingToggle = () => {},
     onFurnace = () => {},
     onFurnaceSelect = () => {},
+    onEquipmentSlotSelect = () => {},
     onHandSlotSelect = () => {},
     onHotbarSelect = () => {},
     onInventoryItemSelect = () => {},
@@ -75,6 +76,7 @@ export class PointerHitboxSystem {
     this.onCraftingToggle = onCraftingToggle;
     this.onFurnace = onFurnace;
     this.onFurnaceSelect = onFurnaceSelect;
+    this.onEquipmentSlotSelect = onEquipmentSlotSelect;
     this.onHandSlotSelect = onHandSlotSelect;
     this.onHotbarSelect = onHotbarSelect;
     this.onInventoryItemSelect = onInventoryItemSelect;
@@ -336,6 +338,14 @@ export class PointerHitboxSystem {
           this.onHandSlotSelect();
         });
         if (handHitbox) hitboxes.push(handHitbox);
+      }
+
+      for (const equipmentSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-equipment-slot]') || [])) {
+        if (!equipmentSlot.dataset.equipmentSlot) continue;
+        const equipmentHitbox = this.createElementHitbox(equipmentSlot, `inventory-equipment-${equipmentSlot.dataset.equipmentSlot}`, () => {
+          this.onEquipmentSlotSelect(equipmentSlot.dataset.equipmentSlot);
+        });
+        if (equipmentHitbox) hitboxes.push(equipmentHitbox);
       }
 
       for (const hotbarSlot of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-inventory-hotbar-slot]') || [])) {

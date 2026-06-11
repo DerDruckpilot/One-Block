@@ -56,6 +56,8 @@ export class MenuPanels {
     furnaceRecipeStates = [],
     hotbarSlots = [],
     handItem = null,
+    equipment = {},
+    characterStats = { attack: 10, defense: 0, movement: 100 },
     activeHotbarSlot = 0,
     inventory,
     inventoryOpen,
@@ -65,7 +67,7 @@ export class MenuPanels {
     settingsOpen = false,
     saveSlots = []
   }) {
-    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem, playerHearts);
+    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem, playerHearts, equipment, characterStats);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
     this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
     this.renderFurnace(inventory, furnaceOpen, furnaceRecipeStates);
@@ -104,7 +106,7 @@ export class MenuPanels {
     return `<button class="menu-close-button" type="button" data-menu-close="${menuId}" aria-label="Menue schliessen">x</button>`;
   }
 
-  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null, playerHearts = []) {
+  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null, playerHearts = [], equipment = {}, characterStats = { attack: 10, defense: 0, movement: 100 }) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
 
@@ -157,10 +159,7 @@ export class MenuPanels {
               ${handItem ? renderItemIcon(handItem, 'equipment-icon item-pixel-icon') : '<span class="equipment-icon item-pixel-icon item-icon-fallback">--</span>'}
               <strong>${handItem ? RESOURCE_LABELS[handItem] : 'Leer'}</strong>
             </button>
-            <div class="equipment-slot equipment-slot-placeholder equip-clothing" aria-hidden="true">
-              <span class="equipment-label">Kleidung</span>
-              <span class="equipment-icon equipment-placeholder-icon">T</span>
-            </div>
+            ${this.renderEquipmentSlot('clothing', 'Kleidung', equipment.clothingItem)}
             <div class="inventory-character-scene" aria-hidden="true">
               <div class="inventory-character-sprite">
                 <span class="character-hair"></span>
@@ -174,23 +173,18 @@ export class MenuPanels {
                 <span></span>
               </div>
             </div>
-            <div class="equipment-slot equipment-slot-placeholder equip-jewelry" aria-hidden="true">
-              <span class="equipment-label">Schmuck</span>
-              <span class="equipment-icon equipment-placeholder-icon">o</span>
-            </div>
+            ${this.renderEquipmentSlot('accessory', 'Zubehoer', equipment.accessoryItem)}
             <div class="equipment-slot equipment-slot-placeholder equip-offhand" aria-hidden="true">
               <span class="equipment-label">Nebenhand</span>
               <span class="equipment-icon equipment-placeholder-icon">O</span>
             </div>
-            <div class="equipment-slot equipment-slot-placeholder equip-shoes" aria-hidden="true">
-              <span class="equipment-label">Schuhe</span>
-              <span class="equipment-icon equipment-placeholder-icon">U</span>
-            </div>
+            ${this.renderEquipmentSlot('shoes', 'Schuhe', equipment.shoesItem)}
           </div>
           <div class="inventory-character-stats" aria-hidden="true">
             <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
-            <span><strong>Angriff</strong><b>10</b></span>
-            <span><strong>Bewegung</strong><b>100%</b></span>
+            <span><strong>Angriff</strong><b>${characterStats.attack}</b></span>
+            <span><strong>Verteidigung</strong><b>${characterStats.defense}</b></span>
+            <span><strong>Bewegung</strong><b>${characterStats.movement}%</b></span>
           </div>
         </aside>
         <section class="inventory-items-panel">
@@ -225,6 +219,22 @@ export class MenuPanels {
       .map((heart) => `<span class="heart heart-${heart}">${icons[heart] || icons.empty}</span>`)
       .join('');
     return `<span class="character-heart-row" aria-label="Lebenspunkte">${heartHtml}</span>`;
+  }
+
+  renderEquipmentSlot(slot, label, resource = null) {
+    const isEmpty = !resource;
+    return `
+      <button
+        class="equipment-slot${isEmpty ? ' is-empty' : ''}"
+        type="button"
+        data-equipment-slot="${slot}"
+        aria-label="${label}"
+      >
+        <span class="equipment-label">${label}</span>
+        ${isEmpty ? '<span class="equipment-icon item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource, 'equipment-icon item-pixel-icon')}
+        <strong>${isEmpty ? 'Leer' : RESOURCE_LABELS[resource]}</strong>
+      </button>
+    `;
   }
 
   handleInventoryTabWheel(event) {

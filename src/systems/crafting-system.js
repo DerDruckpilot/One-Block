@@ -28,12 +28,16 @@ export class CraftingSystem {
       }))
       .filter((cost) => cost.missing > 0);
     const isAvailable = !recipe.requiresWorkbench || hasWorkbenchAccess;
+    const remainingCapacity = this.inventory.getRemainingCapacity?.(recipe.result) ?? Infinity;
+    const hasResultCapacity = remainingCapacity > 0;
 
     return {
       recipe,
-      canCraft: isAvailable && missing.length === 0,
+      canCraft: isAvailable && missing.length === 0 && hasResultCapacity,
       isAvailable,
-      missing
+      missing,
+      hasResultCapacity,
+      remainingCapacity
     };
   }
 
@@ -62,14 +66,15 @@ export class CraftingSystem {
     if (!state.canCraft) {
       return {
         crafted: false,
-        message: 'Nicht genug Ressourcen.'
+        message: state.hasResultCapacity === false ? 'Limit erreicht.' : 'Nicht genug Ressourcen.'
       };
     }
 
     for (const [resource, amount] of Object.entries(state.recipe.costs)) {
       this.inventory.remove(resource, amount);
     }
-    this.inventory.add(state.recipe.result, state.recipe.resultAmount);
+    const amountToAdd = Math.min(state.recipe.resultAmount, state.remainingCapacity);
+    this.inventory.add(state.recipe.result, amountToAdd);
 
     return {
       crafted: true,

@@ -17,6 +17,9 @@ export class Animal {
     x,
     y,
     type = 'chicken',
+    hp = null,
+    maxHp = null,
+    productTimer = 0,
     direction = { x: 0, y: 0 },
     decisionSeconds = 0.5,
     lastGroundTile = null,
@@ -27,6 +30,10 @@ export class Animal {
     this.width = ANIMAL_SIZE;
     this.height = ANIMAL_SIZE;
     this.type = type;
+    this.maxHp = Number.isFinite(maxHp) ? Math.max(1, maxHp) : type === 'sheep' ? 3 : 2;
+    this.hp = Number.isFinite(hp) ? Math.max(0, Math.min(this.maxHp, hp)) : this.maxHp;
+    this.productTimer = Math.max(0, Number(productTimer || 0));
+    this.hitFlashSeconds = 0;
     this.direction = {
       x: Number(direction?.x || 0),
       y: Number(direction?.y || 0)
@@ -44,7 +51,17 @@ export class Animal {
     });
   }
 
+  static fromTileWithType(tile, type = 'chicken') {
+    return new Animal({
+      type,
+      x: tile.x * TILE_SIZE + TILE_SIZE / 2 - ANIMAL_SIZE / 2,
+      y: tile.y * TILE_SIZE + TILE_SIZE / 2 - ANIMAL_SIZE / 2,
+      lastGroundTile: { x: tile.x, y: tile.y }
+    });
+  }
+
   update(deltaSeconds, tileMap, random = Math.random) {
+    this.hitFlashSeconds = Math.max(0, this.hitFlashSeconds - deltaSeconds);
     this.rememberSupport(tileMap);
     this.decisionSeconds -= deltaSeconds;
 
@@ -97,6 +114,17 @@ export class Animal {
   takeKnockback(dx, dy, seconds = 0.12) {
     this.x += dx * seconds;
     this.y += dy * seconds;
+  }
+
+  takeDamage(amount, source) {
+    this.hp = Math.max(0, this.hp - amount);
+    this.hitFlashSeconds = 0.18;
+    const center = this.getCenterPosition();
+    const dx = center.x - source.x;
+    const dy = center.y - source.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    this.takeKnockback((dx / distance) * 120, (dy / distance) * 120, 0.14);
+    return this.hp <= 0;
   }
 
   rememberSupport(tileMap) {
@@ -166,6 +194,9 @@ export class Animal {
   toJSON() {
     return {
       type: this.type,
+      hp: this.hp,
+      maxHp: this.maxHp,
+      productTimer: this.productTimer,
       x: this.x,
       y: this.y,
       direction: { ...this.direction },

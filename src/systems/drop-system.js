@@ -16,13 +16,20 @@ const VALID_DROP_RESOURCES = new Set([
   'springDrop',
   'berry',
   'rawMeat',
+  'wool',
   'egg',
   'friedEgg',
   'clayBrick',
   'unfiredBowl',
   'bowl',
   'unfiredJug',
-  'jug'
+  'jug',
+  'ammoPouch',
+  'quiver',
+  'linenTunic',
+  'travelBoots',
+  'arrow',
+  'stoneBall'
 ]);
 
 const DROP_TILE_OFFSET = 8;
@@ -99,14 +106,16 @@ export class DropSystem {
       drop.age = Math.min(drop.duration, drop.age + deltaSeconds);
       if (drop.age < Math.min(0.18, drop.duration)) continue;
       if (Math.hypot(playerFoot.x - drop.x, playerFoot.y - drop.y) <= DROP_PICKUP_DISTANCE) {
-        inventory.add(drop.resource, drop.amount);
-        collected.push(drop);
+        const added = inventory.add(drop.resource, drop.amount);
+        if (added > 0) {
+          drop.amount -= added;
+          collected.push({ ...drop, amount: added });
+        }
       }
     }
 
     if (collected.length > 0) {
-      const collectedIds = new Set(collected.map((drop) => drop.id));
-      this.drops = this.drops.filter((drop) => !collectedIds.has(drop.id));
+      this.drops = this.drops.filter((drop) => drop.amount > 0);
     }
 
     return collected.map((drop) => ({

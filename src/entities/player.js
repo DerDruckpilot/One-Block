@@ -20,14 +20,14 @@ export class Player {
     this.hitFlashSeconds = 0;
   }
 
-  update(deltaSeconds, input, tileMap) {
+  update(deltaSeconds, input, tileMap, speedMultiplier = 1) {
     this.updateDamageTimers(deltaSeconds);
     const movement = this.readMovement(input);
     if (movement.x !== 0 || movement.y !== 0) {
       this.facing = this.primaryFacing(movement);
     }
 
-    const speed = input.isDown('Shift') ? MOVEMENT.runSpeed : MOVEMENT.walkSpeed;
+    const speed = (input.isDown('Shift') ? MOVEMENT.runSpeed : MOVEMENT.walkSpeed) * Math.max(0.5, Number(speedMultiplier) || 1);
     const nextX = this.x + movement.x * speed * deltaSeconds;
     const nextY = this.y + movement.y * speed * deltaSeconds;
 

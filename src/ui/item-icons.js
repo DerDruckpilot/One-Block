@@ -15,7 +15,15 @@ export const ITEM_ICON_PATHS = {
   slingshot: `${ICON_BASE_PATH}/wooden_slingshot.png`,
   bow: `${ICON_BASE_PATH}/wooden_bow.png`,
   arrow: `${ICON_BASE_PATH}/wooden_arrows.png`,
-  stoneBall: `${ICON_BASE_PATH}/small_rock.png`
+  stoneBall: `${ICON_BASE_PATH}/small_rock.png`,
+  egg: `${ICON_BASE_PATH}/egg.png`,
+  friedEgg: `${ICON_BASE_PATH}/fried_egg.png`,
+  rawMeat: `${ICON_BASE_PATH}/raw_meat.png`,
+  wool: `${ICON_BASE_PATH}/wool.png`,
+  ammoPouch: `${ICON_BASE_PATH}/ammo_pouch.png`,
+  quiver: `${ICON_BASE_PATH}/quiver.png`,
+  linenTunic: `${ICON_BASE_PATH}/linen_tunic.png`,
+  travelBoots: `${ICON_BASE_PATH}/travel_boots.png`
 };
 
 const itemIconImages = new Map();
@@ -62,7 +70,12 @@ const ICON_FALLBACKS = {
   unfiredBowl: 'bowl-raw',
   bowl: 'bowl',
   unfiredJug: 'jug-raw',
-  jug: 'jug'
+  jug: 'jug',
+  wool: 'fiber',
+  ammoPouch: 'bag',
+  quiver: 'quiver',
+  linenTunic: 'shirt',
+  travelBoots: 'boots'
 };
 
 export function getItemIconKind(resource) {

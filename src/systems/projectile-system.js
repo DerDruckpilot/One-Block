@@ -54,7 +54,7 @@ export class ProjectileSystem {
     return projectile;
   }
 
-  update(deltaSeconds, enemySystem, flyingEnemySystem) {
+  update(deltaSeconds, enemySystem, flyingEnemySystem, animalSystem = null) {
     const events = [];
     const remaining = [];
 
@@ -69,7 +69,7 @@ export class ProjectileSystem {
         projectile.x += projectile.direction.x * step;
         projectile.y += projectile.direction.y * step;
         projectile.distance += step;
-        hit = this.findHit(projectile, enemySystem, flyingEnemySystem);
+        hit = this.findHit(projectile, enemySystem, flyingEnemySystem, animalSystem);
       }
 
       if (hit) {
@@ -91,7 +91,7 @@ export class ProjectileSystem {
     return events;
   }
 
-  findHit(projectile, enemySystem, flyingEnemySystem) {
+  findHit(projectile, enemySystem, flyingEnemySystem, animalSystem = null) {
     for (const enemy of enemySystem.enemies) {
       if (this.distanceToTarget(projectile, enemy) <= PROJECTILE_HIT_RADIUS) {
         return { target: enemy, targetType: 'ground' };
@@ -101,6 +101,12 @@ export class ProjectileSystem {
     for (const enemy of flyingEnemySystem.enemies) {
       if (this.distanceToTarget(projectile, enemy) <= PROJECTILE_HIT_RADIUS) {
         return { target: enemy, targetType: 'flying' };
+      }
+    }
+
+    for (const animal of animalSystem?.animals || []) {
+      if (this.distanceToTarget(projectile, animal) <= PROJECTILE_HIT_RADIUS) {
+        return { target: animal, targetType: 'animal' };
       }
     }
 

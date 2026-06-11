@@ -28,7 +28,7 @@ export class AnimalSystem {
     return events;
   }
 
-  maybeSpawn(tileMap, chance = 0.18) {
+  maybeSpawn(tileMap, chance = 0.18, type = 'chicken') {
     if (this.animals.length >= ANIMAL_MAX_COUNT) {
       return { spawned: false, message: null };
     }
@@ -36,10 +36,10 @@ export class AnimalSystem {
       return { spawned: false, message: null };
     }
 
-    return this.spawn(tileMap);
+    return this.spawn(tileMap, type);
   }
 
-  spawn(tileMap) {
+  spawn(tileMap, type = 'chicken') {
     if (this.animals.length >= ANIMAL_MAX_COUNT) {
       return { spawned: false, message: 'Es sind genug Tiere da.' };
     }
@@ -49,12 +49,12 @@ export class AnimalSystem {
       return { spawned: false, message: 'Keine sichere Stelle fuer ein Tier.' };
     }
 
-    const animal = Animal.fromTile(tile);
+    const animal = Animal.fromTileWithType(tile, type);
     this.animals.push(animal);
     return {
       spawned: true,
       animal,
-      message: 'Ein Huhn pickt auf der Insel.'
+      message: type === 'sheep' ? 'Ein Schaf schaut neugierig umher.' : 'Ein Huhn pickt auf der Insel.'
     };
   }
 
@@ -97,11 +97,15 @@ export class AnimalSystem {
   }
 
   findNearestChicken(player, maxDistance) {
+    return this.findNearestAnimal(player, maxDistance, 'chicken');
+  }
+
+  findNearestAnimal(player, maxDistance, type = null) {
     const origin = player.getFootPosition();
     let nearest = null;
     let nearestDistance = Infinity;
     for (const animal of this.animals) {
-      if (animal.type !== 'chicken' || animal.tethered) continue;
+      if ((type && animal.type !== type) || animal.tethered) continue;
       const foot = animal.getFootPosition();
       const distance = Math.hypot(origin.x - foot.x, origin.y - foot.y);
       if (distance <= maxDistance && distance < nearestDistance) {
@@ -120,17 +124,34 @@ export class AnimalSystem {
     const existing = this.getTetheredAnimal();
     if (existing) {
       existing.tethered = false;
-      return { changed: true, animal: existing, message: 'Huhn losgelassen.' };
+      return { changed: true, animal: existing, message: `${this.getAnimalLabel(existing)} losgelassen.` };
     }
 
-    const animal = this.findNearestChicken(player, maxDistance);
+    const animal = this.findNearestAnimal(player, maxDistance);
     if (!animal) {
       return { changed: false, animal: null, message: 'Kein Tier in Reichweite.' };
     }
 
     animal.tethered = true;
     animal.direction = { x: 0, y: 0 };
-    return { changed: true, animal, message: 'Huhn eingefangen.' };
+    return { changed: true, animal, message: `${this.getAnimalLabel(animal)} eingefangen.` };
+  }
+
+  applyDamage(animal, amount, source) {
+    const defeated = animal.takeDamage(amount, source);
+    if (defeated) {
+      this.animals = this.animals.filter((candidate) => candidate !== animal);
+    }
+    return {
+      hit: true,
+      defeated,
+      animal,
+      message: defeated ? `${this.getAnimalLabel(animal)} erlegt.` : `${this.getAnimalLabel(animal)} getroffen.`
+    };
+  }
+
+  getAnimalLabel(animal) {
+    return animal?.type === 'sheep' ? 'Schaf' : 'Huhn';
   }
 
   getRecoveryTile(animal, tileMap) {

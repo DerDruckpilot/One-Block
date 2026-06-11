@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-6';
+const CACHE_NAME = 'one-block-v0-5-7';
 
 const CORE_ASSETS = [
   './',
@@ -17,6 +17,7 @@ const CORE_ASSETS = [
   './src/entities/flying-enemy.js',
   './src/entities/player.js',
   './src/systems/animal-system.js',
+  './src/systems/animal-assets.js',
   './src/systems/crystal-system.js',
   './src/systems/crystal-assets.js',
   './src/systems/crafting-system.js',
@@ -55,6 +56,14 @@ const CORE_ASSETS = [
   './assets/generated/icons/inventory_96/wooden_spear.png',
   './assets/generated/icons/inventory_96/workbench.png',
   './assets/generated/icons/inventory_96/yellow_ore_or_clay_lump.png',
+  './assets/generated/icons/inventory_96/ammo_pouch.png',
+  './assets/generated/icons/inventory_96/egg.png',
+  './assets/generated/icons/inventory_96/fried_egg.png',
+  './assets/generated/icons/inventory_96/linen_tunic.png',
+  './assets/generated/icons/inventory_96/quiver.png',
+  './assets/generated/icons/inventory_96/raw_meat.png',
+  './assets/generated/icons/inventory_96/travel_boots.png',
+  './assets/generated/icons/inventory_96/wool.png',
   './assets/generated/tiles/ground_96/clay_tileset_96.png',
   './assets/generated/tiles/ground_96/earth_tileset_96.png',
   './assets/generated/tiles/ground_96/farmland_tileset_96.png',
@@ -83,6 +92,8 @@ const CORE_ASSETS = [
   './assets/generated/objects/berry_bushes/berry_bush_small_01.png',
   './assets/generated/objects/berry_bushes/berry_bush_unripe_01.png',
   './assets/generated/objects/berry_bushes/berry_bush_unripe_02.png',
+  './assets/generated/objects/animals/chicken_96.png',
+  './assets/generated/objects/animals/sheep_96.png',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'
 ];
