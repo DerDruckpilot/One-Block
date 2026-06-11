@@ -35,14 +35,23 @@ const blendHex = (first, second, ratio = 0.5) => {
 };
 
 const GROUND_TILE_BASE_PATH = 'assets/generated/tiles/ground_96';
+const WATER_TILE_BASE_PATH = 'assets/generated/tiles/water_96';
+const MOIST_EARTH_TILE_BASE_PATH = 'assets/generated/tiles/moist_earth_96';
 const GROUND_TILE_SOURCE_SIZE = 96;
 const GROUND_TILE_SHEET_COLUMNS = 4;
+const GROUND_TILE_ANIMATION_FRAME_COUNT = 4;
 
 export const GROUND_TILE_ASSET_PATHS = {
   [TILE_TYPES.earth]: `${GROUND_TILE_BASE_PATH}/earth_tileset_96.png`,
   [TILE_TYPES.grass]: `${GROUND_TILE_BASE_PATH}/grass_tileset_96.png`,
   [TILE_TYPES.stone]: `${GROUND_TILE_BASE_PATH}/stone_tileset_96.png`,
-  [TILE_TYPES.clay]: `${GROUND_TILE_BASE_PATH}/clay_tileset_96.png`
+  [TILE_TYPES.clay]: `${GROUND_TILE_BASE_PATH}/clay_tileset_96.png`,
+  [TILE_TYPES.moistEarth]: `${MOIST_EARTH_TILE_BASE_PATH}/moist_earth_tileset_96.png`,
+  [TILE_TYPES.water]: `${WATER_TILE_BASE_PATH}/water_tileset_96.png`
+};
+
+export const GROUND_TILE_ANIMATION_PATHS = {
+  [TILE_TYPES.water]: `${WATER_TILE_BASE_PATH}/water_animation_96.png`
 };
 
 const GROUND_TILE_SPRITE_ORDER = [
@@ -74,7 +83,39 @@ const GROUND_TILE_SOURCE_RECTS = GROUND_TILE_SPRITE_ORDER.reduce((rects, name, i
   return rects;
 }, {});
 
+const TRANSITION_DIRECTIONS = ['right', 'left', 'bottom', 'top'];
+const GROUND_TRANSITION_SHEETS = {
+  ground: {
+    path: `${GROUND_TILE_BASE_PATH}/ground_transitions_96.png`,
+    pairs: [
+      [TILE_TYPES.grass, TILE_TYPES.earth],
+      [TILE_TYPES.earth, TILE_TYPES.stone],
+      [TILE_TYPES.earth, TILE_TYPES.clay],
+      [TILE_TYPES.grass, TILE_TYPES.stone]
+    ]
+  },
+  water: {
+    path: `${WATER_TILE_BASE_PATH}/water_transitions_96.png`,
+    pairs: [
+      [TILE_TYPES.water, TILE_TYPES.earth],
+      [TILE_TYPES.water, TILE_TYPES.grass],
+      [TILE_TYPES.water, TILE_TYPES.moistEarth],
+      [TILE_TYPES.water, TILE_TYPES.stone],
+      [TILE_TYPES.water, TILE_TYPES.clay]
+    ]
+  },
+  moistEarth: {
+    path: `${MOIST_EARTH_TILE_BASE_PATH}/moist_earth_transitions_96.png`,
+    pairs: [
+      [TILE_TYPES.moistEarth, TILE_TYPES.earth],
+      [TILE_TYPES.moistEarth, TILE_TYPES.water]
+    ]
+  }
+};
+
 const groundTileImages = new Map();
+const groundTileAnimationImages = new Map();
+const groundTileTransitionImages = new Map();
 
 export function getGroundTileAssetPath(type) {
   return GROUND_TILE_ASSET_PATHS[type] || null;
@@ -90,10 +131,38 @@ export function preloadGroundTileAssets() {
     image.src = path;
     groundTileImages.set(type, image);
   });
+
+  Object.entries(GROUND_TILE_ANIMATION_PATHS).forEach(([type, path]) => {
+    if (groundTileAnimationImages.has(type)) return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = path;
+    groundTileAnimationImages.set(type, image);
+  });
+
+  Object.entries(GROUND_TRANSITION_SHEETS).forEach(([key, sheet]) => {
+    if (groundTileTransitionImages.has(key)) return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = sheet.path;
+    groundTileTransitionImages.set(key, image);
+  });
 }
 
 export function getLoadedGroundTileImage(type) {
   const image = groundTileImages.get(type);
+  if (!image || image.complete !== true || image.naturalWidth <= 0) return null;
+  return image;
+}
+
+function getLoadedGroundTileAnimationImage(type) {
+  const image = groundTileAnimationImages.get(type);
+  if (!image || image.complete !== true || image.naturalWidth <= 0) return null;
+  return image;
+}
+
+function getLoadedGroundTileTransitionImage(key) {
+  const image = groundTileTransitionImages.get(key);
   if (!image || image.complete !== true || image.naturalWidth <= 0) return null;
   return image;
 }
@@ -188,6 +257,17 @@ export class TerrainRenderer {
     return { ...rect };
   }
 
+  getWaterAnimationSourceRect(tile) {
+    const time = globalThis.performance?.now?.() || Date.now();
+    const frame = (Math.floor(time / 520) + this.detailVariant(tile)) % GROUND_TILE_ANIMATION_FRAME_COUNT;
+    return {
+      x: frame * GROUND_TILE_SOURCE_SIZE,
+      y: 0,
+      width: GROUND_TILE_SOURCE_SIZE,
+      height: GROUND_TILE_SOURCE_SIZE
+    };
+  }
+
   selectGroundTileSprite(tile, tileMap) {
     const same = this.getSameNeighborMask(tile, tileMap);
     const edges = this.getEdgeProfile(tile, tileMap);
@@ -217,12 +297,17 @@ export class TerrainRenderer {
     if (!image || typeof context.drawImage !== 'function') return false;
 
     const spriteName = this.selectGroundTileSprite(tile, tileMap);
-    const source = this.getGroundTileSourceRect(spriteName);
+    const animationImage = spriteName.startsWith('full_')
+      ? getLoadedGroundTileAnimationImage(tile.type)
+      : null;
+    const source = animationImage
+      ? this.getWaterAnimationSourceRect(tile)
+      : this.getGroundTileSourceRect(spriteName);
 
     context.save();
     context.imageSmoothingEnabled = false;
     context.drawImage(
-      image,
+      animationImage || image,
       source.x,
       source.y,
       source.width,
@@ -232,9 +317,78 @@ export class TerrainRenderer {
       TILE_SIZE,
       TILE_SIZE
     );
+    this.drawGroundTransitionAsset(context, tile, tileMap, x, y);
     this.drawWateredOverlay(context, tile, tileMap, x, y);
     context.restore();
     return true;
+  }
+
+  drawGroundTransitionAsset(context, tile, tileMap, x, y) {
+    const transition = this.selectGroundTransition(tile, tileMap);
+    if (!transition) return false;
+
+    const image = getLoadedGroundTileTransitionImage(transition.sheetKey);
+    if (!image || typeof context.drawImage !== 'function') return false;
+
+    const directionIndex = TRANSITION_DIRECTIONS.indexOf(transition.direction);
+    if (directionIndex < 0) return false;
+
+    context.drawImage(
+      image,
+      directionIndex * GROUND_TILE_SOURCE_SIZE,
+      transition.row * GROUND_TILE_SOURCE_SIZE,
+      GROUND_TILE_SOURCE_SIZE,
+      GROUND_TILE_SOURCE_SIZE,
+      x,
+      y,
+      TILE_SIZE,
+      TILE_SIZE
+    );
+    return true;
+  }
+
+  selectGroundTransition(tile, tileMap) {
+    const directions = [
+      { name: 'right', opposite: 'left', x: 1, y: 0 },
+      { name: 'left', opposite: 'right', x: -1, y: 0 },
+      { name: 'bottom', opposite: 'top', x: 0, y: 1 },
+      { name: 'top', opposite: 'bottom', x: 0, y: -1 }
+    ];
+
+    for (const direction of directions) {
+      const neighborType = tileMap.getTile(tile.x + direction.x, tile.y + direction.y);
+      if (!neighborType || neighborType === tile.type || neighborType === TILE_TYPES.crystal) continue;
+      const transition = this.resolveTransition(tile.type, neighborType, direction.name, direction.opposite);
+      if (transition) return transition;
+    }
+
+    return null;
+  }
+
+  resolveTransition(currentType, neighborType, direction, oppositeDirection) {
+    const sheetOrder = currentType === TILE_TYPES.water || neighborType === TILE_TYPES.water
+      ? ['water', 'moistEarth', 'ground']
+      : currentType === TILE_TYPES.moistEarth || neighborType === TILE_TYPES.moistEarth
+        ? ['moistEarth', 'ground']
+        : ['ground'];
+
+    for (const sheetKey of sheetOrder) {
+      const sheet = GROUND_TRANSITION_SHEETS[sheetKey];
+      if (!sheet) continue;
+      const row = sheet.pairs.findIndex(([first, second]) =>
+        (first === currentType && second === neighborType) ||
+        (first === neighborType && second === currentType)
+      );
+      if (row < 0) continue;
+      const [first, second] = sheet.pairs[row];
+      return {
+        sheetKey,
+        row,
+        direction: first === currentType && second === neighborType ? direction : oppositeDirection
+      };
+    }
+
+    return null;
   }
 
   drawWateredOverlay(context, tile, tileMap, x, y) {
