@@ -34,7 +34,75 @@ const blendHex = (first, second, ratio = 0.5) => {
   });
 };
 
+const GROUND_TILE_BASE_PATH = 'assets/generated/tiles/ground_96';
+const GROUND_TILE_SOURCE_SIZE = 96;
+const GROUND_TILE_SHEET_COLUMNS = 4;
+
+export const GROUND_TILE_ASSET_PATHS = {
+  [TILE_TYPES.earth]: `${GROUND_TILE_BASE_PATH}/earth_tileset_96.png`,
+  [TILE_TYPES.grass]: `${GROUND_TILE_BASE_PATH}/grass_tileset_96.png`,
+  [TILE_TYPES.stone]: `${GROUND_TILE_BASE_PATH}/stone_tileset_96.png`,
+  [TILE_TYPES.clay]: `${GROUND_TILE_BASE_PATH}/clay_tileset_96.png`
+};
+
+const GROUND_TILE_SPRITE_ORDER = [
+  'full_01',
+  'full_02',
+  'full_03',
+  'full_04',
+  'edge_top',
+  'edge_bottom',
+  'edge_left',
+  'edge_right',
+  'outer_corner_tl',
+  'outer_corner_tr',
+  'outer_corner_bl',
+  'outer_corner_br',
+  'inner_corner_tl',
+  'inner_corner_tr',
+  'inner_corner_bl',
+  'inner_corner_br'
+];
+
+const GROUND_TILE_SOURCE_RECTS = GROUND_TILE_SPRITE_ORDER.reduce((rects, name, index) => {
+  rects[name] = {
+    x: (index % GROUND_TILE_SHEET_COLUMNS) * GROUND_TILE_SOURCE_SIZE,
+    y: Math.floor(index / GROUND_TILE_SHEET_COLUMNS) * GROUND_TILE_SOURCE_SIZE,
+    width: GROUND_TILE_SOURCE_SIZE,
+    height: GROUND_TILE_SOURCE_SIZE
+  };
+  return rects;
+}, {});
+
+const groundTileImages = new Map();
+
+export function getGroundTileAssetPath(type) {
+  return GROUND_TILE_ASSET_PATHS[type] || null;
+}
+
+export function preloadGroundTileAssets() {
+  if (typeof Image === 'undefined') return;
+
+  Object.entries(GROUND_TILE_ASSET_PATHS).forEach(([type, path]) => {
+    if (groundTileImages.has(type)) return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = path;
+    groundTileImages.set(type, image);
+  });
+}
+
+export function getLoadedGroundTileImage(type) {
+  const image = groundTileImages.get(type);
+  if (!image || image.complete !== true || image.naturalWidth <= 0) return null;
+  return image;
+}
+
 export class TerrainRenderer {
+  constructor() {
+    preloadGroundTileAssets();
+  }
+
   drawTile(context, tile, tileMap, screenX, screenY) {
     if (tile.type === TILE_TYPES.crystal) {
       this.drawBaseTile(context, { ...tile, type: TILE_TYPES.earth }, tileMap, screenX, screenY);
@@ -45,6 +113,8 @@ export class TerrainRenderer {
   }
 
   drawBaseTile(context, tile, tileMap, x, y) {
+    if (this.drawGroundTileAsset(context, tile, tileMap, x, y)) return;
+
     const palette = edgeMap[tile.type] || edgeMap.earth;
     const same = this.getSameNeighborMask(tile, tileMap);
     const edges = this.getEdgeProfile(tile, tileMap);
@@ -105,13 +175,75 @@ export class TerrainRenderer {
     this.drawTransitionDetails(context, tile, tileMap, palette, x, y, edges, same);
 
     this.drawTileDetails(context, tile, palette, x, y, this.detailVariant(tile));
-    if (tile.type !== TILE_TYPES.water && tileMap.isWatered?.(tile.x, tile.y)) {
-      context.globalAlpha = 0.22;
-      context.fillStyle = '#5eb7d7';
-      context.fillRect(x + 3, y + 6, TILE_SIZE - 6, 14);
-      context.globalAlpha = 1;
-    }
+    this.drawWateredOverlay(context, tile, tileMap, x, y);
     context.restore();
+  }
+
+  getGroundTileAssetPath(type) {
+    return getGroundTileAssetPath(type);
+  }
+
+  getGroundTileSourceRect(spriteName) {
+    const rect = GROUND_TILE_SOURCE_RECTS[spriteName] || GROUND_TILE_SOURCE_RECTS.full_01;
+    return { ...rect };
+  }
+
+  selectGroundTileSprite(tile, tileMap) {
+    const same = this.getSameNeighborMask(tile, tileMap);
+    const edges = this.getEdgeProfile(tile, tileMap);
+
+    if (edges.topOuter && edges.leftOuter) return 'outer_corner_tl';
+    if (edges.topOuter && edges.rightOuter) return 'outer_corner_tr';
+    if (edges.bottomOuter && edges.leftOuter) return 'outer_corner_bl';
+    if (edges.bottomOuter && edges.rightOuter) return 'outer_corner_br';
+    if (edges.topOuter) return 'edge_top';
+    if (edges.bottomOuter) return 'edge_bottom';
+    if (edges.leftOuter) return 'edge_left';
+    if (edges.rightOuter) return 'edge_right';
+
+    const diagonalMatches = (offsetX, offsetY) =>
+      tileMap.getTile(tile.x + offsetX, tile.y + offsetY) === tile.type;
+
+    if (same.up && same.left && !diagonalMatches(-1, -1)) return 'inner_corner_tl';
+    if (same.up && same.right && !diagonalMatches(1, -1)) return 'inner_corner_tr';
+    if (same.down && same.left && !diagonalMatches(-1, 1)) return 'inner_corner_bl';
+    if (same.down && same.right && !diagonalMatches(1, 1)) return 'inner_corner_br';
+
+    return `full_0${(this.detailVariant(tile) % 4) + 1}`;
+  }
+
+  drawGroundTileAsset(context, tile, tileMap, x, y) {
+    const image = getLoadedGroundTileImage(tile.type);
+    if (!image || typeof context.drawImage !== 'function') return false;
+
+    const spriteName = this.selectGroundTileSprite(tile, tileMap);
+    const source = this.getGroundTileSourceRect(spriteName);
+
+    context.save();
+    context.imageSmoothingEnabled = false;
+    context.drawImage(
+      image,
+      source.x,
+      source.y,
+      source.width,
+      source.height,
+      x,
+      y,
+      TILE_SIZE,
+      TILE_SIZE
+    );
+    this.drawWateredOverlay(context, tile, tileMap, x, y);
+    context.restore();
+    return true;
+  }
+
+  drawWateredOverlay(context, tile, tileMap, x, y) {
+    if (tile.type === TILE_TYPES.water || !tileMap.isWatered?.(tile.x, tile.y)) return;
+
+    context.globalAlpha = 0.22;
+    context.fillStyle = '#5eb7d7';
+    context.fillRect(x + 3, y + 6, TILE_SIZE - 6, 14);
+    context.globalAlpha = 1;
   }
 
   getSameNeighborMask(tile, tileMap) {

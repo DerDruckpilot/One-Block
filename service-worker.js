@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-2';
+const CACHE_NAME = 'one-block-v0-5-3';
 
 const CORE_ASSETS = [
   './',
@@ -53,6 +53,12 @@ const CORE_ASSETS = [
   './assets/generated/icons/inventory_96/wooden_spear.png',
   './assets/generated/icons/inventory_96/workbench.png',
   './assets/generated/icons/inventory_96/yellow_ore_or_clay_lump.png',
+  './assets/generated/tiles/ground_96/clay_tileset_96.png',
+  './assets/generated/tiles/ground_96/earth_tileset_96.png',
+  './assets/generated/tiles/ground_96/farmland_tileset_96.png',
+  './assets/generated/tiles/ground_96/grass_tileset_96.png',
+  './assets/generated/tiles/ground_96/ground_transitions_96.png',
+  './assets/generated/tiles/ground_96/stone_tileset_96.png',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'
 ];
