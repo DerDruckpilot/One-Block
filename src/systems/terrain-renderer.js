@@ -40,6 +40,8 @@ const MOIST_EARTH_TILE_BASE_PATH = 'assets/generated/tiles/moist_earth_96';
 const GROUND_TILE_SOURCE_SIZE = 96;
 const GROUND_TILE_SHEET_COLUMNS = 4;
 const GROUND_TILE_ANIMATION_FRAME_COUNT = 4;
+const GROUND_TRANSITION_SOURCE_BAND = 30;
+const GROUND_TRANSITION_RENDER_BAND = 10;
 
 export const GROUND_TILE_ASSET_PATHS = {
   [TILE_TYPES.earth]: `${GROUND_TILE_BASE_PATH}/earth_tileset_96.png`,
@@ -324,46 +326,108 @@ export class TerrainRenderer {
   }
 
   drawGroundTransitionAsset(context, tile, tileMap, x, y) {
-    const transition = this.selectGroundTransition(tile, tileMap);
-    if (!transition) return false;
+    const transitions = this.selectGroundTransitions(tile, tileMap);
+    if (!transitions.length) return false;
 
-    const image = getLoadedGroundTileTransitionImage(transition.sheetKey);
-    if (!image || typeof context.drawImage !== 'function') return false;
+    let drewTransition = false;
+    for (const transition of transitions) {
+      const image = getLoadedGroundTileTransitionImage(transition.sheetKey);
+      if (!image || typeof context.drawImage !== 'function') continue;
 
-    const directionIndex = TRANSITION_DIRECTIONS.indexOf(transition.direction);
-    if (directionIndex < 0) return false;
+      const directionIndex = TRANSITION_DIRECTIONS.indexOf(transition.direction);
+      if (directionIndex < 0) continue;
 
-    context.drawImage(
-      image,
-      directionIndex * GROUND_TILE_SOURCE_SIZE,
-      transition.row * GROUND_TILE_SOURCE_SIZE,
-      GROUND_TILE_SOURCE_SIZE,
-      GROUND_TILE_SOURCE_SIZE,
-      x,
-      y,
-      TILE_SIZE,
-      TILE_SIZE
-    );
-    return true;
+      const rect = this.getTransitionEdgeRect(transition.direction);
+      context.drawImage(
+        image,
+        directionIndex * GROUND_TILE_SOURCE_SIZE + rect.sourceX,
+        transition.row * GROUND_TILE_SOURCE_SIZE + rect.sourceY,
+        rect.sourceWidth,
+        rect.sourceHeight,
+        x + rect.destX,
+        y + rect.destY,
+        rect.destWidth,
+        rect.destHeight
+      );
+      drewTransition = true;
+    }
+    return drewTransition;
+  }
+
+  getTransitionEdgeRect(direction) {
+    if (direction === 'left') {
+      return {
+        sourceX: 0,
+        sourceY: 0,
+        sourceWidth: GROUND_TRANSITION_SOURCE_BAND,
+        sourceHeight: GROUND_TILE_SOURCE_SIZE,
+        destX: 0,
+        destY: 0,
+        destWidth: GROUND_TRANSITION_RENDER_BAND,
+        destHeight: TILE_SIZE
+      };
+    }
+
+    if (direction === 'right') {
+      return {
+        sourceX: GROUND_TILE_SOURCE_SIZE - GROUND_TRANSITION_SOURCE_BAND,
+        sourceY: 0,
+        sourceWidth: GROUND_TRANSITION_SOURCE_BAND,
+        sourceHeight: GROUND_TILE_SOURCE_SIZE,
+        destX: TILE_SIZE - GROUND_TRANSITION_RENDER_BAND,
+        destY: 0,
+        destWidth: GROUND_TRANSITION_RENDER_BAND,
+        destHeight: TILE_SIZE
+      };
+    }
+
+    if (direction === 'top') {
+      return {
+        sourceX: 0,
+        sourceY: 0,
+        sourceWidth: GROUND_TILE_SOURCE_SIZE,
+        sourceHeight: GROUND_TRANSITION_SOURCE_BAND,
+        destX: 0,
+        destY: 0,
+        destWidth: TILE_SIZE,
+        destHeight: GROUND_TRANSITION_RENDER_BAND
+      };
+    }
+
+    return {
+      sourceX: 0,
+      sourceY: GROUND_TILE_SOURCE_SIZE - GROUND_TRANSITION_SOURCE_BAND,
+      sourceWidth: GROUND_TILE_SOURCE_SIZE,
+      sourceHeight: GROUND_TRANSITION_SOURCE_BAND,
+      destX: 0,
+      destY: TILE_SIZE - GROUND_TRANSITION_RENDER_BAND,
+      destWidth: TILE_SIZE,
+      destHeight: GROUND_TRANSITION_RENDER_BAND
+    };
   }
 
   selectGroundTransition(tile, tileMap) {
+    return this.selectGroundTransitions(tile, tileMap)[0] || null;
+  }
+
+  selectGroundTransitions(tile, tileMap) {
     const directions = [
       { name: 'right', opposite: 'left', x: 1, y: 0 },
       { name: 'left', opposite: 'right', x: -1, y: 0 },
       { name: 'bottom', opposite: 'top', x: 0, y: 1 },
       { name: 'top', opposite: 'bottom', x: 0, y: -1 }
     ];
+    const transitions = [];
 
     for (const direction of directions) {
       const neighborType = tileMap.getTile(tile.x + direction.x, tile.y + direction.y);
       if (!neighborType || neighborType === tile.type || neighborType === TILE_TYPES.crystal) continue;
       if (!this.shouldRenderTransitionForBoundary(tile, tileMap, direction.x, direction.y)) continue;
       const transition = this.resolveTransition(tile.type, neighborType, direction.name, direction.opposite);
-      if (transition) return transition;
+      if (transition) transitions.push(transition);
     }
 
-    return null;
+    return transitions;
   }
 
   shouldRenderTransitionForBoundary(tile, tileMap, offsetX, offsetY) {

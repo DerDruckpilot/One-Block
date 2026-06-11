@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-5';
+const CACHE_NAME = 'one-block-v0-5-6';
 
 const CORE_ASSETS = [
   './',
@@ -18,6 +18,7 @@ const CORE_ASSETS = [
   './src/entities/player.js',
   './src/systems/animal-system.js',
   './src/systems/crystal-system.js',
+  './src/systems/crystal-assets.js',
   './src/systems/crafting-system.js',
   './src/systems/day-night-system.js',
   './src/systems/drop-system.js',
@@ -65,6 +66,7 @@ const CORE_ASSETS = [
   './assets/generated/tiles/water_96/water_animation_96.png',
   './assets/generated/tiles/water_96/water_tileset_96.png',
   './assets/generated/tiles/water_96/water_transitions_96.png',
+  './assets/generated/objects/crystal/crystal_core_96.png',
   './assets/generated/objects/trees/tree_halfgrown_01.png',
   './assets/generated/objects/trees/tree_mature_01.png',
   './assets/generated/objects/trees/tree_mature_02.png',

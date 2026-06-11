@@ -253,14 +253,16 @@ local function drawConcaveCorner(img, ox, oy, tileName, dark, light)
   local cornerY = top and 0 or TILE - 1
   local sx = left and 1 or -1
   local sy = top and 1 or -1
+  local seed = (tileName:find("_tl") and 13) or (tileName:find("_tr") and 29) or (tileName:find("_bl") and 43) or 61
   for yy = 0, 34 do
     for xx = 0, 34 do
       local d = math.sqrt(xx * xx + yy * yy)
+      local rough = (noiseValue(math.floor(xx / 4), math.floor(yy / 4), seed) - 0.5) * 7
       local x = ox + cornerX + sx * xx
       local y = oy + cornerY + sy * yy
-      if d >= 22 and d <= 25 then
+      if d >= 21 + rough and d <= 26 + rough then
         pixel(img, x, y, dark)
-      elseif d >= 19 and d < 22 and ((xx + yy) % 3 ~= 0) then
+      elseif d >= 17 + rough and d < 21 + rough and ((xx + yy + seed) % 3 ~= 0) then
         pixel(img, x, y, light)
       end
     end
