@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-3';
+const CACHE_NAME = 'one-block-v0-5-4';
 
 const CORE_ASSETS = [
   './',
@@ -30,6 +30,7 @@ const CORE_ASSETS = [
   './src/systems/save-system.js',
   './src/systems/render-system.js',
   './src/systems/terrain-renderer.js',
+  './src/systems/world-object-assets.js',
   './src/systems/background-system.js',
   './src/ui/hotbar.js',
   './src/ui/hud.js',
@@ -59,6 +60,27 @@ const CORE_ASSETS = [
   './assets/generated/tiles/ground_96/grass_tileset_96.png',
   './assets/generated/tiles/ground_96/ground_transitions_96.png',
   './assets/generated/tiles/ground_96/stone_tileset_96.png',
+  './assets/generated/tiles/moist_earth_96/moist_earth_tileset_96.png',
+  './assets/generated/tiles/moist_earth_96/moist_earth_transitions_96.png',
+  './assets/generated/tiles/water_96/water_animation_96.png',
+  './assets/generated/tiles/water_96/water_tileset_96.png',
+  './assets/generated/tiles/water_96/water_transitions_96.png',
+  './assets/generated/objects/trees/tree_halfgrown_01.png',
+  './assets/generated/objects/trees/tree_mature_01.png',
+  './assets/generated/objects/trees/tree_mature_02.png',
+  './assets/generated/objects/trees/tree_mature_03.png',
+  './assets/generated/objects/trees/tree_mature_04.png',
+  './assets/generated/objects/trees/tree_sapling_01.png',
+  './assets/generated/objects/trees/tree_stump_01.png',
+  './assets/generated/objects/trees/tree_young_01.png',
+  './assets/generated/objects/berry_bushes/berry_bush_growing_01.png',
+  './assets/generated/objects/berry_bushes/berry_bush_ripe_01.png',
+  './assets/generated/objects/berry_bushes/berry_bush_ripe_02.png',
+  './assets/generated/objects/berry_bushes/berry_bush_ripe_03.png',
+  './assets/generated/objects/berry_bushes/berry_bush_ripe_04.png',
+  './assets/generated/objects/berry_bushes/berry_bush_small_01.png',
+  './assets/generated/objects/berry_bushes/berry_bush_unripe_01.png',
+  './assets/generated/objects/berry_bushes/berry_bush_unripe_02.png',
   './assets/ui/icon-192.png',
   './assets/ui/icon-512.png'
 ];

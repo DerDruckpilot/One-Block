@@ -44,6 +44,7 @@ import { EnemySystem } from '../src/systems/enemy-system.js';
 import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
 import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
+import { getBerryBushAssetPath, getTreeAssetPath, stableVariantIndex } from '../src/systems/world-object-assets.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
@@ -236,6 +237,23 @@ const map = new TileMap();
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
   assert.equal(serviceWorker.includes('./assets/generated/icons/inventory_96/grass_block.png'), true, 'service worker caches 96px inventory icons');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/ground_96/grass_tileset_96.png'), true, 'service worker caches 96px ground tile sheets');
+  assert.equal(serviceWorker.includes('./assets/generated/tiles/water_96/water_tileset_96.png'), true, 'service worker caches 96px water tiles');
+  assert.equal(serviceWorker.includes('./assets/generated/tiles/moist_earth_96/moist_earth_tileset_96.png'), true, 'service worker caches 96px moist earth tiles');
+  assert.equal(serviceWorker.includes('./assets/generated/objects/trees/tree_mature_01.png'), true, 'service worker caches upgraded tree assets');
+  assert.equal(serviceWorker.includes('./assets/generated/objects/berry_bushes/berry_bush_ripe_01.png'), true, 'service worker caches upgraded berry bush assets');
+  assert.equal(serviceWorker.includes('./src/systems/world-object-assets.js'), true, 'service worker caches the world object asset loader');
+}
+
+{
+  assert.equal(getTreeAssetPath(1, 0, 0), 'assets/generated/objects/trees/tree_sapling_01.png', 'tree stage one uses the sapling asset');
+  assert.equal(getTreeAssetPath(2, 0, 0), 'assets/generated/objects/trees/tree_young_01.png', 'tree stage two uses the young tree asset');
+  assert.equal(getTreeAssetPath(3, 4, -2), getTreeAssetPath(3, 4, -2), 'mature tree variant selection is deterministic');
+  assert.equal(getTreeAssetPath(3, 4, -2).includes('/tree_mature_'), true, 'mature tree uses a mature tree variant asset');
+  assert.equal(getBerryBushAssetPath(1, false, 0, 0), 'assets/generated/objects/berry_bushes/berry_bush_small_01.png', 'berry bush stage one uses the small bush asset');
+  assert.equal(getBerryBushAssetPath(2, false, 0, 0), 'assets/generated/objects/berry_bushes/berry_bush_growing_01.png', 'berry bush stage two uses the growing bush asset');
+  assert.equal(getBerryBushAssetPath(3, false, 1, 1).includes('/berry_bush_unripe_'), true, 'unripe mature berry bush uses an unripe variant');
+  assert.equal(getBerryBushAssetPath(3, true, 1, 1).includes('/berry_bush_ripe_'), true, 'ripe mature berry bush uses a ripe variant');
+  assert.equal(stableVariantIndex(3, -7, 43, 4), stableVariantIndex(3, -7, 43, 4), 'world object visual variants are stable by position');
 }
 
 {
@@ -524,7 +542,8 @@ const map = new TileMap();
 
   assert.equal(getGroundTileAssetPath(TILE_TYPES.grass), 'assets/generated/tiles/ground_96/grass_tileset_96.png', 'grass terrain uses the 96px ground tile sheet');
   assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.earth), 'assets/generated/tiles/ground_96/earth_tileset_96.png', 'earth terrain uses the 96px ground tile sheet');
-  assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.water), null, 'water keeps the canvas terrain fallback until a water sheet exists');
+  assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.water), 'assets/generated/tiles/water_96/water_tileset_96.png', 'water terrain uses the 96px water tile sheet');
+  assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.moistEarth), 'assets/generated/tiles/moist_earth_96/moist_earth_tileset_96.png', 'moist earth terrain uses the 96px moist earth tile sheet');
   assert.deepEqual(
     terrainRenderer.getGroundTileSourceRect('edge_top'),
     { x: 0, y: 96, width: 96, height: 96 },

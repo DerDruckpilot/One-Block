@@ -1,11 +1,18 @@
 import { DROP_ANIMATION_SECONDS, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPES } from '../config/constants.js';
 import { TerrainRenderer } from './terrain-renderer.js';
 import { drawItemIcon, getLoadedItemIconImage } from '../ui/item-icons.js';
+import {
+  getBerryBushAssetPath,
+  getLoadedWorldObjectImage,
+  getTreeAssetPath,
+  preloadWorldObjectAssets
+} from './world-object-assets.js';
 
 export class RenderSystem {
   constructor(context, terrainRenderer = new TerrainRenderer()) {
     this.context = context;
     this.terrainRenderer = terrainRenderer;
+    preloadWorldObjectAssets();
   }
 
   renderWorld(tileMap, camera) {
@@ -125,13 +132,13 @@ export class RenderSystem {
         this.drawGate(screenX, screenY, object.open, tileMap.getBarrierCollisionShape(object.x, object.y));
       }
       if (object.type === OBJECT_TYPES.sapling) {
-        this.drawSapling(screenX, screenY, object.growthStage || 1);
+        this.drawSapling(screenX, screenY, object.growthStage || 1, object.x, object.y);
       }
       if (object.type === OBJECT_TYPES.tree) {
         return;
       }
       if (object.type === OBJECT_TYPES.berryBush) {
-        this.drawBerryBush(screenX, screenY, object.growthStage || (object.ready ? 3 : 1), object.ready === true);
+        this.drawBerryBush(screenX, screenY, object.growthStage || (object.ready ? 3 : 1), object.ready === true, object.x, object.y);
       }
     });
   }
@@ -141,7 +148,7 @@ export class RenderSystem {
       if (object.type !== OBJECT_TYPES.tree) return;
       const screenX = Math.round(object.x * TILE_SIZE - camera.x);
       const screenY = Math.round(object.y * TILE_SIZE - camera.y);
-      this.drawTree(screenX, screenY, object.growthStage || 3);
+      this.drawTree(screenX, screenY, object.growthStage || 3, object.x, object.y);
     });
   }
 
@@ -999,7 +1006,25 @@ export class RenderSystem {
     };
   }
 
-  drawSapling(x, y, stage = 1) {
+  drawWorldObjectAsset(path, x, y, width, height, anchorX = 0.5, anchorY = 1) {
+    const image = getLoadedWorldObjectImage(path);
+    if (!image || typeof this.context.drawImage !== 'function') return false;
+
+    const left = Math.round(x + TILE_SIZE / 2 - width * anchorX);
+    const top = Math.round(y + TILE_SIZE - height * anchorY);
+
+    this.context.save();
+    this.context.imageSmoothingEnabled = false;
+    this.context.drawImage(image, left, top, width, height);
+    this.context.restore();
+    return true;
+  }
+
+  drawSapling(x, y, stage = 1, tileX = 0, tileY = 0) {
+    const path = getTreeAssetPath(stage, tileX, tileY);
+    const size = stage <= 1 ? 32 : 48;
+    if (this.drawWorldObjectAsset(path, x, y, size, size)) return;
+
     this.context.save();
     const leafOffset = stage >= 2 ? -4 : 0;
     this.context.fillStyle = '#5b331c';
@@ -1015,11 +1040,14 @@ export class RenderSystem {
     this.context.restore();
   }
 
-  drawTree(x, y, stage = 3) {
+  drawTree(x, y, stage = 3, tileX = 0, tileY = 0) {
     if (stage < 3) {
-      this.drawSapling(x, y, 2);
+      this.drawSapling(x, y, 2, tileX, tileY);
       return;
     }
+
+    const path = getTreeAssetPath(stage, tileX, tileY);
+    if (this.drawWorldObjectAsset(path, x, y, 96, 96)) return;
 
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
@@ -1055,7 +1083,11 @@ export class RenderSystem {
     };
   }
 
-  drawBerryBush(x, y, stage = 3, ready = true) {
+  drawBerryBush(x, y, stage = 3, ready = true, tileX = 0, tileY = 0) {
+    const path = getBerryBushAssetPath(stage, ready, tileX, tileY);
+    const size = stage <= 1 ? 32 : stage === 2 ? 36 : 40;
+    if (this.drawWorldObjectAsset(path, x, y, size, size)) return;
+
     this.context.save();
     this.context.fillStyle = '#2f6f35';
     this.context.fillRect(x + 7, y + (stage >= 2 ? 10 : 15), stage >= 2 ? 18 : 12, stage >= 2 ? 13 : 8);
