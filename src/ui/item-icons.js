@@ -1,5 +1,25 @@
 import { RESOURCE_ICONS } from '../config/constants.js';
 
+const ICON_BASE_PATH = 'assets/generated/icons/inventory_96';
+
+export const ITEM_ICON_PATHS = {
+  earth: `${ICON_BASE_PATH}/grass_block.png`,
+  stone: `${ICON_BASE_PATH}/stone.png`,
+  clay: `${ICON_BASE_PATH}/clay.png`,
+  rawWood: `${ICON_BASE_PATH}/raw_wood_log.png`,
+  fiber: `${ICON_BASE_PATH}/plant_fiber_rope.png`,
+  grassSeed: `${ICON_BASE_PATH}/grass_seeds.png`,
+  workbench: `${ICON_BASE_PATH}/workbench.png`,
+  woodenPickaxe: `${ICON_BASE_PATH}/wooden_pickaxe.png`,
+  woodenSpear: `${ICON_BASE_PATH}/wooden_spear.png`,
+  slingshot: `${ICON_BASE_PATH}/wooden_slingshot.png`,
+  bow: `${ICON_BASE_PATH}/wooden_bow.png`,
+  arrow: `${ICON_BASE_PATH}/wooden_arrows.png`,
+  stoneBall: `${ICON_BASE_PATH}/small_rock.png`
+};
+
+const itemIconImages = new Map();
+
 const ICON_FALLBACKS = {
   earth: 'soil',
   stone: 'stone',
@@ -49,12 +69,49 @@ export function getItemIconKind(resource) {
   return ICON_FALLBACKS[resource] || 'fallback';
 }
 
+export function getItemIconPath(resource) {
+  return ITEM_ICON_PATHS[resource] || null;
+}
+
+export function preloadItemIcons() {
+  if (typeof Image === 'undefined') return;
+
+  Object.entries(ITEM_ICON_PATHS).forEach(([resource, path]) => {
+    if (itemIconImages.has(resource)) return;
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = path;
+    itemIconImages.set(resource, image);
+  });
+}
+
+export function getLoadedItemIconImage(resource) {
+  const image = itemIconImages.get(resource);
+  if (!image || image.complete !== true || image.naturalWidth <= 0) return null;
+  return image;
+}
+
 export function renderItemIcon(resource, className = 'item-pixel-icon') {
   const fallback = RESOURCE_ICONS[resource] || '?';
-  return `<span class="${className} item-icon-${getItemIconKind(resource)}" aria-hidden="true">${fallback}</span>`;
+  const iconPath = getItemIconPath(resource);
+  const image = iconPath
+    ? `<img class="item-icon-image" src="${iconPath}" alt="" decoding="async" loading="eager" draggable="false" onload="this.parentElement.classList.add('has-image')" onerror="this.remove()" />`
+    : '';
+  return `<span class="${className} item-icon-${getItemIconKind(resource)}" aria-hidden="true">${image}<span class="item-icon-fallback-text">${fallback}</span></span>`;
 }
 
 export function drawItemIcon(context, resource, x, y, size = 16) {
+  const image = getLoadedItemIconImage(resource);
+  if (image && typeof context.drawImage === 'function') {
+    const left = Math.round(x - size / 2);
+    const top = Math.round(y - size / 2);
+    context.save();
+    context.imageSmoothingEnabled = false;
+    context.drawImage(image, left, top, size, size);
+    context.restore();
+    return true;
+  }
+
   const unit = Math.max(1, Math.floor(size / 8));
   const left = Math.round(x - size / 2);
   const top = Math.round(y - size / 2);
@@ -130,4 +187,7 @@ export function drawItemIcon(context, resource, x, y, size = 16) {
   }
 
   context.restore();
+  return false;
 }
+
+preloadItemIcons();

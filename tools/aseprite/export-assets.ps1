@@ -34,7 +34,8 @@ if (-not $sourceFiles) {
 }
 
 foreach ($sourceFile in $sourceFiles) {
-  $relativePath = [System.IO.Path]::GetRelativePath($sourceRoot, $sourceFile.FullName)
+  $sourceRootPath = $sourceRoot.Path.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+  $relativePath = $sourceFile.FullName.Substring($sourceRootPath.Length).TrimStart([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
   $relativeOutput = [System.IO.Path]::ChangeExtension($relativePath, ".png")
   $outputPath = Join-Path $outputRoot $relativeOutput
   $outputDirectory = Split-Path $outputPath -Parent

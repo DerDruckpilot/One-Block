@@ -718,6 +718,7 @@ button.menu-row:hover {
 }
 
 .item-pixel-icon {
+  position: relative;
   display: inline-block;
   width: 24px;
   height: 24px;
@@ -728,6 +729,32 @@ button.menu-row:hover {
   image-rendering: pixelated;
   vertical-align: middle;
   box-shadow: inset 0 0 0 2px rgba(255, 226, 156, 0.12);
+}
+
+.item-pixel-icon.has-image {
+  background: transparent;
+  box-shadow: none;
+}
+
+.item-icon-image {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+
+.item-pixel-icon.has-image::before,
+.item-pixel-icon.has-image::after {
+  display: none;
+}
+
+.item-icon-fallback-text {
+  color: transparent;
 }
 
 .item-pixel-icon::before,

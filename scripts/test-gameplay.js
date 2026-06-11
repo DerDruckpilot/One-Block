@@ -45,6 +45,7 @@ import { LogSystem } from '../src/systems/log-system.js';
 import { TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
+import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
 import { isPortraitViewport, updateOrientationState } from '../src/ui/orientation.js';
 import { PointerHitboxSystem } from '../src/ui/pointer-hitboxes.js';
@@ -213,6 +214,7 @@ const map = new TileMap();
   const indexHtml = readFileSync('index.html', 'utf8');
   const styles = readFileSync('src/styles.css', 'utf8');
   const mainScript = readFileSync('src/main.js', 'utf8');
+  const serviceWorker = readFileSync('service-worker.js', 'utf8');
 
   assert.equal(indexHtml.includes('maximum-scale=1'), true, 'mobile viewport caps pinch and double-tap zoom scale');
   assert.equal(indexHtml.includes('user-scalable=no'), true, 'mobile viewport disables browser double-tap zoom');
@@ -229,7 +231,29 @@ const map = new TileMap();
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
   assert.equal(styles.includes('.stat-stamina'), false, 'inventory character panel no longer styles a stamina bar');
   assert.equal(styles.includes('.menu-panel:not(#inventory-panel)'), true, 'non-inventory menus share the inventory-style frame direction');
+  assert.equal(styles.includes('.item-icon-image'), true, 'item icons can render real PNG image assets');
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(serviceWorker.includes('./assets/generated/icons/inventory_96/grass_block.png'), true, 'service worker caches 96px inventory icons');
+}
+
+{
+  assert.equal(getItemIconPath('earth'), 'assets/generated/icons/inventory_96/grass_block.png', 'earth uses the 96px grass block icon');
+  assert.equal(getItemIconPath('rawWood'), 'assets/generated/icons/inventory_96/raw_wood_log.png', 'raw wood uses the 96px log icon');
+  assert.equal(getItemIconPath('grassSeed'), 'assets/generated/icons/inventory_96/grass_seeds.png', 'grass seeds use the 96px seed icon');
+  assert.equal(getItemIconPath('woodenPickaxe'), 'assets/generated/icons/inventory_96/wooden_pickaxe.png', 'wooden pickaxe uses the 96px pickaxe icon');
+  assert.equal(getItemIconPath('slingshot'), 'assets/generated/icons/inventory_96/wooden_slingshot.png', 'slingshot uses the 96px slingshot icon');
+  assert.equal(getItemIconPath('arrow'), 'assets/generated/icons/inventory_96/wooden_arrows.png', 'arrows use the 96px arrow bundle icon');
+  assert.equal(getItemIconPath('stoneBall'), 'assets/generated/icons/inventory_96/small_rock.png', 'stone balls use the small rock icon');
+  assert.equal(ITEM_ICON_PATHS.yellow_ore_or_clay_lump, undefined, 'unmatched preview-only icon is not introduced as a gameplay item');
+
+  const earthIconHtml = renderItemIcon('earth');
+  assert.equal(earthIconHtml.includes('item-icon-image'), true, 'rendered item icon includes a PNG image element');
+  assert.equal(earthIconHtml.includes('assets/generated/icons/inventory_96/grass_block.png'), true, 'rendered item icon points at the 96px PNG');
+
+  const context = createDrawContext();
+  const drewPng = drawItemIcon(context, 'earth', 16, 16, 24);
+  assert.equal(drewPng, false, 'canvas item drawing keeps fallback when PNG image is not loaded');
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect'), true, 'canvas fallback still draws a pixel icon');
 }
 
 {
