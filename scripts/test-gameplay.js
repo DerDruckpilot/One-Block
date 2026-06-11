@@ -225,6 +225,10 @@ const map = new TileMap();
   assert.equal(styles.includes('#inventory-panel .inventory-slot-name'), true, 'inventory item labels have dedicated compact styling');
   assert.equal(styles.includes('-webkit-line-clamp: 2'), true, 'long inventory labels are clamped to avoid slot overflow');
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
+  assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
+  assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
+  assert.equal(styles.includes('.stat-stamina'), false, 'inventory character panel no longer styles a stamina bar');
+  assert.equal(styles.includes('.menu-panel:not(#inventory-panel)'), true, 'non-inventory menus share the inventory-style frame direction');
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
 }
 
@@ -890,9 +894,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointermove = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointermove') pointermove = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const canvas = {
@@ -937,19 +945,134 @@ const map = new TileMap();
   });
 
   pointerdown(createPointerEvent(320, 130));
+  assert.equal(selectedTab, null, 'inventory tab waits for tap release before selection');
+  pointerup(createPointerEvent(320, 130));
   assert.equal(selectedTab, 'tools', 'inventory tab can be selected by pointer hitbox');
+
+  selectedTab = null;
+  pointerdown(createPointerEvent(320, 130));
+  pointermove(createPointerEvent(346, 130));
+  pointerup(createPointerEvent(346, 130));
+  assert.equal(selectedTab, null, 'horizontal drag on an inventory tab scrolls without selecting a tab');
 
   hitboxes.getCraftingOpen = () => true;
   hitboxes.getInventoryOpen = () => false;
   pointerdown(createPointerEvent(340, 150));
+  pointerup(createPointerEvent(340, 150));
   assert.equal(selectedRecipe, 'woodenSpear', 'crafting recipe can be selected by pointer hitbox');
+
+  selectedRecipe = null;
+  pointerdown(createPointerEvent(340, 150));
+  pointermove(createPointerEvent(340, 175));
+  pointerup(createPointerEvent(340, 175));
+  assert.equal(selectedRecipe, null, 'dragging on a crafting recipe does not accidentally select it');
 }
 
 {
   let pointerdown = null;
+  let pointermove = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointermove') pointermove = callback;
+      if (type === 'pointerup') pointerup = callback;
+    }
+  };
+  const canvas = {
+    width: 960,
+    height: 540,
+    focus() {},
+    getBoundingClientRect() {
+      return { left: 0, top: 0, width: 960, height: 540 };
+    }
+  };
+  const cookingRecipe = createRectElement(
+    { left: 330, top: 140, width: 150, height: 42 },
+    { dataset: { cookSelect: 'roastedBerries' } }
+  );
+  const furnaceRecipe = createRectElement(
+    { left: 330, top: 140, width: 150, height: 42 },
+    { dataset: { furnaceSelect: 'clayBrick' } }
+  );
+  const saveButton = createRectElement(
+    { left: 330, top: 140, width: 92, height: 34 },
+    { dataset: { saveSlot: '1' } }
+  );
+  const cookingPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelectorAll: (selector) => selector === '[data-cook-select]' ? [cookingRecipe] : [] }
+  );
+  const furnacePanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 220 },
+    { querySelectorAll: (selector) => selector === '[data-furnace-select]' ? [furnaceRecipe] : [] }
+  );
+  const settingsPanel = createRectElement(
+    { left: 300, top: 90, width: 360, height: 260 },
+    { querySelectorAll: (selector) => selector === '[data-save-slot]' ? [saveButton] : [] }
+  );
+  let selectedCookingRecipe = null;
+  let selectedFurnaceRecipe = null;
+  let savedSlot = null;
+  const hitboxes = new PointerHitboxSystem({
+    canvas,
+    cookingPanel,
+    furnacePanel,
+    getCookingOpen: () => true,
+    getFurnaceOpen: () => false,
+    getSettingsOpen: () => false,
+    onCookSelect(recipeId) {
+      selectedCookingRecipe = recipeId;
+    },
+    onFurnaceSelect(recipeId) {
+      selectedFurnaceRecipe = recipeId;
+    },
+    onSettingsSaveSlot(slotIndex) {
+      savedSlot = slotIndex;
+    },
+    pointerTarget,
+    settingsPanel
+  });
+
+  pointerdown(createPointerEvent(340, 150));
+  pointerup(createPointerEvent(340, 150));
+  assert.equal(selectedCookingRecipe, 'roastedBerries', 'cooking recipe tap selects the recipe');
+  selectedCookingRecipe = null;
+  pointerdown(createPointerEvent(340, 150));
+  pointermove(createPointerEvent(340, 176));
+  pointerup(createPointerEvent(340, 176));
+  assert.equal(selectedCookingRecipe, null, 'dragging on a cooking recipe does not accidentally select it');
+
+  hitboxes.getCookingOpen = () => false;
+  hitboxes.getFurnaceOpen = () => true;
+  pointerdown(createPointerEvent(340, 150));
+  pointerup(createPointerEvent(340, 150));
+  assert.equal(selectedFurnaceRecipe, 'clayBrick', 'furnace recipe tap selects the recipe');
+  selectedFurnaceRecipe = null;
+  pointerdown(createPointerEvent(340, 150));
+  pointermove(createPointerEvent(340, 176));
+  pointerup(createPointerEvent(340, 176));
+  assert.equal(selectedFurnaceRecipe, null, 'dragging on a furnace recipe does not accidentally select it');
+
+  hitboxes.getFurnaceOpen = () => false;
+  hitboxes.getSettingsOpen = () => true;
+  pointerdown(createPointerEvent(340, 150));
+  pointerup(createPointerEvent(340, 150));
+  assert.equal(savedSlot, 1, 'settings save button tap still activates the slot');
+  savedSlot = null;
+  pointerdown(createPointerEvent(340, 150));
+  pointermove(createPointerEvent(340, 176));
+  pointerup(createPointerEvent(340, 176));
+  assert.equal(savedSlot, null, 'dragging on a settings button does not accidentally activate it');
+}
+
+{
+  let pointerdown = null;
+  let pointerup = null;
+  const pointerTarget = {
+    addEventListener(type, callback) {
+      if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const canvas = {
@@ -1170,9 +1293,11 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const inventoryButton = createRectElement({ left: 420, top: 12, width: 54, height: 38 });
@@ -1328,6 +1453,7 @@ const map = new TileMap();
     hasWorkbenchAccess: false,
     inventory,
     inventoryOpen: true,
+    playerHearts: ['full', 'half', 'empty'],
     recipeStates: crafting.getRecipeStates({ craftingContext: 'normal', hasWorkbenchAccess: false }),
     selectedInventoryResource: 'rawWood'
   });
@@ -1342,6 +1468,11 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hand-Slot oder Hotbar-Slot anklicken.'), false, 'inventory panel omits bulky hotbar assignment helper text');
   assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), true, 'inventory panel keeps compact hotbar assignment area');
   assert.equal(inventoryPanel.innerHTML.includes('data-hand-slot="true"'), true, 'inventory panel exposes a hand equipment slot');
+  assert.equal(inventoryPanel.innerHTML.includes('character-heart-row'), true, 'inventory character panel renders true HP hearts');
+  assert.equal(inventoryPanel.innerHTML.includes('heart-full'), true, 'inventory character panel renders full hearts');
+  assert.equal(inventoryPanel.innerHTML.includes('heart-half'), true, 'inventory character panel renders half hearts');
+  assert.equal(inventoryPanel.innerHTML.includes('heart-empty'), true, 'inventory character panel renders empty hearts');
+  assert.equal(inventoryPanel.innerHTML.includes('Ausdauer'), false, 'inventory character panel no longer renders stamina');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-hotbar-slot="1"'), true, 'inventory panel exposes its own hotbar assignment slots');
   assert.equal(inventoryPanel.innerHTML.includes('Hotbar 2: Stein'), true, 'inventory hotbar shows assigned slot labels');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
@@ -1446,9 +1577,11 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const inventory = new ResourceInventory();
@@ -1477,6 +1610,8 @@ const map = new TileMap();
   assert.equal(game.isGamePaused(), true, 'open crafting pauses gameplay before crafting button clicks');
 
   pointerdown(createPointerEvent(360, 240));
+  assert.equal(game.inventory.get('rawWood'), 5, 'crafting button waits for tap release before crafting');
+  pointerup(createPointerEvent(360, 240));
 
   assert.equal(game.inventory.get('rawWood'), 0, 'crafting button click consumes raw wood');
   assert.equal(game.inventory.get('fiber'), 0, 'crafting button click consumes fibers');
@@ -1486,9 +1621,11 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
+  let pointerup = null;
   const pointerTarget = {
     addEventListener(type, callback) {
       if (type === 'pointerdown') pointerdown = callback;
+      if (type === 'pointerup') pointerup = callback;
     }
   };
   const craftButton = createRectElement(
@@ -1515,6 +1652,7 @@ const map = new TileMap();
   assert.equal(game.isGamePaused(), true, 'disabled crafting button is still handled through paused menu UI');
 
   pointerdown(createPointerEvent(360, 240));
+  pointerup(createPointerEvent(360, 240));
 
   assert.equal(game.inventory.get('workbench'), 0, 'disabled crafting button does not craft');
   assert.equal(game.crystalSystem.lastMessage, 'Nicht genug Material.', 'disabled crafting button writes a missing material log');
@@ -3078,7 +3216,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
-  const pointerTarget = { addEventListener(type, callback) { if (type === 'pointerdown') pointerdown = callback; } };
+  let pointermove = null;
+  let pointerup = null;
+  const pointerTarget = { addEventListener(type, callback) {
+    if (type === 'pointerdown') pointerdown = callback;
+    if (type === 'pointermove') pointermove = callback;
+    if (type === 'pointerup') pointerup = callback;
+  } };
   const canvas = { width: 960, height: 540, focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) };
   let crafted = null;
   const craftButton = createRectElement(
@@ -3098,6 +3242,7 @@ const map = new TileMap();
   });
 
   pointerdown(createPointerEvent(520, 330));
+  pointerup(createPointerEvent(520, 330));
   assert.equal(crafted, 'bow', 'crafting button remains clickable after scroll-position changes');
 }
 
@@ -3438,7 +3583,13 @@ const map = new TileMap();
 
 {
   let pointerdown = null;
-  const pointerTarget = { addEventListener(type, callback) { if (type === 'pointerdown') pointerdown = callback; } };
+  let pointermove = null;
+  let pointerup = null;
+  const pointerTarget = { addEventListener(type, callback) {
+    if (type === 'pointerdown') pointerdown = callback;
+    if (type === 'pointermove') pointermove = callback;
+    if (type === 'pointerup') pointerup = callback;
+  } };
   const canvas = { width: 960, height: 540, focus() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) };
   let selected = null;
   let removeToggled = false;
@@ -3461,8 +3612,16 @@ const map = new TileMap();
     pointerTarget
   });
   pointerdown(createPointerEvent(330, 160));
+  assert.equal(selected, null, 'build menu item waits for tap release before selection');
+  pointerup(createPointerEvent(330, 160));
   assert.equal(selected, 'fence', 'build menu item is touch/click selectable');
+  selected = null;
+  pointerdown(createPointerEvent(330, 160));
+  pointermove(createPointerEvent(330, 184));
+  pointerup(createPointerEvent(330, 184));
+  assert.equal(selected, null, 'dragging on a build menu item does not accidentally select it');
   pointerdown(createPointerEvent(330, 110));
+  pointerup(createPointerEvent(330, 110));
   assert.equal(removeToggled, true, 'build menu remove mode is touch/click selectable');
 }
 
@@ -4191,9 +4350,10 @@ const map = new TileMap();
   const buildPanel = { hidden: true, innerHTML: '' };
   const cookingPanel = { hidden: true, innerHTML: '' };
   const furnacePanel = { hidden: true, innerHTML: '' };
+  const settingsPanel = { hidden: true, innerHTML: '' };
   const inventory = new ResourceInventory();
   const crafting = new CraftingSystem(inventory);
-  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel });
+  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel });
 
   menus.update({
     inventory,
@@ -4205,7 +4365,9 @@ const map = new TileMap();
     recipeStates: crafting.getRecipeStates({ craftingContext: 'normal' }),
     cookingRecipeStates: crafting.getRecipeStates({ craftingContext: 'cooking' }),
     furnaceRecipeStates: crafting.getRecipeStates({ craftingContext: 'furnace' }),
-    hotbarSlots: [...DEFAULT_HOTBAR_SLOTS]
+    hotbarSlots: [...DEFAULT_HOTBAR_SLOTS],
+    settingsOpen: true,
+    saveSlots: [{ index: 1, occupied: false, savedAt: null }]
   });
 
   assert.equal(inventoryPanel.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu has an X close button');
@@ -4213,6 +4375,7 @@ const map = new TileMap();
   assert.equal(buildPanel.innerHTML.includes('data-menu-close="build"'), true, 'build menu has an X close button');
   assert.equal(cookingPanel.innerHTML.includes('data-menu-close="cooking"'), true, 'cooking menu has an X close button');
   assert.equal(furnacePanel.innerHTML.includes('data-menu-close="furnace"'), true, 'furnace menu has an X close button');
+  assert.equal(settingsPanel.innerHTML.includes('data-menu-close="settings"'), true, 'settings menu has an X close button');
 
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
@@ -4221,11 +4384,13 @@ const map = new TileMap();
   game.buildOpen = true;
   game.cookingOpen = true;
   game.furnaceOpen = true;
+  game.settingsOpen = true;
   game.closeMenu('inventory');
   game.closeMenu('crafting');
   game.closeMenu('build');
   game.closeMenu('cooking');
   game.closeMenu('furnace');
+  game.closeMenu('settings');
   assert.equal(game.isGamePaused(), false, 'closing all menus through X handlers resumes gameplay');
 }
 

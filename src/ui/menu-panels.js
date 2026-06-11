@@ -41,6 +41,7 @@ export class MenuPanels {
         this.lastInventoryHtml = '';
       }
     });
+    this.inventoryPanel?.addEventListener?.('wheel', (event) => this.handleInventoryTabWheel(event), { passive: false });
   }
 
   update({
@@ -58,12 +59,13 @@ export class MenuPanels {
     activeHotbarSlot = 0,
     inventory,
     inventoryOpen,
+    playerHearts = [],
     recipeStates,
     selectedInventoryResource,
     settingsOpen = false,
     saveSlots = []
   }) {
-    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem);
+    this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem, playerHearts);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
     this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
     this.renderFurnace(inventory, furnaceOpen, furnaceRecipeStates);
@@ -102,7 +104,7 @@ export class MenuPanels {
     return `<button class="menu-close-button" type="button" data-menu-close="${menuId}" aria-label="Menue schliessen">x</button>`;
   }
 
-  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null) {
+  renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null, playerHearts = []) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
 
@@ -186,8 +188,7 @@ export class MenuPanels {
             </div>
           </div>
           <div class="inventory-character-stats" aria-hidden="true">
-            <span><strong>Gesundheit</strong><i class="stat-bar stat-health"></i></span>
-            <span><strong>Ausdauer</strong><i class="stat-bar stat-stamina"></i></span>
+            <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
             <span><strong>Angriff</strong><b>10</b></span>
             <span><strong>Bewegung</strong><b>100%</b></span>
           </div>
@@ -212,6 +213,26 @@ export class MenuPanels {
         ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
       </div>
     `);
+  }
+
+  renderCharacterHearts(hearts = []) {
+    const icons = {
+      full: '♥',
+      half: '◐',
+      empty: '♡'
+    };
+    const heartHtml = hearts
+      .map((heart) => `<span class="heart heart-${heart}">${icons[heart] || icons.empty}</span>`)
+      .join('');
+    return `<span class="character-heart-row" aria-label="Lebenspunkte">${heartHtml}</span>`;
+  }
+
+  handleInventoryTabWheel(event) {
+    const tabList = event.target?.closest?.('.menu-tabs');
+    if (!tabList || Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    tabList.scrollLeft += event.deltaY;
+    event.preventDefault?.();
   }
 
   renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot) {
@@ -491,7 +512,9 @@ export class MenuPanels {
       const selectionStart = Number.isInteger(activeElement?.selectionStart) ? activeElement.selectionStart : null;
       const selectionEnd = Number.isInteger(activeElement?.selectionEnd) ? activeElement.selectionEnd : selectionStart;
       const previousGrid = this.inventoryPanel.querySelector?.('.inventory-grid');
+      const previousTabs = this.inventoryPanel.querySelector?.('.menu-tabs');
       const previousScrollTop = Number.isFinite(previousGrid?.scrollTop) ? previousGrid.scrollTop : 0;
+      const previousTabScrollLeft = Number.isFinite(previousTabs?.scrollLeft) ? previousTabs.scrollLeft : 0;
 
       this.inventoryPanel.innerHTML = html;
       this.lastInventoryHtml = html;
@@ -499,6 +522,10 @@ export class MenuPanels {
       const nextGrid = this.inventoryPanel.querySelector?.('.inventory-grid');
       if (nextGrid && previousScrollTop > 0) {
         nextGrid.scrollTop = previousScrollTop;
+      }
+      const nextTabs = this.inventoryPanel.querySelector?.('.menu-tabs');
+      if (nextTabs && previousTabScrollLeft > 0) {
+        nextTabs.scrollLeft = previousTabScrollLeft;
       }
 
       if (restoreFilterFocus) {

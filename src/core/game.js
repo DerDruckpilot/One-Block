@@ -332,6 +332,7 @@ export class Game {
       hotbarSlots: this.hotbarSlots,
       inventory: this.inventory,
       inventoryOpen: this.inventoryOpen,
+      playerHearts: this.player.getHeartStates(),
       recipeStates: this.craftingSystem.getRecipeStates({
         craftingContext: this.craftingContext,
         hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false
