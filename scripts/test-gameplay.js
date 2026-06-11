@@ -27,6 +27,7 @@ import {
   RESOURCE_LABELS,
   SAPLING_GROW_SECONDS,
   SLINGSHOT_RANGE,
+  TILE_TYPES,
   TILE_SIZE
 } from '../src/config/constants.js';
 import { Camera } from '../src/core/camera.js';
@@ -42,7 +43,7 @@ import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { EnemySystem } from '../src/systems/enemy-system.js';
 import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
-import { TerrainRenderer } from '../src/systems/terrain-renderer.js';
+import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
@@ -234,6 +235,7 @@ const map = new TileMap();
   assert.equal(styles.includes('.item-icon-image'), true, 'item icons can render real PNG image assets');
   assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
   assert.equal(serviceWorker.includes('./assets/generated/icons/inventory_96/grass_block.png'), true, 'service worker caches 96px inventory icons');
+  assert.equal(serviceWorker.includes('./assets/generated/tiles/ground_96/grass_tileset_96.png'), true, 'service worker caches 96px ground tile sheets');
 }
 
 {
@@ -519,6 +521,15 @@ const map = new TileMap();
   terrainMap.setStone(2, 0);
   const context = createDrawContext();
   const terrainRenderer = new TerrainRenderer();
+
+  assert.equal(getGroundTileAssetPath(TILE_TYPES.grass), 'assets/generated/tiles/ground_96/grass_tileset_96.png', 'grass terrain uses the 96px ground tile sheet');
+  assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.earth), 'assets/generated/tiles/ground_96/earth_tileset_96.png', 'earth terrain uses the 96px ground tile sheet');
+  assert.equal(terrainRenderer.getGroundTileAssetPath(TILE_TYPES.water), null, 'water keeps the canvas terrain fallback until a water sheet exists');
+  assert.deepEqual(
+    terrainRenderer.getGroundTileSourceRect('edge_top'),
+    { x: 0, y: 96, width: 96, height: 96 },
+    'ground tile sheet source rects address 96px cells'
+  );
 
   terrainRenderer.drawTile(context, { x: 1, y: 0, type: 'grass' }, terrainMap, 32, 0);
   terrainRenderer.drawTile(context, { x: 2, y: 0, type: 'stone' }, terrainMap, 64, 0);
@@ -4045,11 +4056,16 @@ const map = new TileMap();
 {
   const terrain = new TerrainRenderer();
   const terrainMap = new TileMap();
+  terrainMap.tiles.clear();
   terrainMap.setGrass(0, 0);
   terrainMap.setGrass(1, 0);
   terrainMap.setGrass(-1, 0);
   terrainMap.setGrass(0, 1);
   terrainMap.setGrass(0, -1);
+  terrainMap.setGrass(-1, -1);
+  terrainMap.setGrass(1, -1);
+  terrainMap.setGrass(-1, 1);
+  terrainMap.setGrass(1, 1);
   const profile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
   assert.equal(profile.interior, true, 'ground rendering detects same-type interior surfaces');
   assert.equal(profile.outerEdge, false, 'interior ground surface does not render as outer edge');
@@ -4078,11 +4094,43 @@ const map = new TileMap();
     'same-type interior surfaces do not draw a bright internal top seam'
   );
   assert.equal(terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), terrain.detailVariant({ x: 2, y: -3, type: 'stone' }), 'tile detail variants are deterministic by position and type');
+  assert.ok(
+    terrain.selectGroundTileSprite({ x: 0, y: 0, type: 'grass' }, terrainMap).startsWith('full_0'),
+    'loaded ground tile assets use deterministic full-tile variants on same-type interiors'
+  );
   assert.deepEqual(
     terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap),
     terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap),
     'tile render profiles are deterministic across repeated calls'
   );
+
+  const outerCornerMap = new TileMap();
+  outerCornerMap.tiles.clear();
+  outerCornerMap.setGrass(0, 0);
+  outerCornerMap.setGrass(1, 0);
+  outerCornerMap.setGrass(0, 1);
+  assert.equal(
+    terrain.selectGroundTileSprite({ x: 0, y: 0, type: 'grass' }, outerCornerMap),
+    'outer_corner_tl',
+    'ground tile assets select outer corner sprites on visible island corners'
+  );
+
+  const innerCornerMap = new TileMap();
+  innerCornerMap.tiles.clear();
+  innerCornerMap.setGrass(0, 0);
+  innerCornerMap.setGrass(-1, 0);
+  innerCornerMap.setGrass(1, 0);
+  innerCornerMap.setGrass(0, -1);
+  innerCornerMap.setGrass(0, 1);
+  innerCornerMap.setGrass(1, -1);
+  innerCornerMap.setGrass(-1, 1);
+  innerCornerMap.setGrass(1, 1);
+  assert.equal(
+    terrain.selectGroundTileSprite({ x: 0, y: 0, type: 'grass' }, innerCornerMap),
+    'inner_corner_tl',
+    'ground tile assets select inner corner sprites for missing diagonal surface pieces'
+  );
+
   terrainMap.setEarth(1, 0);
   terrainMap.setEarth(0, 1);
   const edgeProfile = terrain.getRenderProfile({ x: 0, y: 0, type: 'grass' }, terrainMap);
