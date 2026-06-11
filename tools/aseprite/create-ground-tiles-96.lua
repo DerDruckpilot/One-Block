@@ -311,20 +311,36 @@ local function drawEdgeBand(img, ox, oy, p, side)
   end
 end
 
-local function drawInnerCorner(img, ox, oy, p, corner)
+local function drawOrganicInnerCorner(img, ox, oy, p, corner)
   local cx = corner:find("r") and ox + TILE - 1 or ox
   local cy = corner:find("b") and oy + TILE - 1 or oy
   local sx = corner:find("r") and -1 or 1
   local sy = corner:find("b") and -1 or 1
-  for r = 0, 30 do
-    for a = 0, r do
-      local x = cx + sx * a
-      local y = cy + sy * (r - a)
-      pixel(img, x, y, p.deep)
+  local seed = (corner == "tl" and 17) or (corner == "tr" and 31) or (corner == "bl" and 47) or 59
+
+  for yy = 0, 36 do
+    for xx = 0, 36 do
+      local d = math.sqrt(xx * xx + yy * yy)
+      local noise = noiseValue(math.floor(xx / 4), math.floor(yy / 4), seed)
+      local rough = (noise - 0.5) * 8
+      local x = cx + sx * xx
+      local y = cy + sy * yy
+
+      if d >= 20 + rough and d <= 27 + rough then
+        pixel(img, x, y, noise > 0.42 and p.dark or p.deep)
+      elseif d >= 16 + rough and d < 20 + rough and ((xx + yy + seed) % 3 ~= 0) then
+        pixel(img, x, y, p.light)
+      elseif d > 27 + rough and d < 32 + rough and noise > 0.74 then
+        pixel(img, x, y, p.dark)
+      end
     end
   end
-  ellipse(img, cx + sx * 30, cy + sy * 30, 25, 25, p.dark)
-  ellipse(img, cx + sx * 34, cy + sy * 34, 18, 18, p.base)
+
+  for i = 0, 7 do
+    local x = cx + sx * (12 + i * 4)
+    local y = cy + sy * (30 - (i % 3) * 3)
+    rect(img, x - (sx < 0 and 2 or 0), y - (sy < 0 and 2 or 0), 3, 3, i % 2 == 0 and p.dark or p.light)
+  end
 end
 
 local function drawTile(img, ox, oy, p, tileName, variant)
@@ -337,10 +353,10 @@ local function drawTile(img, ox, oy, p, tileName, variant)
   if tileName == "outer_corner_tr" then drawEdgeBand(img, ox, oy, p, "top"); drawEdgeBand(img, ox, oy, p, "right") end
   if tileName == "outer_corner_bl" then drawEdgeBand(img, ox, oy, p, "bottom"); drawEdgeBand(img, ox, oy, p, "left") end
   if tileName == "outer_corner_br" then drawEdgeBand(img, ox, oy, p, "bottom"); drawEdgeBand(img, ox, oy, p, "right") end
-  if tileName == "inner_corner_tl" then drawInnerCorner(img, ox, oy, p, "tl") end
-  if tileName == "inner_corner_tr" then drawInnerCorner(img, ox, oy, p, "tr") end
-  if tileName == "inner_corner_bl" then drawInnerCorner(img, ox, oy, p, "bl") end
-  if tileName == "inner_corner_br" then drawInnerCorner(img, ox, oy, p, "br") end
+  if tileName == "inner_corner_tl" then drawOrganicInnerCorner(img, ox, oy, p, "tl") end
+  if tileName == "inner_corner_tr" then drawOrganicInnerCorner(img, ox, oy, p, "tr") end
+  if tileName == "inner_corner_bl" then drawOrganicInnerCorner(img, ox, oy, p, "bl") end
+  if tileName == "inner_corner_br" then drawOrganicInnerCorner(img, ox, oy, p, "br") end
 end
 
 local renderedSheets = {}

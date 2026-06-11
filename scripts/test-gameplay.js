@@ -43,6 +43,7 @@ import { CraftingSystem } from '../src/systems/crafting-system.js';
 import { EnemySystem } from '../src/systems/enemy-system.js';
 import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
+import { getCrystalAssetPath } from '../src/systems/crystal-assets.js';
 import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import { getBerryBushAssetPath, getTreeAssetPath, getTreeAssetSpec, stableVariantIndex } from '../src/systems/world-object-assets.js';
 import { Hud } from '../src/ui/hud.js';
@@ -239,9 +240,12 @@ const map = new TileMap();
   assert.equal(serviceWorker.includes('./assets/generated/tiles/ground_96/grass_tileset_96.png'), true, 'service worker caches 96px ground tile sheets');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/water_96/water_tileset_96.png'), true, 'service worker caches 96px water tiles');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/moist_earth_96/moist_earth_tileset_96.png'), true, 'service worker caches 96px moist earth tiles');
+  assert.equal(serviceWorker.includes('./src/systems/crystal-assets.js'), true, 'service worker caches the crystal asset loader');
+  assert.equal(serviceWorker.includes('./assets/generated/objects/crystal/crystal_core_96.png'), true, 'service worker caches the upgraded crystal asset');
   assert.equal(serviceWorker.includes('./assets/generated/objects/trees/tree_mature_01.png'), true, 'service worker caches upgraded tree assets');
   assert.equal(serviceWorker.includes('./assets/generated/objects/berry_bushes/berry_bush_ripe_01.png'), true, 'service worker caches upgraded berry bush assets');
   assert.equal(serviceWorker.includes('./src/systems/world-object-assets.js'), true, 'service worker caches the world object asset loader');
+  assert.equal(getCrystalAssetPath(), 'assets/generated/objects/crystal/crystal_core_96.png', 'crystal rendering uses the upgraded 96px crystal asset path');
 }
 
 {
@@ -2257,6 +2261,7 @@ const map = new TileMap();
 
   game.crystalSystem.random = () => 0.1;
   assert.equal(game.tryUseCrystal(), true, 'crystal interaction spawns a visible drop');
+  assert.equal(game.attackFeedback.kind, 'activate', 'normal crystal interaction uses the activation flash kind');
   assert.equal(game.inventory.get('earth'), 0, 'crystal interaction does not add resources directly');
   assert.equal(game.dropSystem.drops.length, 1, 'crystal interaction creates one world drop');
   assert.equal(game.dropSystem.drops[0].resource, 'earth', 'crystal drop uses weighted base resource roll');
@@ -2621,6 +2626,7 @@ const map = new TileMap();
   assert.equal(game.inventory.get('stone'), 0, 'wooden pickaxe attack spawns stone before pickup');
   assert.equal(game.dropSystem.drops.length, 1, 'wooden pickaxe attack creates a visible drop');
   assert.equal(game.dropSystem.drops[0].resource, 'stone', 'wooden pickaxe attack unlocks stone drops at the crystal');
+  assert.equal(game.attackFeedback.kind, 'attack', 'pickaxe crystal action uses the attack flash kind');
   assert.equal(game.crystalSystem.lastMessage, 'Stein splittert heraus.', 'pickaxe attack writes the visible drop log');
   assert.equal(game.logSystem.entries.includes('Du schlägst Splitter aus dem Kristall.'), true, 'pickaxe attack logs the crystal hit feedback');
 }
@@ -4194,6 +4200,22 @@ const map = new TileMap();
     terrain.selectGroundTransition({ x: 1, y: 0, type: 'stone' }, fallbackTransitionMap)?.sheetKey,
     'ground',
     'coordinate fallback still renders exactly one side of a legacy material boundary'
+  );
+  const transitionEdgeRect = terrain.getTransitionEdgeRect('right');
+  assert.equal(transitionEdgeRect.destWidth < TILE_SIZE, true, 'asset transitions render as narrow edge bands instead of full-tile overlays');
+  assert.equal(transitionEdgeRect.destX, TILE_SIZE - transitionEdgeRect.destWidth, 'right-side transition band is anchored to the shared edge');
+
+  const cornerTransitionMap = new TileMap();
+  cornerTransitionMap.tiles.clear();
+  cornerTransitionMap.tileRenderOrders.clear();
+  cornerTransitionMap.nextTileRenderOrder = 1;
+  cornerTransitionMap.setEarth(0, 1);
+  cornerTransitionMap.setEarth(1, 0);
+  cornerTransitionMap.setStone(1, 1);
+  assert.equal(
+    terrain.selectGroundTransitions({ x: 1, y: 1, type: 'stone' }, cornerTransitionMap).length,
+    2,
+    'newer corner tiles can render both owned transition edges without repainting the full tile'
   );
 
   const transitionContext = createDrawContext();

@@ -357,6 +357,7 @@ export class Game {
     );
 
     if (isCloseToCrystal) {
+      this.setCrystalHitFeedback('activate');
       if (this.trySpawnNightSpringDrop()) {
         this.saveGame();
         return true;
@@ -492,7 +493,7 @@ export class Game {
       return false;
     }
 
-    this.setCrystalHitFeedback();
+    this.setCrystalHitFeedback('attack');
     this.setLog('Du schlägst Splitter aus dem Kristall.');
     if (this.trySpawnNightSpringDrop()) {
       this.saveGame();
@@ -727,10 +728,11 @@ export class Game {
     };
   }
 
-  setCrystalHitFeedback() {
+  setCrystalHitFeedback(kind = 'activate') {
     const center = this.tileMap.getCrystalCenter();
     this.attackFeedback = {
       type: 'crystalHit',
+      kind,
       x: center.x,
       y: center.y,
       seconds: ATTACK_FEEDBACK_SECONDS,
@@ -1320,6 +1322,7 @@ export class Game {
   }
 
   trySpawnCrystalEncounter() {
+    this.setCrystalHitFeedback('attack');
     const encounterDrops = CRYSTAL_ENCOUNTER_DROPS_BY_LEVEL[this.crystalLevel] || CRYSTAL_ENCOUNTER_DROPS;
     const choice = chooseWeightedDrop(encounterDrops, this.crystalSystem.random()).encounter;
     const spawn = choice === 'flying'
@@ -2195,7 +2198,7 @@ export class Game {
   render() {
     this.backgroundSystem.render(this.context, this.camera, this.dayNightSystem);
     this.renderSystem.renderWorld(this.tileMap, this.camera);
-    this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now(), this.crystalLevel);
+    this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now(), this.crystalLevel, this.attackFeedback);
     this.renderSystem.renderObjects(this.tileMap, this.camera);
     this.renderSystem.renderDrops(this.dropSystem.drops, this.camera);
     this.renderSystem.renderAnimals(this.animalSystem.animals, this.camera);
