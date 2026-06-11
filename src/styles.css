@@ -855,6 +855,191 @@ button.menu-row:hover {
   background: linear-gradient(180deg, #a64a3a, #5d241d);
 }
 
+.menu-panel:not(#inventory-panel) {
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(500px, calc(100dvh - 104px));
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, #5a4129 0 10px, transparent 10px calc(100% - 10px), #5a4129 calc(100% - 10px)),
+    linear-gradient(180deg, #6b4327 0 10px, transparent 10px calc(100% - 10px), #3b2b20 calc(100% - 10px)),
+    linear-gradient(180deg, #d1a25f, #8b623b);
+  box-shadow:
+    inset 0 0 0 4px #2b1a11,
+    inset 0 0 0 8px #7a5d3e,
+    0 12px 30px rgba(0, 0, 0, 0.4);
+  color: #fff4d2;
+}
+
+.menu-panel:not(#inventory-panel) .menu-close-button {
+  top: 4px;
+  z-index: 6;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  margin: -3px -2px 0 8px;
+  border: 4px solid #4d2f1d;
+  box-shadow: inset 0 0 0 2px #e5a26e, 0 3px 0 #2b1a11;
+}
+
+.menu-panel:not(#inventory-panel) .menu-frame-title {
+  position: sticky;
+  top: 2px;
+  z-index: 5;
+  margin: -12px auto 10px;
+  padding: 6px 28px;
+  border-color: #2b1a11;
+  background:
+    linear-gradient(90deg, transparent 0 10px, rgba(93, 54, 29, 0.9) 10px calc(100% - 10px), transparent calc(100% - 10px)),
+    linear-gradient(180deg, #a66835, #5a3420);
+  box-shadow: inset 0 3px 0 #d59a55, 0 3px 0 rgba(43, 26, 17, 0.55);
+  font-size: 22px;
+}
+
+.menu-panel:not(#inventory-panel) .crafting-layout,
+.menu-panel:not(#inventory-panel) .settings-panel-content {
+  padding: 8px;
+  border: 4px solid #5a3924;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 231, 169, 0.28), rgba(147, 99, 53, 0.16)),
+    #c99555;
+  box-shadow:
+    inset 0 0 0 3px #e5b978,
+    inset 0 0 0 6px rgba(70, 42, 25, 0.16);
+  color: #3b2417;
+}
+
+.menu-panel:not(#inventory-panel) .recipe-list,
+.menu-panel:not(#inventory-panel) .build-menu-scroll,
+.menu-panel:not(#inventory-panel) .settings-panel-content {
+  scrollbar-color: #d7a762 #3a2418;
+}
+
+.menu-panel:not(#inventory-panel) .recipe-list {
+  max-height: 310px;
+  gap: 5px;
+  padding: 5px;
+  border: 3px solid #5a3924;
+  border-radius: 8px;
+  background: rgba(51, 31, 20, 0.58);
+}
+
+.menu-panel:not(#inventory-panel) .recipe-list-item {
+  min-height: 34px;
+  gap: 7px;
+  padding: 5px 7px;
+  border-width: 3px;
+  box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
+  font-size: 13px;
+  touch-action: pan-y;
+}
+
+.menu-panel:not(#inventory-panel) .recipe-detail {
+  min-height: 210px;
+  padding: 8px;
+  border: 3px solid #5a3924;
+  background: rgba(255, 244, 210, 0.18);
+  color: #3b2417;
+}
+
+.menu-panel:not(#inventory-panel) .recipe-result,
+.menu-panel:not(#inventory-panel) .material-card {
+  background: rgba(43, 26, 17, 0.32);
+  color: #fff4d2;
+}
+
+.menu-panel:not(#inventory-panel) .material-grid {
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+}
+
+.menu-panel:not(#inventory-panel) .material-card {
+  min-height: 52px;
+  padding: 5px;
+  font-size: 12px;
+}
+
+.menu-panel:not(#inventory-panel) .craft-button,
+.menu-panel:not(#inventory-panel) .build-remove-toggle,
+.menu-panel:not(#inventory-panel) .settings-slot-actions button,
+.menu-panel:not(#inventory-panel) .settings-reset-button {
+  min-height: 34px;
+  border: 3px solid #4d2f1d;
+  border-radius: 7px;
+  box-shadow: inset 0 2px 0 rgba(255, 244, 210, 0.18);
+  font-size: 13px;
+}
+
+.menu-panel:not(#inventory-panel) .build-remove-toggle {
+  margin-bottom: 5px;
+  background: linear-gradient(180deg, #926138, #4a2d1d);
+}
+
+.menu-panel:not(#inventory-panel) .build-menu-scroll {
+  max-height: 350px;
+  gap: 8px;
+  padding: 6px;
+  border: 4px solid #5a3924;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 231, 169, 0.28), rgba(147, 99, 53, 0.16)),
+    #c99555;
+}
+
+.menu-panel:not(#inventory-panel) .build-menu-grid {
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 6px;
+}
+
+.menu-panel:not(#inventory-panel) .build-menu-item {
+  min-height: 36px;
+  grid-template-columns: 28px 1fr auto;
+  gap: 6px;
+  padding: 5px 7px;
+  border-width: 3px;
+  box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
+  font-size: 12px;
+  touch-action: pan-y;
+}
+
+.menu-panel:not(#inventory-panel) .settings-panel-content {
+  max-height: 360px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.menu-panel:not(#inventory-panel) .settings-save-grid {
+  gap: 7px;
+}
+
+.menu-panel:not(#inventory-panel) .settings-save-slot {
+  gap: 7px;
+  padding: 7px;
+  border: 3px solid #5a3924;
+  background: rgba(51, 31, 20, 0.46);
+  color: #fff4d2;
+}
+
+.menu-panel:not(#inventory-panel) .settings-save-slot span,
+.menu-panel:not(#inventory-panel) .menu-note {
+  color: #ffe0c5;
+}
+
+.menu-tabs {
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+.menu-tab {
+  touch-action: pan-x;
+}
+
 .inventory-hotbar-slot {
   position: relative;
   display: grid;
@@ -1217,26 +1402,29 @@ button.menu-row:hover {
   gap: 3px;
 }
 
+.inventory-character-stats .character-heart-stat {
+  grid-column: 1 / -1;
+}
+
 .inventory-character-stats b {
   color: #2b1a11;
 }
 
-.stat-bar {
-  display: block;
-  width: 100%;
-  height: 10px;
-  border: 2px solid #4d2f1d;
-  border-radius: 999px;
-  background: #3b2417;
-  box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.12);
+.character-heart-row {
+  display: flex;
+  gap: 3px;
+  color: #b7352d;
+  font-size: 15px;
+  line-height: 1;
+  text-shadow: 0 1px 0 rgba(255, 244, 210, 0.34);
 }
 
-.stat-health {
-  background: linear-gradient(90deg, #b7352d 0 82%, #3b2417 82%);
+.character-heart-row .heart-empty {
+  color: rgba(59, 36, 23, 0.42);
 }
 
-.stat-stamina {
-  background: linear-gradient(90deg, #3ca852 0 74%, #3b2417 74%);
+.character-heart-row .heart-half {
+  color: #d46a3d;
 }
 
 #inventory-panel .inventory-items-panel {
@@ -1913,9 +2101,9 @@ button.menu-row:hover {
     gap: 2px;
   }
 
-  #inventory-panel .stat-bar {
-    height: 7px;
-    border-width: 1px;
+  #inventory-panel .character-heart-row {
+    gap: 2px;
+    font-size: 11px;
   }
 
   #inventory-panel .inventory-items-panel {

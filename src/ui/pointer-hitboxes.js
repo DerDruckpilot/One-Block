@@ -120,6 +120,7 @@ export class PointerHitboxSystem {
     }
 
     if (hitbox.deferTap) {
+      hitbox.element?.setPointerCapture?.(event.pointerId);
       this.pendingTap = {
         hitbox,
         pointerId: event.pointerId,
@@ -152,6 +153,7 @@ export class PointerHitboxSystem {
 
     const pending = this.pendingTap;
     this.pendingTap = null;
+    pending.hitbox.element?.releasePointerCapture?.(event.pointerId);
     if (pending.moved) return false;
 
     const point = this.getPointerPoint(event);
@@ -166,6 +168,7 @@ export class PointerHitboxSystem {
 
   cancelPendingTap(event) {
     if (!this.pendingTap || this.pendingTap.pointerId === event.pointerId) {
+      this.pendingTap?.hitbox?.element?.releasePointerCapture?.(event.pointerId);
       this.pendingTap = null;
     }
   }
@@ -227,7 +230,7 @@ export class PointerHitboxSystem {
             return;
           }
           this.onCraft(craftButton.dataset.craft);
-        });
+        }, { deferTap: true });
         if (craftButtonHitbox) hitboxes.push(craftButtonHitbox);
       }
 
@@ -235,7 +238,7 @@ export class PointerHitboxSystem {
         if (!recipeButton.dataset.craftSelect) continue;
         const recipeHitbox = this.createElementHitbox(recipeButton, `recipe-${recipeButton.dataset.craftSelect}`, () => {
           this.onCraftSelect(recipeButton.dataset.craftSelect);
-        });
+        }, { deferTap: true });
         if (recipeHitbox) hitboxes.push(recipeHitbox);
       }
 
@@ -258,7 +261,7 @@ export class PointerHitboxSystem {
             return;
           }
           this.onCook(cookButton.dataset.cook);
-        });
+        }, { deferTap: true });
         if (cookButtonHitbox) hitboxes.push(cookButtonHitbox);
       }
 
@@ -266,7 +269,7 @@ export class PointerHitboxSystem {
         if (!recipeButton.dataset.cookSelect) continue;
         const recipeHitbox = this.createElementHitbox(recipeButton, `cook-recipe-${recipeButton.dataset.cookSelect}`, () => {
           this.onCookSelect(recipeButton.dataset.cookSelect);
-        });
+        }, { deferTap: true });
         if (recipeHitbox) hitboxes.push(recipeHitbox);
       }
 
@@ -289,7 +292,7 @@ export class PointerHitboxSystem {
             return;
           }
           this.onFurnace(furnaceButton.dataset.furnace);
-        });
+        }, { deferTap: true });
         if (furnaceButtonHitbox) hitboxes.push(furnaceButtonHitbox);
       }
 
@@ -297,7 +300,7 @@ export class PointerHitboxSystem {
         if (!recipeButton.dataset.furnaceSelect) continue;
         const recipeHitbox = this.createElementHitbox(recipeButton, `furnace-recipe-${recipeButton.dataset.furnaceSelect}`, () => {
           this.onFurnaceSelect(recipeButton.dataset.furnaceSelect);
-        });
+        }, { deferTap: true });
         if (recipeHitbox) hitboxes.push(recipeHitbox);
       }
 
@@ -316,7 +319,7 @@ export class PointerHitboxSystem {
         if (!tabButton.dataset.inventoryTab) continue;
         const tabHitbox = this.createElementHitbox(tabButton, `inventory-tab-${tabButton.dataset.inventoryTab}`, () => {
           this.onInventoryTabSelect(tabButton.dataset.inventoryTab);
-        });
+        }, { deferTap: true });
         if (tabHitbox) hitboxes.push(tabHitbox);
       }
 
@@ -358,14 +361,14 @@ export class PointerHitboxSystem {
         if (!buildButton.dataset.buildResource) continue;
         const buildHitbox = this.createElementHitbox(buildButton, `build-${buildButton.dataset.buildResource}`, () => {
           this.onBuildItemSelect(buildButton.dataset.buildResource);
-        });
+        }, { deferTap: true });
         if (buildHitbox) hitboxes.push(buildHitbox);
       }
 
       for (const removeButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-build-remove]') || [])) {
         const removeHitbox = this.createElementHitbox(removeButton, 'build-remove', () => {
           this.onBuildRemoveToggle();
-        });
+        }, { deferTap: true });
         if (removeHitbox) hitboxes.push(removeHitbox);
       }
 
@@ -383,26 +386,26 @@ export class PointerHitboxSystem {
       for (const saveButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-save-slot]') || [])) {
         const saveHitbox = this.createElementHitbox(saveButton, `save-slot-${saveButton.dataset.saveSlot}`, () => {
           this.onSettingsSaveSlot(Number(saveButton.dataset.saveSlot));
-        });
+        }, { deferTap: true });
         if (saveHitbox) hitboxes.push(saveHitbox);
       }
 
       for (const loadButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-load-slot]') || [])) {
         const loadHitbox = this.createElementHitbox(loadButton, `load-slot-${loadButton.dataset.loadSlot}`, () => {
           if (!loadButton.disabled) this.onSettingsLoadSlot(Number(loadButton.dataset.loadSlot));
-        });
+        }, { deferTap: true });
         if (loadHitbox) hitboxes.push(loadHitbox);
       }
 
       for (const deleteButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-delete-slot]') || [])) {
         const deleteHitbox = this.createElementHitbox(deleteButton, `delete-slot-${deleteButton.dataset.deleteSlot}`, () => {
           if (!deleteButton.disabled) this.onSettingsDeleteSlot(Number(deleteButton.dataset.deleteSlot));
-        });
+        }, { deferTap: true });
         if (deleteHitbox) hitboxes.push(deleteHitbox);
       }
 
       for (const resetButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-settings-reset]') || [])) {
-        const resetHitbox = this.createElementHitbox(resetButton, 'settings-reset', () => this.onSettingsReset());
+        const resetHitbox = this.createElementHitbox(resetButton, 'settings-reset', () => this.onSettingsReset(), { deferTap: true });
         if (resetHitbox) hitboxes.push(resetHitbox);
       }
 
