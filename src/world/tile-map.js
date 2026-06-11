@@ -26,6 +26,8 @@ const CONNECTION_DIRECTIONS = [
 export class TileMap {
   constructor() {
     this.tiles = new Map();
+    this.tileRenderOrders = new Map();
+    this.nextTileRenderOrder = 1;
     this.objects = new Map();
     this.objectStates = new Map();
     this.crystal = { x: 0, y: 0 };
@@ -38,35 +40,49 @@ export class TileMap {
         this.setEarth(x, y);
       }
     }
-    this.tiles.set(keyOf(0, 0), TILE_TYPES.crystal);
+    this.setTile(0, 0, TILE_TYPES.crystal);
   }
 
   getTile(x, y) {
     return this.tiles.get(keyOf(x, y)) || null;
   }
 
+  setTile(x, y, type, renderOrder = null) {
+    const key = keyOf(x, y);
+    this.tiles.set(key, type);
+    const order = Number.isFinite(renderOrder) && renderOrder > 0
+      ? renderOrder
+      : this.nextTileRenderOrder;
+    this.tileRenderOrders.set(key, order);
+    this.nextTileRenderOrder = Math.max(this.nextTileRenderOrder, order + 1);
+  }
+
+  getTileRenderOrder(x, y) {
+    return this.tileRenderOrders.get(keyOf(x, y)) || null;
+  }
+
   setEarth(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.earth);
+    this.setTile(x, y, TILE_TYPES.earth);
   }
 
   setGrass(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.grass);
+    this.setTile(x, y, TILE_TYPES.grass);
   }
 
   setStone(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.stone);
+    this.setTile(x, y, TILE_TYPES.stone);
   }
 
   setClay(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.clay);
+    this.setTile(x, y, TILE_TYPES.clay);
   }
 
   setMoistEarth(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.moistEarth);
+    this.setTile(x, y, TILE_TYPES.moistEarth);
   }
 
   setWater(x, y) {
-    this.tiles.set(keyOf(x, y), TILE_TYPES.water);
+    this.setTile(x, y, TILE_TYPES.water);
   }
 
   getObject(x, y) {
@@ -121,6 +137,8 @@ export class TileMap {
 
   loadTiles(tiles) {
     this.tiles.clear();
+    this.tileRenderOrders.clear();
+    this.nextTileRenderOrder = 1;
     for (const tile of tiles) {
       if ([
         TILE_TYPES.earth,
@@ -131,10 +149,15 @@ export class TileMap {
         TILE_TYPES.water,
         TILE_TYPES.crystal
       ].includes(tile.type)) {
-        this.tiles.set(keyOf(tile.x, tile.y), tile.type);
+        this.setTile(tile.x, tile.y, tile.type, Number(tile.renderOrder));
       }
     }
-    this.tiles.set(keyOf(this.crystal.x, this.crystal.y), TILE_TYPES.crystal);
+    this.setTile(
+      this.crystal.x,
+      this.crystal.y,
+      TILE_TYPES.crystal,
+      this.getTileRenderOrder(this.crystal.x, this.crystal.y)
+    );
   }
 
   loadObjects(objects = []) {
@@ -158,7 +181,12 @@ export class TileMap {
 
   toJSON() {
     const tiles = [];
-    this.forEachTile((tile) => tiles.push(tile));
+    this.forEachTile((tile) => {
+      tiles.push({
+        ...tile,
+        renderOrder: this.getTileRenderOrder(tile.x, tile.y)
+      });
+    });
     return tiles;
   }
 

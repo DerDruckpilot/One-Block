@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-4';
+const CACHE_NAME = 'one-block-v0-5-5';
 
 const CORE_ASSETS = [
   './',

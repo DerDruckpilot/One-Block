@@ -4,7 +4,7 @@ import { drawItemIcon, getLoadedItemIconImage } from '../ui/item-icons.js';
 import {
   getBerryBushAssetPath,
   getLoadedWorldObjectImage,
-  getTreeAssetPath,
+  getTreeAssetSpec,
   preloadWorldObjectAssets
 } from './world-object-assets.js';
 
@@ -1021,9 +1021,8 @@ export class RenderSystem {
   }
 
   drawSapling(x, y, stage = 1, tileX = 0, tileY = 0) {
-    const path = getTreeAssetPath(stage, tileX, tileY);
-    const size = stage <= 1 ? 32 : 48;
-    if (this.drawWorldObjectAsset(path, x, y, size, size)) return;
+    const tree = getTreeAssetSpec(stage, tileX, tileY);
+    if (this.drawWorldObjectAsset(tree.path, x, y, tree.width, tree.height)) return;
 
     this.context.save();
     const leafOffset = stage >= 2 ? -4 : 0;
@@ -1046,8 +1045,8 @@ export class RenderSystem {
       return;
     }
 
-    const path = getTreeAssetPath(stage, tileX, tileY);
-    if (this.drawWorldObjectAsset(path, x, y, 96, 96)) return;
+    const tree = getTreeAssetSpec(stage, tileX, tileY);
+    if (this.drawWorldObjectAsset(tree.path, x, y, tree.width, tree.height)) return;
 
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';

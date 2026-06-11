@@ -44,7 +44,7 @@ import { EnemySystem } from '../src/systems/enemy-system.js';
 import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
 import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
-import { getBerryBushAssetPath, getTreeAssetPath, stableVariantIndex } from '../src/systems/world-object-assets.js';
+import { getBerryBushAssetPath, getTreeAssetPath, getTreeAssetSpec, stableVariantIndex } from '../src/systems/world-object-assets.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
@@ -249,6 +249,10 @@ const map = new TileMap();
   assert.equal(getTreeAssetPath(2, 0, 0), 'assets/generated/objects/trees/tree_young_01.png', 'tree stage two uses the young tree asset');
   assert.equal(getTreeAssetPath(3, 4, -2), getTreeAssetPath(3, 4, -2), 'mature tree variant selection is deterministic');
   assert.equal(getTreeAssetPath(3, 4, -2).includes('/tree_mature_'), true, 'mature tree uses a mature tree variant asset');
+  assert.ok(new Set([0, 1, 2, 3].map((x) => getTreeAssetPath(3, x, 0))).size > 1, 'nearby mature trees use visible variant assets');
+  const matureTreeSpec = getTreeAssetSpec(3, 4, -2);
+  assert.equal(matureTreeSpec.path, getTreeAssetPath(3, 4, -2), 'tree render spec uses the same deterministic mature asset path');
+  assert.equal(matureTreeSpec.height > TILE_SIZE * 3, true, 'mature tree render spec is taller than a single tile so the crown can extend upward');
   assert.equal(getBerryBushAssetPath(1, false, 0, 0), 'assets/generated/objects/berry_bushes/berry_bush_small_01.png', 'berry bush stage one uses the small bush asset');
   assert.equal(getBerryBushAssetPath(2, false, 0, 0), 'assets/generated/objects/berry_bushes/berry_bush_growing_01.png', 'berry bush stage two uses the growing bush asset');
   assert.equal(getBerryBushAssetPath(3, false, 1, 1).includes('/berry_bush_unripe_'), true, 'unripe mature berry bush uses an unripe variant');
@@ -4158,6 +4162,39 @@ const map = new TileMap();
   assert.equal(edgeProfile.horizontalTransitionFill, '#4f8f3f', 'horizontal different-type transitions use the tile material color instead of a bright gap');
   assert.notEqual(edgeProfile.transitionBlendFill, '#4f8f3f', 'different-type transitions blend neighboring material colors instead of drawing a hard edge');
   assert.equal(terrainMap.isPositionSupportedByTile(TILE_SIZE / 2, TILE_SIZE / 2), true, 'tile support logic stays independent from render profile');
+
+  const oneSidedTransitionMap = new TileMap();
+  oneSidedTransitionMap.tiles.clear();
+  oneSidedTransitionMap.tileRenderOrders.clear();
+  oneSidedTransitionMap.nextTileRenderOrder = 1;
+  oneSidedTransitionMap.setEarth(0, 0);
+  oneSidedTransitionMap.setStone(1, 0);
+  assert.equal(
+    terrain.selectGroundTransition({ x: 0, y: 0, type: 'earth' }, oneSidedTransitionMap),
+    null,
+    'older existing tile keeps a full material face at a different-material boundary'
+  );
+  assert.equal(
+    terrain.selectGroundTransition({ x: 1, y: 0, type: 'stone' }, oneSidedTransitionMap)?.sheetKey,
+    'ground',
+    'newer adjacent tile owns the material transition at the shared boundary'
+  );
+
+  const fallbackTransitionMap = new TileMap();
+  fallbackTransitionMap.tiles.clear();
+  fallbackTransitionMap.setEarth(0, 0);
+  fallbackTransitionMap.setStone(1, 0);
+  fallbackTransitionMap.tileRenderOrders.clear();
+  assert.equal(
+    terrain.selectGroundTransition({ x: 0, y: 0, type: 'earth' }, fallbackTransitionMap),
+    null,
+    'missing legacy render order falls back to one deterministic transition side'
+  );
+  assert.equal(
+    terrain.selectGroundTransition({ x: 1, y: 0, type: 'stone' }, fallbackTransitionMap)?.sheetKey,
+    'ground',
+    'coordinate fallback still renders exactly one side of a legacy material boundary'
+  );
 
   const transitionContext = createDrawContext();
   terrain.drawTile(transitionContext, { x: 0, y: 0, type: 'grass' }, terrainMap, 0, 0);
