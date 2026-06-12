@@ -7,6 +7,10 @@
   --wood-light: #b77a43;
   --parchment: #d3a66a;
   --panel-fill: rgba(86, 57, 35, 0.94);
+  --menu-title-top: max(10px, calc(env(safe-area-inset-top) + 10px));
+  --menu-window-top: max(76px, calc(env(safe-area-inset-top) + 76px));
+  --menu-window-bottom: max(22px, calc(env(safe-area-inset-bottom) + 22px));
+  --inventory-window-bottom: max(88px, calc(env(safe-area-inset-bottom) + 88px));
 }
 
 * {
@@ -172,12 +176,13 @@ body {
 
 .menu-panel {
   position: fixed;
-  top: max(70px, calc(env(safe-area-inset-top) + 70px));
+  top: var(--menu-window-top);
+  bottom: var(--menu-window-bottom);
   left: 0;
   right: 0;
   margin: 0 auto;
   width: min(820px, calc(100vw - 28px));
-  max-height: min(430px, calc(100dvh - 132px));
+  max-height: none;
   overflow: auto;
   padding: 14px;
   border: 4px solid #6d5237;
@@ -199,11 +204,11 @@ body {
 }
 
 .menu-close-button {
-  position: sticky;
-  float: right;
-  right: 10px;
-  top: 8px;
-  z-index: 3;
+  position: fixed;
+  top: var(--menu-title-top);
+  right: max(18px, calc(env(safe-area-inset-right) + 18px));
+  z-index: 26;
+  float: none;
   min-width: 36px;
   min-height: 36px;
   border: 3px solid #4d2f1d;
@@ -222,7 +227,11 @@ body {
 }
 
 .menu-frame-title {
-  margin: -6px auto 12px;
+  position: fixed;
+  top: var(--menu-title-top);
+  left: 50%;
+  z-index: 25;
+  margin: 0;
   width: max-content;
   max-width: 100%;
   padding: 6px 28px;
@@ -234,6 +243,8 @@ body {
   font-weight: 900;
   text-align: center;
   text-shadow: 0 2px 0 #2b1a11;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .inventory-layout {
@@ -925,7 +936,7 @@ button.menu-row:hover {
 
 .menu-panel:not(#inventory-panel) {
   width: min(760px, calc(100vw - 28px));
-  max-height: min(500px, calc(100dvh - 104px));
+  max-height: none;
   padding: 12px;
   border: 0;
   border-radius: 10px;
@@ -941,22 +952,25 @@ button.menu-row:hover {
 }
 
 .menu-panel:not(#inventory-panel) .menu-close-button {
-  top: 4px;
-  z-index: 6;
+  position: fixed;
+  top: var(--menu-title-top);
+  right: max(18px, calc(env(safe-area-inset-right) + 18px));
+  z-index: 26;
   width: 40px;
   height: 40px;
   min-width: 40px;
   min-height: 40px;
-  margin: -3px -2px 0 8px;
+  margin: 0;
   border: 4px solid #4d2f1d;
   box-shadow: inset 0 0 0 2px #e5a26e, 0 3px 0 #2b1a11;
 }
 
 .menu-panel:not(#inventory-panel) .menu-frame-title {
-  position: sticky;
-  top: 2px;
-  z-index: 5;
-  margin: -12px auto 10px;
+  position: fixed;
+  top: var(--menu-title-top);
+  left: 50%;
+  z-index: 25;
+  margin: 0;
   padding: 6px 28px;
   border-color: #2b1a11;
   background:
@@ -964,10 +978,14 @@ button.menu-row:hover {
     linear-gradient(180deg, #a66835, #5a3420);
   box-shadow: inset 0 3px 0 #d59a55, 0 3px 0 rgba(43, 26, 17, 0.55);
   font-size: 22px;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .menu-panel:not(#inventory-panel) .crafting-layout,
 .menu-panel:not(#inventory-panel) .settings-panel-content {
+  height: 100%;
+  min-height: 0;
   padding: 8px;
   border: 4px solid #5a3924;
   border-radius: 10px;
@@ -987,7 +1005,8 @@ button.menu-row:hover {
 }
 
 .menu-panel:not(#inventory-panel) .recipe-list {
-  max-height: 310px;
+  max-height: none;
+  min-height: 0;
   gap: 5px;
   padding: 5px;
   border: 3px solid #5a3924;
@@ -1047,7 +1066,8 @@ button.menu-row:hover {
 }
 
 .menu-panel:not(#inventory-panel) .build-menu-scroll {
-  max-height: 350px;
+  max-height: none;
+  min-height: 0;
   gap: 8px;
   padding: 6px;
   border: 4px solid #5a3924;
@@ -1074,7 +1094,8 @@ button.menu-row:hover {
 }
 
 .menu-panel:not(#inventory-panel) .settings-panel-content {
-  max-height: 360px;
+  max-height: none;
+  min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: pan-y;
@@ -1175,8 +1196,10 @@ button.menu-row:hover {
 }
 
 #inventory-panel {
+  top: var(--menu-window-top);
+  bottom: var(--inventory-window-bottom);
   width: min(1080px, calc(100vw - 34px));
-  max-height: min(620px, calc(100dvh - 108px));
+  max-height: none;
   padding: 16px 18px 18px;
   border: 0;
   border-radius: 10px;
@@ -1214,7 +1237,7 @@ button.menu-row:hover {
 
 #inventory-panel .menu-close-button {
   position: fixed;
-  top: max(10px, calc(env(safe-area-inset-top) + 10px));
+  top: var(--menu-title-top);
   right: max(18px, calc(env(safe-area-inset-right) + 18px));
   z-index: 26;
   float: none;
@@ -1231,7 +1254,7 @@ button.menu-row:hover {
 
 #inventory-panel .inventory-title {
   position: fixed;
-  top: max(10px, calc(env(safe-area-inset-top) + 10px));
+  top: var(--menu-title-top);
   left: 50%;
   z-index: 25;
   margin: 0;
@@ -1252,8 +1275,8 @@ button.menu-row:hover {
 #inventory-panel .inventory-layout {
   grid-template-columns: minmax(292px, 0.82fr) minmax(430px, 1.18fr);
   gap: 16px;
-  height: min(430px, calc(100dvh - 172px));
-  min-height: 354px;
+  height: 100%;
+  min-height: 0;
 }
 
 #inventory-panel .inventory-character-panel,
@@ -1273,9 +1296,9 @@ button.menu-row:hover {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto 1fr auto;
-  gap: 7px;
+  gap: 5px;
   min-height: 0;
-  padding: 10px;
+  padding: 9px;
   overflow: hidden;
 }
 
@@ -1288,9 +1311,9 @@ button.menu-row:hover {
 
 .inventory-equipment-grid {
   display: grid;
-  grid-template-columns: 74px minmax(118px, 1fr) 74px;
-  grid-template-rows: 72px minmax(136px, 1fr) 72px;
-  gap: 8px;
+  grid-template-columns: 64px minmax(116px, 1fr) 64px;
+  grid-template-rows: 62px minmax(132px, 1fr) 62px;
+  gap: 5px;
   align-items: center;
   min-height: 0;
 }
@@ -1300,13 +1323,13 @@ button.menu-row:hover {
   grid-row: 1 / 4;
   position: relative;
   align-self: stretch;
-  min-height: 258px;
+  min-height: 238px;
 }
 
 #inventory-panel .inventory-character-sprite {
   position: absolute;
   left: 50%;
-  top: clamp(44px, 18%, 58px);
+  top: clamp(62px, 24%, 82px);
   z-index: 2;
   width: 104px;
   height: 154px;
@@ -1359,7 +1382,7 @@ button.menu-row:hover {
 .character-island {
   position: absolute;
   left: 50%;
-  bottom: 14px;
+  bottom: 8px;
   width: 164px;
   height: 56px;
   transform: translateX(-50%);
@@ -1388,8 +1411,8 @@ button.menu-row:hover {
 #inventory-panel .equipment-slot {
   display: grid;
   place-items: center;
-  min-height: 70px;
-  padding: 6px;
+  min-height: 62px;
+  padding: 4px;
   border: 4px solid #5a3924;
   border-radius: 8px;
   background:
@@ -1437,9 +1460,9 @@ button.menu-row:hover {
 }
 
 #inventory-panel .equipment-icon {
-  width: 46px;
-  height: 46px;
-  margin: 4px auto;
+  width: 40px;
+  height: 40px;
+  margin: 2px auto;
 }
 
 .equipment-placeholder-icon {
@@ -1453,13 +1476,13 @@ button.menu-row:hover {
 .inventory-character-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 5px 8px;
-  padding: 6px 8px;
+  gap: 3px 6px;
+  padding: 5px 7px;
   border: 3px solid #8a623e;
   border-radius: 8px;
   background: rgba(255, 223, 157, 0.22);
   color: #4a2d1d;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -1469,7 +1492,8 @@ button.menu-row:hover {
 }
 
 .inventory-character-stats .character-heart-stat {
-  grid-column: 1 / -1;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 .inventory-character-stats b {
@@ -1479,9 +1503,10 @@ button.menu-row:hover {
 #inventory-panel .inventory-character-stats .character-heart-row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 3px;
+  justify-content: center;
+  gap: 2px;
   color: #b7352d;
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 244, 210, 0.34);
 }
@@ -1823,6 +1848,13 @@ button.menu-row:hover {
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
+  :root {
+    --menu-title-top: max(6px, calc(env(safe-area-inset-top) + 6px));
+    --menu-window-top: max(46px, calc(env(safe-area-inset-top) + 46px));
+    --menu-window-bottom: max(12px, calc(env(safe-area-inset-bottom) + 12px));
+    --inventory-window-bottom: max(62px, calc(env(safe-area-inset-bottom) + 62px));
+  }
+
   #hud {
     left: max(8px, env(safe-area-inset-left));
     top: max(8px, env(safe-area-inset-top));
@@ -1844,9 +1876,8 @@ button.menu-row:hover {
   }
 
   .menu-panel {
-    top: max(50px, calc(env(safe-area-inset-top) + 50px));
     width: min(720px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
-    max-height: calc(100dvh - 62px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    max-height: none;
     padding: 10px;
     font-size: 13px;
   }
@@ -1907,11 +1938,11 @@ button.menu-row:hover {
 
   .recipe-list,
   .recipe-detail {
-    max-height: 220px;
+    max-height: none;
   }
 
   .build-menu-scroll {
-    max-height: 220px;
+    max-height: none;
   }
 
   .build-menu-grid {
@@ -1984,10 +2015,39 @@ button.menu-row:hover {
 }
 
 @media (max-height: 560px) and (orientation: landscape) {
+  :root {
+    --menu-title-top: max(6px, calc(env(safe-area-inset-top) + 6px));
+    --menu-window-top: max(46px, calc(env(safe-area-inset-top) + 46px));
+    --menu-window-bottom: max(12px, calc(env(safe-area-inset-bottom) + 12px));
+    --inventory-window-bottom: max(62px, calc(env(safe-area-inset-bottom) + 62px));
+  }
+
+  .menu-panel:not(#inventory-panel) {
+    width: min(760px, calc(100vw - 14px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    padding: 7px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+  }
+
+  .menu-panel:not(#inventory-panel) .menu-close-button {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-width: 3px;
+    border-radius: 7px;
+    font-size: 17px;
+  }
+
+  .menu-panel:not(#inventory-panel) .menu-frame-title {
+    padding: 4px 22px;
+    border-width: 2px;
+    font-size: 18px;
+    box-shadow: inset 0 2px 0 #d59a55, 0 2px 0 rgba(43, 26, 17, 0.55);
+  }
+
   #inventory-panel {
-    top: max(22px, calc(env(safe-area-inset-top) + 22px));
     width: min(940px, calc(100vw - 14px - env(safe-area-inset-left) - env(safe-area-inset-right)));
-    max-height: calc(100dvh - 48px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     padding: 7px 9px 8px;
     border-radius: 8px;
     box-shadow:
@@ -2012,7 +2072,7 @@ button.menu-row:hover {
     height: 34px;
     min-width: 34px;
     min-height: 34px;
-    margin: -2px -1px 0 5px;
+    margin: 0;
     border-width: 3px;
     border-radius: 7px;
     font-size: 17px;
@@ -2020,7 +2080,7 @@ button.menu-row:hover {
 
   #inventory-panel .inventory-title {
     min-width: 150px;
-    margin: -14px auto 6px;
+    margin: 0;
     padding: 4px 22px;
     border-width: 2px;
     font-size: 18px;
@@ -2030,8 +2090,8 @@ button.menu-row:hover {
   #inventory-panel .inventory-layout {
     grid-template-columns: minmax(198px, 0.76fr) minmax(318px, 1.24fr);
     gap: 8px;
-    height: min(270px, calc(100dvh - 126px));
-    min-height: 228px;
+    height: 100%;
+    min-height: 0;
   }
 
   #inventory-panel .inventory-character-panel,
@@ -2055,18 +2115,18 @@ button.menu-row:hover {
 
   #inventory-panel .inventory-equipment-grid {
     grid-template-columns: 50px minmax(72px, 1fr) 50px;
-    grid-template-rows: minmax(48px, 0.82fr) minmax(76px, 1fr) minmax(48px, 0.82fr);
-    gap: 5px;
+    grid-template-rows: 44px minmax(76px, 1fr) 44px;
+    gap: 4px;
   }
 
   #inventory-panel .inventory-character-scene {
-    min-height: 160px;
+    min-height: 152px;
   }
 
   #inventory-panel .inventory-character-sprite {
     width: 68px;
     height: 100px;
-    top: 30px;
+    top: 38px;
   }
 
   #inventory-panel .character-hair {
@@ -2109,7 +2169,7 @@ button.menu-row:hover {
   }
 
   #inventory-panel .character-island {
-    bottom: 18px;
+    bottom: 10px;
     width: 102px;
     height: 34px;
     border-width: 3px;
@@ -2128,7 +2188,7 @@ button.menu-row:hover {
   #inventory-panel .character-island span:nth-child(3) { left: 82px; bottom: 7px; }
 
   #inventory-panel .equipment-slot {
-    min-height: 48px;
+    min-height: 44px;
     padding: 3px;
     border-width: 3px;
     border-radius: 7px;
@@ -2142,15 +2202,15 @@ button.menu-row:hover {
   }
 
   #inventory-panel .equipment-icon {
-    width: 22px;
-    height: 22px;
+    width: 21px;
+    height: 21px;
     margin: 2px auto;
   }
 
   #inventory-panel .inventory-character-stats {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 4px 6px;
-    padding: 5px;
+    padding: 4px 5px;
     border-width: 2px;
     border-radius: 6px;
     font-size: 9px;
@@ -2161,8 +2221,8 @@ button.menu-row:hover {
   }
 
   #inventory-panel .character-heart-row {
-    gap: 2px;
-    font-size: 11px;
+    gap: 1px;
+    font-size: 9px;
   }
 
   #inventory-panel .inventory-items-panel {

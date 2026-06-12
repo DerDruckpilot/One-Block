@@ -248,10 +248,17 @@ const map = new TileMap();
   assert.equal(/#inventory-panel\s+\.inventory-slot-name\s*\{[^}]*display:\s*none;/.test(styles), true, 'inventory item labels are hidden so icons carry the slot');
   assert.equal(styles.includes('.inventory-item-tooltip'), true, 'inventory selected-item tooltip is styled');
   assert.equal(styles.includes('.recipe-description'), true, 'recipe descriptions are styled');
+  assert.equal(styles.includes('--menu-window-top'), true, 'menus reserve shared top space below fixed titles');
+  assert.equal(styles.includes('--inventory-window-bottom'), true, 'inventory reserves bottom space above the fixed hotbar');
+  assert.equal(/\.menu-frame-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'all menu titles can sit fixed above menu windows');
+  assert.equal(/\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'all menu close buttons can sit fixed above menu windows');
+  assert.equal(/\.menu-panel:not\(#inventory-panel\)\s+\.menu-frame-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed title layout');
+  assert.equal(/\.menu-panel:not\(#inventory-panel\)\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed close button layout');
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
   assert.equal(styles.includes('#inventory-panel .inventory-character-stats .character-heart-row'), true, 'inventory character hearts are explicitly laid out horizontally');
+  assert.equal(/\.inventory-character-stats\s+\.character-heart-stat\s*\{[^}]*grid-column:\s*2;/.test(styles), true, 'inventory health is positioned under the defense column');
   assert.equal(/#inventory-panel\s+\.inventory-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory title can sit above the menu window');
   assert.equal(/#inventory-panel\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory close button can sit above the menu window');
   assert.equal(/#inventory-panel\s+\.inventory-hotbar-dock\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory hotbar is fixed outside the inventory window');
@@ -464,6 +471,11 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('Bogen'), true, 'selected item tooltip includes the item name');
   assert.equal(inventoryPanel.innerHTML.includes('Verbraucht Pfeile'), true, 'selected item tooltip includes the item function');
   assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-compatible'), true, 'hand slot highlights a selected valid hand item');
+  assert.equal(
+    inventoryPanel.innerHTML.indexOf('<strong>Gesundheit</strong>') > inventoryPanel.innerHTML.indexOf('<strong>Verteidigung</strong>'),
+    true,
+    'inventory character health is rendered below defense in the compact stats box'
+  );
   menus.renderInventory(inventory, true, 'earth', ['earth', null, null, null], 0, null, [], {}, {});
   assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-incompatible'), true, 'hand slot marks an invalid selected item as incompatible');
 }
