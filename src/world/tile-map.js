@@ -3,6 +3,7 @@ import {
   CONNECTABLE_BARRIER_GROUPS,
   CONNECTABLE_BARRIER_TYPES,
   FLYING_ENTITY_BLOCKING_OBJECTS,
+  FLOOR_OVERLAY_RESOURCES,
   GROUND_ENTITY_BLOCKING_OBJECTS,
   OBJECT_TYPES,
   PLAYER_BLOCKING_OBJECTS,
@@ -12,6 +13,7 @@ import {
 
 const keyOf = (x, y) => `${x},${y}`;
 const PLACEABLE_OBJECTS = new Set(Object.values(OBJECT_TYPES));
+const FLOOR_OVERLAYS = new Set(FLOOR_OVERLAY_RESOURCES);
 const CONNECTABLE_BARRIERS = new Set(CONNECTABLE_BARRIER_TYPES);
 const OPENABLE_BARRIERS = new Set([OBJECT_TYPES.gate, OBJECT_TYPES.door]);
 const HALF_TILE = TILE_SIZE / 2;
@@ -30,6 +32,7 @@ export class TileMap {
     this.nextTileRenderOrder = 1;
     this.objects = new Map();
     this.objectStates = new Map();
+    this.floorOverlays = new Map();
     this.crystal = { x: 0, y: 0 };
     this.createStartIsland();
   }
@@ -87,6 +90,21 @@ export class TileMap {
 
   getObject(x, y) {
     return this.objects.get(keyOf(x, y)) || null;
+  }
+
+  getFloorOverlay(x, y) {
+    return this.floorOverlays.get(keyOf(x, y)) || null;
+  }
+
+  setFloorOverlay(x, y, type) {
+    if (!FLOOR_OVERLAYS.has(type)) return false;
+    if (!this.isGround(x, y) || this.isCrystal(x, y)) return false;
+    this.floorOverlays.set(keyOf(x, y), type);
+    return true;
+  }
+
+  removeFloorOverlay(x, y) {
+    return this.floorOverlays.delete(keyOf(x, y));
   }
 
   setObject(x, y, type) {
@@ -160,6 +178,22 @@ export class TileMap {
     );
   }
 
+  loadFloorOverlays(floorOverlays = []) {
+    this.floorOverlays.clear();
+    if (!Array.isArray(floorOverlays)) return;
+    for (const floor of floorOverlays) {
+      if (
+        FLOOR_OVERLAYS.has(floor?.type) &&
+        Number.isInteger(floor.x) &&
+        Number.isInteger(floor.y) &&
+        this.isGround(floor.x, floor.y) &&
+        !this.isCrystal(floor.x, floor.y)
+      ) {
+        this.floorOverlays.set(keyOf(floor.x, floor.y), floor.type);
+      }
+    }
+  }
+
   loadObjects(objects = []) {
     this.objects.clear();
     this.objectStates.clear();
@@ -171,7 +205,10 @@ export class TileMap {
         } else if (object.type === OBJECT_TYPES.chickenNest) {
           this.objectStates.set(keyOf(object.x, object.y), { eggTimer: Math.max(0, Number(object.eggTimer || 0)) });
         } else if (object.type === OBJECT_TYPES.feedTrough) {
-          this.objectStates.set(keyOf(object.x, object.y), { feed: Math.max(0, Number(object.feed || 0)) });
+          this.objectStates.set(keyOf(object.x, object.y), {
+            feed: Math.max(0, Number(object.feed || 0)),
+            woolTimer: Math.max(0, Number(object.woolTimer || 0))
+          });
         } else if (object.type === OBJECT_TYPES.waterTrough) {
           this.objectStates.set(keyOf(object.x, object.y), { filled: object.filled === true });
         }
@@ -194,6 +231,12 @@ export class TileMap {
     const objects = [];
     this.forEachObject((object) => objects.push(object));
     return objects;
+  }
+
+  floorOverlaysToJSON() {
+    const floorOverlays = [];
+    this.forEachFloorOverlay((floor) => floorOverlays.push(floor));
+    return floorOverlays;
   }
 
   canPlaceEarth(x, y, blockedTile = null) {
@@ -410,7 +453,7 @@ export class TileMap {
 
   getWallDoorRenderState(x, y) {
     const type = this.getObject(x, y);
-    if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door].includes(type)) return null;
+    if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.window].includes(type)) return null;
     const connections = this.getConnectableConnections(x, y);
     const horizontal = connections.left || connections.right;
     const vertical = connections.up || connections.down;
@@ -526,6 +569,13 @@ export class TileMap {
       const [x, y] = key.split(',').map(Number);
       const state = this.objectStates.get(key) || {};
       callback({ x, y, type, ...state });
+    }
+  }
+
+  forEachFloorOverlay(callback) {
+    for (const [key, type] of this.floorOverlays.entries()) {
+      const [x, y] = key.split(',').map(Number);
+      callback({ x, y, type });
     }
   }
 }

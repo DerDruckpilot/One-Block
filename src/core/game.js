@@ -12,6 +12,7 @@ import {
   ACCESSORY_EQUIPMENT_RESOURCES,
   CLOTHING_EQUIPMENT_RESOURCES,
   SHOE_EQUIPMENT_RESOURCES,
+  FLOOR_OVERLAY_RESOURCES,
   FURNACE_INTERACTION_DISTANCE,
   GATE_INTERACTION_DISTANCE,
   GAME_VIEW,
@@ -78,10 +79,16 @@ const PLACEABLE_OBJECT_ITEMS = new Set([
   OBJECT_TYPES.waterTrough,
   OBJECT_TYPES.furnace,
   OBJECT_TYPES.table,
-  OBJECT_TYPES.chair
+  OBJECT_TYPES.chair,
+  OBJECT_TYPES.window,
+  OBJECT_TYPES.rug,
+  OBJECT_TYPES.plantPot,
+  OBJECT_TYPES.shelf,
+  OBJECT_TYPES.floorLantern
 ]);
 
 const REMOVABLE_OBJECT_ITEMS = new Set(REMOVABLE_OBJECT_TYPES);
+const FLOOR_OVERLAY_ITEMS = new Set(FLOOR_OVERLAY_RESOURCES);
 const HAND_EQUIPMENT_ITEMS = new Set(HAND_EQUIPMENT_RESOURCES);
 const CLOTHING_EQUIPMENT_ITEMS = new Set(CLOTHING_EQUIPMENT_RESOURCES);
 const SHOE_EQUIPMENT_ITEMS = new Set(SHOE_EQUIPMENT_RESOURCES);
@@ -338,11 +345,11 @@ export class Game {
       buildRemoveMode: this.removeMode,
       buildSelectedResource: this.buildSelectedResource,
       cookingOpen: this.cookingOpen,
-      cookingRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'cooking' }),
+      cookingRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'cooking', crystalLevel: this.crystalLevel }),
       craftingOpen: this.craftingOpen,
       craftingContext: this.craftingContext,
       furnaceOpen: this.furnaceOpen,
-      furnaceRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'furnace' }),
+      furnaceRecipeStates: this.craftingSystem.getRecipeStates({ craftingContext: 'furnace', crystalLevel: this.crystalLevel }),
       activeHotbarSlot: this.activeHotbarSlot,
       handItem: this.handItem,
       hasWorkbenchAccess: this.hasWorkbenchAccess(),
@@ -354,7 +361,8 @@ export class Game {
       characterStats: this.getCharacterStats(),
       recipeStates: this.craftingSystem.getRecipeStates({
         craftingContext: this.craftingContext,
-        hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false
+        hasWorkbenchAccess: this.craftingContext === 'workbench' ? this.hasWorkbenchAccess() : false,
+        crystalLevel: this.crystalLevel
       }),
       selectedInventoryResource: this.selectedInventoryResource,
       settingsOpen: this.settingsOpen,
@@ -634,9 +642,49 @@ export class Game {
 
   consumeCrystalLevelUpMessage() {
     if (!this.pendingCrystalLevelUp) return false;
-    this.setLog(`Kristall erreicht Stufe ${this.pendingCrystalLevelUp}.`);
+    const level = this.pendingCrystalLevelUp;
+    this.setLog(`Der Kristall erreicht Stufe ${level}.`);
+    this.setLog('Neue Möglichkeiten wurden freigeschaltet.');
+    this.handleCrystalLevelUpEvent(level);
     this.pendingCrystalLevelUp = null;
     return true;
+  }
+
+  handleCrystalLevelUpEvent(level) {
+    this.setCrystalHitFeedback('levelUp');
+    const reward = this.getCrystalLevelReward(level);
+    if (reward) {
+      const visibleDrop = this.dropSystem.spawnFromCrystal(reward, this.tileMap);
+      if (!visibleDrop) {
+        this.inventory.add(reward.resource, reward.amount);
+      }
+      this.setLog(`${RESOURCE_LABELS[reward.resource]} leuchtet aus dem Kristall.`);
+    }
+    if (level >= 4) {
+      const wave = this.spawnCrystalEnemyWave(level);
+      if (wave.spawned > 0) {
+        this.setLog('Der Kristall ruft Gegner herbei.');
+      }
+    }
+  }
+
+  getCrystalLevelReward(level) {
+    if (level === 2) return { resource: 'treeSeed', amount: 2 };
+    if (level === 3) return { resource: 'springDrop', amount: 1 };
+    if (level === 4) return { resource: 'ammoPouch', amount: 1 };
+    if (level >= 5) return { resource: 'quiver', amount: 1 };
+    return null;
+  }
+
+  spawnCrystalEnemyWave(level) {
+    const targetCount = Math.min(4, Math.max(2, level - 1));
+    let spawned = 0;
+    for (let i = 0; i < targetCount; i += 1) {
+      const result = this.enemySystem.spawnNearCrystal(this.tileMap, level, () => this.crystalSystem.random(), { maxActive: targetCount });
+      if (!result.spawned) break;
+      spawned += 1;
+    }
+    return { spawned, targetCount };
   }
 
   getCrystalDropTable() {
@@ -829,13 +877,14 @@ export class Game {
 
   setCrystalHitFeedback(kind = 'activate') {
     const center = this.tileMap.getCrystalCenter();
+    const duration = kind === 'levelUp' ? 0.75 : ATTACK_FEEDBACK_SECONDS;
     this.attackFeedback = {
       type: 'crystalHit',
       kind,
       x: center.x,
       y: center.y,
-      seconds: ATTACK_FEEDBACK_SECONDS,
-      duration: ATTACK_FEEDBACK_SECONDS
+      seconds: duration,
+      duration
     };
   }
 
@@ -917,6 +966,12 @@ export class Game {
       this.setLog('Lehm platziert.');
     }
 
+    if (FLOOR_OVERLAY_ITEMS.has(activeItem)) {
+      this.tileMap.setFloorOverlay(placement.x, placement.y, activeItem);
+      this.inventory.remove(activeItem, 1);
+      this.setLog(`${RESOURCE_LABELS[activeItem]} verlegt.`);
+    }
+
     if (PLACEABLE_OBJECT_ITEMS.has(activeItem)) {
       this.tileMap.setObject(placement.x, placement.y, activeItem);
       this.inventory.remove(activeItem, 1);
@@ -964,6 +1019,10 @@ export class Game {
         canPlace: false,
         message: 'Kein Item ausgewählt.'
       };
+    }
+
+    if (FLOOR_OVERLAY_ITEMS.has(activeItem)) {
+      return this.getFloorOverlayPlacementPreview(activeItem, target, playerTile);
     }
 
     if (PLACEABLE_OBJECT_ITEMS.has(activeItem)) {
@@ -1044,6 +1103,55 @@ export class Game {
     };
   }
 
+  getFloorOverlayPlacementPreview(resource, target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
+    const label = RESOURCE_LABELS[resource];
+    if (this.inventory.get(resource) <= 0) {
+      return {
+        ...target,
+        canPlace: false,
+        message: `Nicht genug ${label}.`
+      };
+    }
+
+    if (target.x === playerTile.x && target.y === playerTile.y) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist blockiert.'
+      };
+    }
+
+    if (!this.tileMap.isGround(target.x, target.y) || this.tileMap.isCrystal(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Boden braucht vorhandenen Untergrund.'
+      };
+    }
+
+    if (this.tileMap.getObject(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Zielfeld ist bereits belegt.'
+      };
+    }
+
+    if (this.tileMap.getFloorOverlay(target.x, target.y)) {
+      return {
+        ...target,
+        canPlace: false,
+        message: 'Dort liegt bereits ein Boden.'
+      };
+    }
+
+    return {
+      ...target,
+      canPlace: true,
+      message: `${label} kann verlegt werden.`
+    };
+  }
+
   getWorkbenchPlacementPreview(target = this.player.getFacingTile(), playerTile = this.player.getTilePosition()) {
     return this.getObjectPlacementPreview(OBJECT_TYPES.workbench, target, playerTile);
   }
@@ -1107,12 +1215,15 @@ export class Game {
   getRemovalPreview() {
     const target = this.player.getFacingTile();
     const object = this.tileMap.getObject(target.x, target.y);
+    const floorOverlay = this.tileMap.getFloorOverlay(target.x, target.y);
     return {
       ...target,
-      canPlace: Boolean(object && REMOVABLE_OBJECT_ITEMS.has(object)),
+      canPlace: Boolean((object && REMOVABLE_OBJECT_ITEMS.has(object)) || floorOverlay),
       message: object && REMOVABLE_OBJECT_ITEMS.has(object)
         ? `${RESOURCE_LABELS[object]} kann entfernt werden.`
-        : 'Kein entfernbares Objekt.'
+        : floorOverlay
+          ? `${RESOURCE_LABELS[floorOverlay]} kann entfernt werden.`
+          : 'Kein entfernbares Objekt.'
     };
   }
 
@@ -1124,12 +1235,19 @@ export class Game {
     }
 
     const object = this.tileMap.getObject(preview.x, preview.y);
-    this.tileMap.removeObject(preview.x, preview.y);
-    this.inventory.add(object, 1);
-    if (object === OBJECT_TYPES.bed && this.respawnTarget?.type === 'bed' && this.respawnTarget.x === preview.x && this.respawnTarget.y === preview.y) {
-      this.respawnTarget = { type: 'crystal' };
+    if (object && REMOVABLE_OBJECT_ITEMS.has(object)) {
+      this.tileMap.removeObject(preview.x, preview.y);
+      this.inventory.add(object, 1);
+      if (object === OBJECT_TYPES.bed && this.respawnTarget?.type === 'bed' && this.respawnTarget.x === preview.x && this.respawnTarget.y === preview.y) {
+        this.respawnTarget = { type: 'crystal' };
+      }
+      this.setLog('Objekt entfernt.');
+    } else {
+      const floorOverlay = this.tileMap.getFloorOverlay(preview.x, preview.y);
+      this.tileMap.removeFloorOverlay(preview.x, preview.y);
+      this.inventory.add(floorOverlay, 1);
+      this.setLog(`${RESOURCE_LABELS[floorOverlay]} entfernt.`);
     }
-    this.setLog('Objekt entfernt.');
     this.saveGame();
     return true;
   }
@@ -1435,6 +1553,14 @@ export class Game {
     }
 
     const encounterDrops = CRYSTAL_ENCOUNTER_DROPS_BY_LEVEL[this.crystalLevel] || CRYSTAL_ENCOUNTER_DROPS;
+    if (this.crystalLevel >= 4 && this.crystalSystem.random() < 0.08) {
+      const wave = this.spawnCrystalEnemyWave(this.crystalLevel);
+      this.setLog(wave.spawned > 0 ? 'Der Kristall ruft Gegner herbei.' : 'Es ist bereits eine Kreatur da.');
+      this.consumeCrystalLevelUpMessage();
+      this.saveGame();
+      return wave.spawned > 0;
+    }
+
     const choice = chooseWeightedDrop(encounterDrops, this.crystalSystem.random()).encounter;
     const spawn = choice === 'flying'
       ? this.flyingEnemySystem.spawnNearCrystal(this.tileMap)
@@ -1874,7 +2000,8 @@ export class Game {
   tryCraft(recipeId) {
     const result = this.craftingSystem.craft(recipeId, {
       craftingContext: this.craftingContext,
-      hasWorkbenchAccess: this.hasWorkbenchAccess()
+      hasWorkbenchAccess: this.hasWorkbenchAccess(),
+      crystalLevel: this.crystalLevel
     });
     this.setLog(result.message);
     if (result.crafted) {
@@ -1985,7 +2112,8 @@ export class Game {
   tryCook(recipeId) {
     const result = this.craftingSystem.craft(recipeId, {
       craftingContext: 'cooking',
-      hasWorkbenchAccess: false
+      hasWorkbenchAccess: false,
+      crystalLevel: this.crystalLevel
     });
 
     const messages = {
@@ -2021,7 +2149,8 @@ export class Game {
   tryFurnace(recipeId) {
     const result = this.craftingSystem.craft(recipeId, {
       craftingContext: 'furnace',
-      hasWorkbenchAccess: false
+      hasWorkbenchAccess: false,
+      crystalLevel: this.crystalLevel
     });
 
     const messages = {
@@ -2326,6 +2455,7 @@ export class Game {
     }
 
     this.tileMap.loadTiles(save.tiles);
+    this.tileMap.loadFloorOverlays(save.floorOverlays);
     this.tileMap.loadObjects(save.objects);
     this.plantSystem.load(save.plants, save.grassCooldowns, this.tileMap);
 
@@ -2398,6 +2528,7 @@ export class Game {
   createSaveState() {
     return {
       tiles: this.tileMap.toJSON(),
+      floorOverlays: this.tileMap.floorOverlaysToJSON(),
       objects: this.tileMap.objectsToJSON(),
       resources: this.inventory.toJSON(),
       enemies: this.enemySystem.toJSON(),

@@ -2,7 +2,9 @@ import { DROP_ANIMATION_SECONDS, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPE
 import { TerrainRenderer } from './terrain-renderer.js';
 import { drawItemIcon, getLoadedItemIconImage } from '../ui/item-icons.js';
 import {
+  getBuildingObjectAssetSpec,
   getBerryBushAssetPath,
+  getFloorOverlayAssetPath,
   getLoadedWorldObjectImage,
   getTreeAssetSpec,
   preloadWorldObjectAssets
@@ -29,6 +31,12 @@ export class RenderSystem {
       const screenY = Math.round(tile.y * TILE_SIZE - camera.y);
 
       this.terrainRenderer.drawTile(this.context, tile, tileMap, screenX, screenY);
+    });
+
+    tileMap.forEachFloorOverlay?.((floor) => {
+      const screenX = Math.round(floor.x * TILE_SIZE - camera.x);
+      const screenY = Math.round(floor.y * TILE_SIZE - camera.y);
+      this.drawFloorOverlay(floor.type, screenX, screenY);
     });
   }
 
@@ -198,9 +206,16 @@ export class RenderSystem {
         const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
         this.drawWoodWall(screenX, screenY, renderState);
       }
+      if (object.type === OBJECT_TYPES.window) {
+        const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
+        this.drawWindow(screenX, screenY, renderState);
+      }
       if (object.type === OBJECT_TYPES.door) {
         const renderState = tileMap.getWallDoorRenderState(object.x, object.y);
         this.drawDoor(screenX, screenY, renderState?.open === true, renderState);
+      }
+      if ([OBJECT_TYPES.rug, OBJECT_TYPES.plantPot, OBJECT_TYPES.shelf, OBJECT_TYPES.floorLantern].includes(object.type)) {
+        this.drawBuildingObjectAsset(object.type, screenX, screenY);
       }
       if (object.type === OBJECT_TYPES.table) {
         this.drawTable(screenX, screenY);
@@ -237,7 +252,7 @@ export class RenderSystem {
 
   renderForegroundBarriers(tileMap, camera, subjects = []) {
     tileMap.forEachObject((object) => {
-      if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door].includes(object.type)) return;
+      if (![OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.window].includes(object.type)) return;
       const shape = tileMap.getBarrierCollisionShape(object.x, object.y);
       if (!shape.horizontal) return;
       if (!this.shouldRenderBarrierForeground(object, shape, subjects)) return;
@@ -1036,7 +1051,7 @@ export class RenderSystem {
     const centerY = y + TILE_SIZE / 2;
 
     this.context.save();
-    if (profile.kind === 'wall' || profile.kind === 'door') {
+    if (profile.kind === 'wall' || profile.kind === 'door' || profile.kind === 'window') {
       const top = centerY - (palette.height || palette.capHeight) + 4;
       const height = palette.height || palette.capHeight;
       this.context.fillStyle = palette.main;
@@ -1046,6 +1061,10 @@ export class RenderSystem {
       this.context.fillStyle = palette.accent;
       this.context.fillRect(left + 3, top + 12, Math.max(3, right - left - 6), 2);
       this.context.fillRect(left + 3, top + 20, Math.max(3, right - left - 6), 2);
+      if (profile.kind === 'window') {
+        this.context.fillStyle = '#9ed7dc';
+        this.context.fillRect(x + TILE_SIZE / 2 - 5, centerY - 16, 10, 9);
+      }
       if (profile.kind === 'door') {
         this.context.fillStyle = palette.accent;
         this.context.fillRect(x + TILE_SIZE / 2 + 4, centerY - 15, 3, 3);
@@ -1077,6 +1096,9 @@ export class RenderSystem {
   getBarrierRenderProfile(type, open = false) {
     if (type === OBJECT_TYPES.woodWall) {
       return { kind: 'wall', mass: 'solid', connectsWith: 'wall', openable: false, horizontalTopOffset: -8, foregroundLayer: true };
+    }
+    if (type === OBJECT_TYPES.window) {
+      return { kind: 'window', mass: 'solid', connectsWith: 'wall', openable: false, horizontalTopOffset: -8, foregroundLayer: true };
     }
     if (type === OBJECT_TYPES.door) {
       return { kind: 'door', mass: open ? 'open-solid' : 'solid', connectsWith: 'wall', openable: true, open, horizontalTopOffset: -6, foregroundLayer: true };
@@ -1128,6 +1150,86 @@ export class RenderSystem {
     this.context.drawImage(image, left, top, width, height);
     this.context.restore();
     return true;
+  }
+
+  drawFloorOverlay(type, x, y) {
+    const path = getFloorOverlayAssetPath(type);
+    const image = path ? getLoadedWorldObjectImage(path) : null;
+    this.context.save();
+    this.context.imageSmoothingEnabled = false;
+    if (image && typeof this.context.drawImage === 'function') {
+      this.context.drawImage(image, x, y, TILE_SIZE, TILE_SIZE);
+      this.context.restore();
+      return true;
+    }
+
+    if (type === 'stoneFloor') {
+      this.context.fillStyle = '#6e6a60';
+      this.context.fillRect(x + 2, y + 4, 28, 24);
+      this.context.fillStyle = '#8a867b';
+      this.context.fillRect(x + 4, y + 6, 11, 9);
+      this.context.fillRect(x + 17, y + 6, 10, 9);
+      this.context.fillRect(x + 4, y + 17, 23, 8);
+      this.context.fillStyle = '#4a4741';
+      this.context.fillRect(x + 15, y + 6, 2, 20);
+      this.context.fillRect(x + 4, y + 15, 23, 2);
+    } else {
+      this.context.fillStyle = '#8d572d';
+      this.context.fillRect(x + 1, y + 5, 30, 22);
+      this.context.fillStyle = '#b7773d';
+      this.context.fillRect(x + 3, y + 7, 26, 4);
+      this.context.fillRect(x + 3, y + 15, 26, 4);
+      this.context.fillStyle = '#5b351e';
+      this.context.fillRect(x + 3, y + 13, 26, 2);
+      this.context.fillRect(x + 3, y + 21, 26, 2);
+    }
+    this.context.restore();
+    return false;
+  }
+
+  drawBuildingObjectAsset(type, x, y) {
+    const spec = getBuildingObjectAssetSpec(type);
+    if (spec && this.drawWorldObjectAsset(spec.path, x, y, spec.width, spec.height)) return true;
+
+    this.context.save();
+    this.context.imageSmoothingEnabled = false;
+    if (type === OBJECT_TYPES.rug) {
+      this.context.fillStyle = '#8f3f3b';
+      this.context.fillRect(x + 5, y + 10, 22, 16);
+      this.context.fillStyle = '#d09262';
+      this.context.fillRect(x + 8, y + 13, 16, 10);
+    } else if (type === OBJECT_TYPES.plantPot) {
+      this.context.fillStyle = '#8a4a2d';
+      this.context.fillRect(x + 10, y + 17, 12, 10);
+      this.context.fillStyle = '#5f9f48';
+      this.context.fillRect(x + 9, y + 9, 5, 9);
+      this.context.fillRect(x + 17, y + 8, 5, 10);
+    } else if (type === OBJECT_TYPES.shelf) {
+      this.context.fillStyle = '#6b3e24';
+      this.context.fillRect(x + 5, y + 6, 22, 22);
+      this.context.fillStyle = '#b2713f';
+      this.context.fillRect(x + 8, y + 10, 16, 3);
+      this.context.fillRect(x + 8, y + 19, 16, 3);
+    } else {
+      this.context.fillStyle = '#5a3820';
+      this.context.fillRect(x + 13, y + 10, 6, 17);
+      this.context.fillStyle = '#ffd36b';
+      this.context.fillRect(x + 11, y + 8, 10, 8);
+    }
+    this.context.restore();
+    return false;
+  }
+
+  drawWindow(x, y, shape = null) {
+    const profile = this.getBarrierRenderProfile(OBJECT_TYPES.window);
+    if (this.drawBuildingObjectAsset(OBJECT_TYPES.window, x, y)) return;
+    this.drawWallDoorShape(x, y, { ...shape, profile }, this.getBarrierPalette(OBJECT_TYPES.woodWall));
+    this.context.save();
+    this.context.fillStyle = '#9ed7dc';
+    this.context.fillRect(x + 10, y + 7, 12, 12);
+    this.context.fillStyle = '#f2ffef';
+    this.context.fillRect(x + 12, y + 8, 3, 4);
+    this.context.restore();
   }
 
   drawSapling(x, y, stage = 1, tileX = 0, tileY = 0) {

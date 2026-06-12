@@ -24,10 +24,17 @@ const VALID_DROP_RESOURCES = new Set([
   'bowl',
   'unfiredJug',
   'jug',
+  'woodFloor',
+  'stoneFloor',
   'ammoPouch',
   'quiver',
   'linenTunic',
   'travelBoots',
+  'window',
+  'rug',
+  'plantPot',
+  'shelf',
+  'floorLantern',
   'arrow',
   'stoneBall'
 ]);
