@@ -1363,34 +1363,66 @@ export class RenderSystem {
     const darkness = dayNightSystem.getDarkness();
     if (darkness <= 0) return;
 
-    this.context.save();
-    this.context.fillStyle = `rgba(12, 20, 43, ${darkness})`;
-    this.context.fillRect(0, 0, view.width, view.height);
-    this.context.globalCompositeOperation = 'destination-out';
+    const overlayCanvas = this.createLightingOverlayCanvas(view);
+    const overlayContext = overlayCanvas?.getContext?.('2d');
+    const targetContext = overlayContext || this.context;
+
+    targetContext.save?.();
+    targetContext.clearRect?.(0, 0, view.width, view.height);
+    targetContext.fillStyle = `rgba(7, 10, 18, ${darkness})`;
+    targetContext.fillRect(0, 0, view.width, view.height);
+
+    if (!overlayContext) {
+      targetContext.restore?.();
+      return;
+    }
+
+    targetContext.globalCompositeOperation = 'destination-out';
 
     tileMap.forEachObject((object) => {
       if (object.type !== OBJECT_TYPES.torch && object.type !== OBJECT_TYPES.campfire) return;
       const radius = object.type === OBJECT_TYPES.campfire ? 78 : 48;
       const x = object.x * TILE_SIZE + TILE_SIZE / 2 - camera.x;
       const y = object.y * TILE_SIZE + TILE_SIZE / 2 - camera.y;
-      const gradient = this.context.createRadialGradient?.(x, y, radius * 0.18, x, y, radius);
+      const gradient = targetContext.createRadialGradient?.(x, y, radius * 0.16, x, y, radius);
       if (gradient) {
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.86, darkness + 0.18)})`);
-        gradient.addColorStop(0.62, `rgba(255, 255, 255, ${Math.min(0.5, darkness * 0.62)})`);
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.98, darkness + 0.3)})`);
+        gradient.addColorStop(0.58, `rgba(255, 255, 255, ${Math.min(0.58, darkness * 0.78)})`);
         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        this.context.fillStyle = gradient;
-        this.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-      } else if (this.context.beginPath && this.context.arc && this.context.fill) {
-        this.context.fillStyle = `rgba(255, 255, 255, ${Math.min(0.65, darkness)})`;
-        this.context.beginPath();
-        this.context.arc(x, y, radius, 0, Math.PI * 2);
-        this.context.fill();
+        targetContext.fillStyle = gradient;
+        targetContext.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      } else if (targetContext.beginPath && targetContext.arc && targetContext.fill) {
+        targetContext.fillStyle = `rgba(255, 255, 255, ${Math.min(0.82, darkness + 0.16)})`;
+        targetContext.beginPath();
+        targetContext.arc(x, y, radius, 0, Math.PI * 2);
+        targetContext.fill();
       } else {
-        this.context.fillStyle = `rgba(255, 255, 255, ${Math.min(0.65, darkness)})`;
-        this.context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+        targetContext.fillStyle = `rgba(255, 255, 255, ${Math.min(0.82, darkness + 0.16)})`;
+        targetContext.fillRect(x - radius, y - radius, radius * 2, radius * 2);
       }
     });
-    this.context.restore();
+    targetContext.restore?.();
+
+    if (typeof this.context.drawImage === 'function') {
+      this.context.save();
+      this.context.drawImage(overlayCanvas, 0, 0);
+      this.context.restore();
+    }
+  }
+
+  createLightingOverlayCanvas(view) {
+    if (typeof OffscreenCanvas === 'function') {
+      return new OffscreenCanvas(view.width, view.height);
+    }
+
+    if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+      const canvas = document.createElement('canvas');
+      canvas.width = view.width;
+      canvas.height = view.height;
+      return canvas;
+    }
+
+    return null;
   }
 
   drawIslandShadow(tileMap, camera) {

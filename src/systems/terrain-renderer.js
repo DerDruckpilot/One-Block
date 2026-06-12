@@ -331,6 +331,12 @@ export class TerrainRenderer {
 
     let drewTransition = false;
     for (const transition of transitions) {
+      if (transition.procedural) {
+        this.drawProceduralGroundTransition(context, tile.type, transition.neighborType, transition.direction, x, y);
+        drewTransition = true;
+        continue;
+      }
+
       const image = getLoadedGroundTileTransitionImage(transition.sheetKey);
       if (!image || typeof context.drawImage !== 'function') continue;
 
@@ -352,6 +358,32 @@ export class TerrainRenderer {
       drewTransition = true;
     }
     return drewTransition;
+  }
+
+  drawProceduralGroundTransition(context, currentType, neighborType, direction, x, y) {
+    const rect = this.getTransitionEdgeRect(direction);
+    const currentPalette = edgeMap[currentType] || edgeMap[TILE_TYPES.grass];
+    const neighborPalette = edgeMap[neighborType] || currentPalette;
+    const edgeFill = blendHex(currentPalette.mid, neighborPalette.mid, 0.5);
+    const highlightFill = blendHex(currentPalette.top, neighborPalette.mid, 0.42);
+
+    context.fillStyle = edgeFill;
+    context.fillRect(x + rect.destX, y + rect.destY, rect.destWidth, rect.destHeight);
+
+    const detailInset = Math.max(1, Math.floor(GROUND_TRANSITION_RENDER_BAND * 0.35));
+    context.fillStyle = highlightFill;
+    if (direction === 'left' || direction === 'right') {
+      const detailX = direction === 'left'
+        ? x + rect.destX + rect.destWidth - detailInset
+        : x + rect.destX;
+      context.fillRect(detailX, y + 4, detailInset, TILE_SIZE - 8);
+      return;
+    }
+
+    const detailY = direction === 'top'
+      ? y + rect.destY + rect.destHeight - detailInset
+      : y + rect.destY;
+    context.fillRect(x + 4, detailY, TILE_SIZE - 8, detailInset);
   }
 
   getTransitionEdgeRect(direction) {
@@ -445,6 +477,16 @@ export class TerrainRenderer {
   }
 
   resolveTransition(currentType, neighborType, direction, oppositeDirection) {
+    if (this.isDirectGrassStoneTransition(currentType, neighborType)) {
+      return {
+        procedural: true,
+        sheetKey: 'direct',
+        row: 0,
+        neighborType,
+        direction
+      };
+    }
+
     const sheetOrder = currentType === TILE_TYPES.water || neighborType === TILE_TYPES.water
       ? ['water', 'moistEarth', 'ground']
       : currentType === TILE_TYPES.moistEarth || neighborType === TILE_TYPES.moistEarth
@@ -468,6 +510,11 @@ export class TerrainRenderer {
     }
 
     return null;
+  }
+
+  isDirectGrassStoneTransition(currentType, neighborType) {
+    return (currentType === TILE_TYPES.grass && neighborType === TILE_TYPES.stone) ||
+      (currentType === TILE_TYPES.stone && neighborType === TILE_TYPES.grass);
   }
 
   drawWateredOverlay(context, tile, tileMap, x, y) {

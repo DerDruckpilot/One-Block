@@ -241,6 +241,11 @@ const map = new TileMap();
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
+  assert.equal(styles.includes('#inventory-panel .inventory-character-stats .character-heart-row'), true, 'inventory character hearts are explicitly laid out horizontally');
+  assert.equal(styles.includes('position: fixed;\n  top: max(10px, calc(env(safe-area-inset-top) + 10px));'), true, 'inventory title and close button can sit above the menu window');
+  assert.equal(styles.includes('#inventory-panel .inventory-hotbar-dock {\n  position: fixed;'), true, 'inventory hotbar is fixed outside the inventory window');
+  assert.equal(styles.includes('.hand-indicator {\n  position: fixed;'), true, 'hand item indicator remains screen-positioned');
+  assert.equal(styles.includes('.hand-indicator') && styles.includes('background: transparent;'), true, 'hand item indicator renders without an extra box');
   assert.equal(styles.includes('.stat-stamina'), false, 'inventory character panel no longer styles a stamina bar');
   assert.equal(styles.includes('.menu-panel:not(#inventory-panel)'), true, 'non-inventory menus share the inventory-style frame direction');
   assert.equal(styles.includes('.item-icon-image'), true, 'item icons can render real PNG image assets');
@@ -2172,7 +2177,8 @@ const map = new TileMap();
   renderer.renderLighting({ getDarkness: () => 0.52 }, tileMap, { x: 0, y: 0 }, GAME_VIEW);
 
   assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.args[2] === GAME_VIEW.width), true, 'night lighting draws a screen darkness overlay');
-  assert.equal(context.calls.filter((call) => call.fn === 'fillRect').length >= 3, true, 'torch and campfire cut soft light windows out of the darkness overlay');
+  assert.equal(context.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === 'rgba(7, 10, 18, 0.52)'), true, 'night lighting uses a neutral darkness mask');
+  assert.equal(context.calls.some((call) => typeof call.fillStyle === 'string' && call.fillStyle.includes('12, 20, 43')), false, 'night lighting no longer applies the old blue scene tint');
   assert.equal(context.calls.some((call) => typeof call.fillStyle === 'string' && call.fillStyle.includes('255, 196')), false, 'object light no longer paints the world with a yellow tint');
 
   const dayContext = createDrawContext();
@@ -4310,6 +4316,27 @@ const map = new TileMap();
     'ground',
     'coordinate fallback still renders exactly one side of a legacy material boundary'
   );
+  const directGrassStoneMap = new TileMap();
+  directGrassStoneMap.tiles.clear();
+  directGrassStoneMap.tileRenderOrders.clear();
+  directGrassStoneMap.nextTileRenderOrder = 1;
+  directGrassStoneMap.setGrass(0, 0);
+  directGrassStoneMap.setStone(1, 0);
+  const directGrassStoneTransition = terrain.selectGroundTransition({ x: 1, y: 0, type: 'stone' }, directGrassStoneMap);
+  assert.equal(directGrassStoneTransition?.procedural, true, 'grass-to-stone transitions use a direct procedural material edge');
+  assert.equal(directGrassStoneTransition?.neighborType, TILE_TYPES.grass, 'grass-to-stone transition targets grass directly instead of inserting earth');
+  assert.equal(
+    terrain.selectGroundTransition({ x: 0, y: 0, type: 'grass' }, directGrassStoneMap),
+    null,
+    'grass-to-stone boundaries still render on exactly one side'
+  );
+  const directGrassStoneContext = createDrawContext();
+  terrain.drawProceduralGroundTransition(directGrassStoneContext, TILE_TYPES.stone, TILE_TYPES.grass, 'left', 0, 0);
+  assert.equal(
+    directGrassStoneContext.calls.some((call) => call.fn === 'fillRect' && call.fillStyle === '#7a4f2d'),
+    false,
+    'direct grass-to-stone edge does not draw an earth-colored strip'
+  );
   const transitionEdgeRect = terrain.getTransitionEdgeRect('right');
   assert.equal(transitionEdgeRect.destWidth < TILE_SIZE, true, 'asset transitions render as narrow edge bands instead of full-tile overlays');
   assert.equal(transitionEdgeRect.destX, TILE_SIZE - transitionEdgeRect.destWidth, 'right-side transition band is anchored to the shared edge');
@@ -4948,11 +4975,19 @@ const map = new TileMap();
   game.inventory.add('linenTunic', 1);
   game.inventory.add('travelBoots', 1);
   game.inventory.add('quiver', 1);
+  game.inventory.add('ammoPouch', 1);
   assert.equal(game.equipEquipmentItem('linenTunic'), true, 'linen tunic can be equipped');
   assert.equal(game.equipEquipmentItem('travelBoots'), true, 'travel boots can be equipped');
   assert.equal(game.equipEquipmentItem('quiver'), true, 'quiver can be equipped as accessory');
+  game.selectedInventoryResource = 'ammoPouch';
+  assert.equal(game.handleEquipmentSlotClick('accessory'), true, 'clicking the accessory slot handles selected accessory equipment');
+  assert.equal(game.getEquipmentState().accessoryItem, 'ammoPouch', 'ammo pouch can be assigned through the accessory slot flow');
+  game.selectedInventoryResource = 'stone';
+  assert.equal(game.handleEquipmentSlotClick('accessory'), true, 'accessory slot rejects invalid selected items without closing the inventory flow');
+  assert.equal(game.getEquipmentState().accessoryItem, 'ammoPouch', 'invalid accessory assignment keeps the current accessory equipped');
   assert.equal(game.getDefenseBonus(), 1, 'linen tunic adds defense');
   assert.equal(game.getMovementMultiplier() > 1, true, 'travel boots increase movement speed');
+  game.equipEquipmentItem('quiver');
   game.saveGame();
   const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
   assert.equal(loadedGame.getEquipmentState().clothingItem, 'linenTunic', 'clothing equipment saves and loads');

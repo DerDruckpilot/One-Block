@@ -227,7 +227,7 @@ export class MenuPanels {
     const rejectsSelected = selectedResource ? !acceptsSelected : false;
     return `
       <button
-        class="equipment-slot${isEmpty ? ' is-empty' : ''}${acceptsSelected ? ' is-compatible' : ''}${rejectsSelected ? ' is-incompatible' : ''}"
+        class="equipment-slot equip-${slot}${isEmpty ? ' is-empty' : ''}${acceptsSelected ? ' is-compatible' : ''}${rejectsSelected ? ' is-incompatible' : ''}"
         type="button"
         data-equipment-slot="${slot}"
         aria-label="${label}"
