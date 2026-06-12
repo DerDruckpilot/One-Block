@@ -250,24 +250,24 @@ const map = new TileMap();
   assert.equal(styles.includes('.recipe-description'), true, 'recipe descriptions are styled');
   assert.equal(styles.includes('--menu-window-top'), true, 'menus reserve shared top space below fixed titles');
   assert.equal(styles.includes('--inventory-window-bottom'), true, 'inventory reserves bottom space above the fixed hotbar');
+  assert.equal(indexHtml.includes('id="menu-chrome"'), true, 'menus have a shared external title and close-button layer');
   assert.equal(/\.menu-frame-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'all menu titles can sit fixed above menu windows');
   assert.equal(/\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'all menu close buttons can sit fixed above menu windows');
-  assert.equal(/\.menu-panel:not\(#inventory-panel\)\s+\.menu-frame-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed title layout');
-  assert.equal(/\.menu-panel:not\(#inventory-panel\)\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed close button layout');
+  assert.equal(/\.menu-chrome:not\(\.is-inventory\)\s+\.menu-frame-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed title layer');
+  assert.equal(/\.menu-chrome:not\(\.is-inventory\)\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'non-inventory menus use the detached fixed close-button layer');
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
   assert.equal(styles.includes('#inventory-panel .inventory-character-stats .character-heart-row'), true, 'inventory character hearts are explicitly laid out horizontally');
   assert.equal(/\.inventory-character-stats\s+\.character-heart-stat\s*\{[^}]*grid-column:\s*2;/.test(styles), true, 'inventory health is positioned under the defense column');
-  assert.equal(/#inventory-panel\s+\.inventory-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory title can sit above the menu window');
-  assert.equal(/#inventory-panel\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory close button can sit above the menu window');
-  assert.equal(/#inventory-panel\s+\.inventory-hotbar-dock\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory hotbar is fixed outside the inventory window');
+  assert.equal(/\.menu-chrome\.is-inventory\s+\.inventory-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory title sits in the external chrome layer');
+  assert.equal(/\.menu-chrome\.is-inventory\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory close button sits in the external chrome layer');
   assert.equal(/\.hand-indicator\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'hand item indicator remains screen-positioned');
   assert.equal(/\.hand-indicator\s*\{[^}]*background:\s*transparent;/.test(styles), true, 'hand item indicator renders without an extra box');
   assert.equal(styles.includes('.stat-stamina'), false, 'inventory character panel no longer styles a stamina bar');
   assert.equal(styles.includes('.menu-panel:not(#inventory-panel)'), true, 'non-inventory menus share the inventory-style frame direction');
   assert.equal(styles.includes('.item-icon-image'), true, 'item icons can render real PNG image assets');
-  assert.equal(mainScript.includes("closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')"), true, 'menu touch events are exempt from gameplay touch prevention');
+  assert.equal(mainScript.includes('#menu-chrome'), true, 'menu chrome touch events are exempt from gameplay touch prevention');
   assert.equal(serviceWorker.includes('./assets/generated/icons/inventory_96/grass_block.png'), true, 'service worker caches 96px inventory icons');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/ground_96/grass_tileset_96.png'), true, 'service worker caches 96px ground tile sheets');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/water_96/water_tileset_96.png'), true, 'service worker caches 96px water tiles');
@@ -464,8 +464,7 @@ const map = new TileMap();
   menus.renderInventory(inventory, true, 'bow', ['earth', null, null, null], 0, null, [], {}, {});
   assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-title'), false, 'inventory hotbar renders without the old title element');
   assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), false, 'inventory hotbar no longer renders a headline');
-  assert.equal(inventoryPanel.innerHTML.includes('hotbar-key'), false, 'inventory hotbar slots do not render slot-number elements');
-  assert.equal(inventoryPanel.innerHTML.includes('hotbar-label'), false, 'inventory hotbar slots do not render abbreviations');
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-assignment'), false, 'inventory panel no longer renders a duplicate hotbar block');
   assert.equal(inventoryPanel.innerHTML.includes('inventory-slot-name'), false, 'inventory item slots do not render item names inside slots');
   assert.equal(inventoryPanel.innerHTML.includes('inventory-item-tooltip'), true, 'selected inventory item renders an info tooltip');
   assert.equal(inventoryPanel.innerHTML.includes('Bogen'), true, 'selected item tooltip includes the item name');
@@ -496,6 +495,7 @@ const map = new TileMap();
   menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'normal' }), 'normal');
   assert.equal(craftingPanel.innerHTML.includes('recipe-description'), true, 'crafting detail area renders a recipe description');
   assert.equal(craftingPanel.innerHTML.includes('Ermoeglicht fortgeschrittenes Crafting'), true, 'crafting recipe description explains the selected result');
+  assert.equal(craftingPanel.innerHTML.includes('recipe-result'), false, 'crafting detail omits the duplicate result name box');
 }
 
 {
@@ -1378,9 +1378,15 @@ const map = new TileMap();
   });
 
   pointerdown(createPointerEvent(430, 470));
-  assert.equal(selectedSlot, null, 'normal hotbar hitbox is inactive while a menu is open');
+  assert.equal(selectedSlot, 2, 'normal hotbar hitbox stays active while inventory is open');
 
+  selectedSlot = null;
   hitboxes.getInventoryOpen = () => false;
+  hitboxes.getCraftingOpen = () => true;
+  pointerdown(createPointerEvent(430, 470));
+  assert.equal(selectedSlot, null, 'normal hotbar hitbox is inactive while non-inventory menus are open');
+
+  hitboxes.getCraftingOpen = () => false;
   pointerdown(createPointerEvent(430, 470));
   assert.equal(selectedSlot, 2, 'normal hotbar hitbox works again after menus close');
 }
@@ -1507,7 +1513,7 @@ const map = new TileMap();
   assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while inventory is open');
   assert.equal(settingsButton.hidden, true, 'settings button is hidden while inventory is open');
   assert.equal(helpElement.hidden, true, 'help HUD is hidden while inventory is open');
-  assert.equal(hotbarElement.hidden, true, 'normal hotbar is hidden while a menu is open');
+  assert.equal(hotbarElement.hidden, false, 'normal hotbar stays visible for inventory assignment');
   assert.equal(touchControlsElement.hidden, true, 'touch controls are hidden while a menu is open');
   assert.equal(game.getDebugState().paused, true, 'debug state exposes the pause state');
 
@@ -1526,6 +1532,7 @@ const map = new TileMap();
   game.update(0.016);
   assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while settings is open');
   assert.equal(settingsButton.hidden, true, 'settings button is hidden while settings is open');
+  assert.equal(hotbarElement.hidden, true, 'normal hotbar is hidden while settings is open');
 
   game.settingsOpen = false;
   game.craftingOpen = true;
@@ -1533,6 +1540,7 @@ const map = new TileMap();
   assert.equal(hudContainerElement.hidden, true, 'log HUD is hidden while crafting is open');
   assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while crafting is open');
   assert.equal(settingsButton.hidden, true, 'settings button is hidden while crafting is open');
+  assert.equal(hotbarElement.hidden, true, 'normal hotbar is hidden while crafting is open');
 }
 
 {
@@ -1714,11 +1722,13 @@ const map = new TileMap();
     hidden: true,
     innerHTML: ''
   };
+  const menuChromeElement = { hidden: true, innerHTML: '', className: '' };
   const inventory = new ResourceInventory();
   inventory.add('rawWood', 4);
   const menus = new MenuPanels({
     craftingPanel,
-    inventoryPanel
+    inventoryPanel,
+    menuChromeElement
   });
   const crafting = new CraftingSystem(inventory);
 
@@ -1743,15 +1753,15 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-filter="true"'), true, 'inventory panel exposes a filter field');
   assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hand-Slot oder Hotbar-Slot anklicken.'), false, 'inventory panel omits bulky hotbar assignment helper text');
   assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), false, 'inventory panel omits the old hotbar headline');
-  assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-assignment'), true, 'inventory panel keeps compact hotbar assignment slots');
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-assignment'), false, 'inventory panel does not duplicate the fixed gameplay hotbar');
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu exposes its close button through menu chrome');
+  assert.equal(menuChromeElement.innerHTML.includes('Inventar'), true, 'inventory menu exposes its title through menu chrome');
   assert.equal(inventoryPanel.innerHTML.includes('data-hand-slot="true"'), true, 'inventory panel exposes a hand equipment slot');
   assert.equal(inventoryPanel.innerHTML.includes('character-heart-row'), true, 'inventory character panel renders true HP hearts');
   assert.equal(inventoryPanel.innerHTML.includes('heart-full'), true, 'inventory character panel renders full hearts');
   assert.equal(inventoryPanel.innerHTML.includes('heart-half'), true, 'inventory character panel renders half hearts');
   assert.equal(inventoryPanel.innerHTML.includes('heart-empty'), true, 'inventory character panel renders empty hearts');
   assert.equal(inventoryPanel.innerHTML.includes('Ausdauer'), false, 'inventory character panel no longer renders stamina');
-  assert.equal(inventoryPanel.innerHTML.includes('data-inventory-hotbar-slot="1"'), true, 'inventory panel exposes its own hotbar assignment slots');
-  assert.equal(inventoryPanel.innerHTML.includes('Hotbar 2: Stein'), true, 'inventory hotbar shows assigned slot labels');
   assert.equal(craftingPanel.hidden, false, 'crafting panel opens');
   assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'crafting panel shows workbench recipe');
   assert.equal(craftingPanel.innerHTML.includes('Fackel'), true, 'normal crafting panel shows torch recipe');
@@ -1797,7 +1807,7 @@ const map = new TileMap();
     recipeStates: crafting.getRecipeStates({ craftingContext: 'workbench', hasWorkbenchAccess: true }),
     selectedInventoryResource: null
   });
-  assert.equal(craftingPanel.innerHTML.includes('Werkbank'), true, 'workbench crafting title is shown');
+  assert.equal(menuChromeElement.innerHTML.includes('Werkbank'), true, 'workbench crafting title is shown in menu chrome');
   assert.equal(craftingPanel.innerHTML.includes('Holzspitzhacke'), true, 'workbench crafting shows pickaxe recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzspeer'), true, 'workbench crafting shows spear recipe');
   assert.equal(craftingPanel.innerHTML.includes('Holzwand'), true, 'workbench crafting shows wall recipe');
@@ -4749,31 +4759,40 @@ const map = new TileMap();
   const cookingPanel = { hidden: true, innerHTML: '' };
   const furnacePanel = { hidden: true, innerHTML: '' };
   const settingsPanel = { hidden: true, innerHTML: '' };
+  const menuChromeElement = { hidden: true, innerHTML: '', className: '' };
   const inventory = new ResourceInventory();
   const crafting = new CraftingSystem(inventory);
-  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel });
-
-  menus.update({
+  const menus = new MenuPanels({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel, menuChromeElement });
+  const renderWithOpenMenu = (openState) => menus.update({
     inventory,
-    inventoryOpen: true,
-    craftingOpen: true,
-    buildOpen: true,
-    cookingOpen: true,
-    furnaceOpen: true,
+    inventoryOpen: false,
+    craftingOpen: false,
+    buildOpen: false,
+    cookingOpen: false,
+    furnaceOpen: false,
     recipeStates: crafting.getRecipeStates({ craftingContext: 'normal' }),
     cookingRecipeStates: crafting.getRecipeStates({ craftingContext: 'cooking' }),
     furnaceRecipeStates: crafting.getRecipeStates({ craftingContext: 'furnace' }),
     hotbarSlots: [...DEFAULT_HOTBAR_SLOTS],
-    settingsOpen: true,
-    saveSlots: [{ index: 1, occupied: false, savedAt: null }]
+    settingsOpen: false,
+    saveSlots: [{ index: 1, occupied: false, savedAt: null }],
+    ...openState
   });
 
-  assert.equal(inventoryPanel.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu has an X close button');
-  assert.equal(craftingPanel.innerHTML.includes('data-menu-close="crafting"'), true, 'crafting menu has an X close button');
-  assert.equal(buildPanel.innerHTML.includes('data-menu-close="build"'), true, 'build menu has an X close button');
-  assert.equal(cookingPanel.innerHTML.includes('data-menu-close="cooking"'), true, 'cooking menu has an X close button');
-  assert.equal(furnacePanel.innerHTML.includes('data-menu-close="furnace"'), true, 'furnace menu has an X close button');
-  assert.equal(settingsPanel.innerHTML.includes('data-menu-close="settings"'), true, 'settings menu has an X close button');
+  renderWithOpenMenu({ inventoryOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu has an X close button');
+  assert.equal(menuChromeElement.innerHTML.includes('Inventar'), true, 'inventory menu has a title');
+  renderWithOpenMenu({ craftingOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="crafting"'), true, 'crafting menu has an X close button');
+  renderWithOpenMenu({ buildOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="build"'), true, 'build menu has an X close button');
+  assert.equal(menuChromeElement.innerHTML.includes('Bauen'), true, 'build menu has a title');
+  renderWithOpenMenu({ cookingOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="cooking"'), true, 'cooking menu has an X close button');
+  renderWithOpenMenu({ furnaceOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="furnace"'), true, 'furnace menu has an X close button');
+  renderWithOpenMenu({ settingsOpen: true });
+  assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="settings"'), true, 'settings menu has an X close button');
 
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });

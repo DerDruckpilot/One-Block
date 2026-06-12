@@ -16,6 +16,7 @@ export class PointerHitboxSystem {
     hotbarElement,
     inventoryButton,
     inventoryPanel,
+    menuChromeElement = null,
     onBlockedCook = () => {},
     onBlockedCraft = () => {},
     onBlockedFurnace = () => {},
@@ -61,6 +62,7 @@ export class PointerHitboxSystem {
     this.hotbarElement = hotbarElement;
     this.inventoryButton = inventoryButton;
     this.inventoryPanel = inventoryPanel;
+    this.menuChromeElement = menuChromeElement;
     this.settingsButton = settingsButton;
     this.settingsPanel = settingsPanel;
     this.onBlockedCook = onBlockedCook;
@@ -96,6 +98,12 @@ export class PointerHitboxSystem {
     pointerTarget?.addEventListener?.('pointermove', (event) => this.handlePointerMove(event), { capture: true });
     pointerTarget?.addEventListener?.('pointerup', (event) => this.handlePointerUp(event), { capture: true });
     pointerTarget?.addEventListener?.('pointercancel', (event) => this.cancelPendingTap(event), { capture: true });
+  }
+
+  getCloseButtons(panel, menuId) {
+    const panelButtons = Array.from(panel?.querySelectorAll?.('[data-menu-close]') || []);
+    const chromeButtons = Array.from(this.menuChromeElement?.querySelectorAll?.(`[data-menu-close="${menuId}"]`) || []);
+    return [...panelButtons, ...chromeButtons];
   }
 
   updateHitboxes() {
@@ -218,7 +226,7 @@ export class PointerHitboxSystem {
     const hitboxes = [];
 
     if (this.getCraftingOpen()) {
-      for (const closeButton of Array.from(this.craftingPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.craftingPanel, 'crafting')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-crafting', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -249,7 +257,7 @@ export class PointerHitboxSystem {
     }
 
     if (this.getCookingOpen()) {
-      for (const closeButton of Array.from(this.cookingPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.cookingPanel, 'cooking')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-cooking', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -280,7 +288,7 @@ export class PointerHitboxSystem {
     }
 
     if (this.getFurnaceOpen()) {
-      for (const closeButton of Array.from(this.furnacePanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.furnacePanel, 'furnace')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-furnace', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -311,7 +319,7 @@ export class PointerHitboxSystem {
     }
 
     if (this.getInventoryOpen()) {
-      for (const closeButton of Array.from(this.inventoryPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.inventoryPanel, 'inventory')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-inventory', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -361,7 +369,7 @@ export class PointerHitboxSystem {
     }
 
     if (this.getBuildOpen()) {
-      for (const closeButton of Array.from(this.buildPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.buildPanel, 'build')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-build', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -387,7 +395,7 @@ export class PointerHitboxSystem {
     }
 
     if (this.getSettingsOpen()) {
-      for (const closeButton of Array.from(this.settingsPanel?.querySelectorAll?.('[data-menu-close]') || [])) {
+      for (const closeButton of this.getCloseButtons(this.settingsPanel, 'settings')) {
         if (!closeButton.dataset.menuClose) continue;
         const closeHitbox = this.createElementHitbox(closeButton, 'close-settings', () => this.onMenuClose(closeButton.dataset.menuClose));
         if (closeHitbox) hitboxes.push(closeHitbox);
@@ -427,7 +435,7 @@ export class PointerHitboxSystem {
   }
 
   getHotbarHitboxes() {
-    if (this.getInventoryOpen() || this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen() || this.getFurnaceOpen() || this.getSettingsOpen()) return [];
+    if (this.getCraftingOpen() || this.getBuildOpen() || this.getCookingOpen() || this.getFurnaceOpen() || this.getSettingsOpen()) return [];
 
     return Array.from(this.hotbarElement?.querySelectorAll?.('[data-hotbar-slot]') || [])
       .map((element) => this.createElementHitbox(

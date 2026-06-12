@@ -149,6 +149,7 @@ export class Game {
       craftingPanel: options.craftingPanel,
       furnacePanel: options.furnacePanel,
       inventoryPanel: options.inventoryPanel,
+      menuChromeElement: options.menuChromeElement,
       settingsPanel: options.settingsPanel
     });
     this.buildButton = options.buildButton;
@@ -172,6 +173,7 @@ export class Game {
       hotbarElement: options.hotbarElement,
       inventoryButton: options.inventoryButton,
       inventoryPanel: options.inventoryPanel,
+      menuChromeElement: options.menuChromeElement,
       onBlockedCook: () => {
         this.setLog('Nicht genug Zutaten.');
       },
@@ -2675,7 +2677,7 @@ export class Game {
   updateInteractiveUiState() {
     const menuOpen = this.isMenuOpen();
     if (this.hotbar.element) {
-      this.hotbar.element.hidden = menuOpen;
+      this.hotbar.element.hidden = menuOpen && !this.inventoryOpen;
     }
     if (this.hudContainerElement) {
       this.hudContainerElement.hidden = menuOpen;

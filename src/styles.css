@@ -203,6 +203,21 @@ body {
   display: none;
 }
 
+.menu-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.menu-chrome[hidden] {
+  display: none;
+}
+
+.menu-chrome .menu-close-button {
+  pointer-events: auto;
+}
+
 .menu-close-button {
   position: fixed;
   top: var(--menu-title-top);
@@ -951,7 +966,8 @@ button.menu-row:hover {
   color: #fff4d2;
 }
 
-.menu-panel:not(#inventory-panel) .menu-close-button {
+.menu-panel:not(#inventory-panel) .menu-close-button,
+.menu-chrome:not(.is-inventory) .menu-close-button {
   position: fixed;
   top: var(--menu-title-top);
   right: max(18px, calc(env(safe-area-inset-right) + 18px));
@@ -965,7 +981,8 @@ button.menu-row:hover {
   box-shadow: inset 0 0 0 2px #e5a26e, 0 3px 0 #2b1a11;
 }
 
-.menu-panel:not(#inventory-panel) .menu-frame-title {
+.menu-panel:not(#inventory-panel) .menu-frame-title,
+.menu-chrome:not(.is-inventory) .menu-frame-title {
   position: fixed;
   top: var(--menu-title-top);
   left: 50%;
@@ -1015,38 +1032,68 @@ button.menu-row:hover {
 }
 
 .menu-panel:not(#inventory-panel) .recipe-list-item {
-  min-height: 34px;
-  gap: 7px;
-  padding: 5px 7px;
+  min-height: 44px;
+  gap: 9px;
+  padding: 5px 8px;
   border-width: 3px;
   box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
   font-size: 13px;
   touch-action: pan-y;
 }
 
+.menu-panel:not(#inventory-panel) .recipe-list-item .menu-icon .item-pixel-icon {
+  width: 32px;
+  height: 32px;
+}
+
 .menu-panel:not(#inventory-panel) .recipe-detail {
   min-height: 210px;
-  padding: 8px;
+  display: grid;
+  grid-template-rows: auto auto auto auto auto;
+  align-content: start;
+  gap: 7px;
+  padding: 10px;
   border: 3px solid #5a3924;
   background: rgba(255, 244, 210, 0.18);
   color: #3b2417;
 }
 
-.menu-panel:not(#inventory-panel) .recipe-result,
 .menu-panel:not(#inventory-panel) .material-card {
   background: rgba(43, 26, 17, 0.32);
   color: #fff4d2;
 }
 
+.menu-panel:not(#inventory-panel) .recipe-detail h3 {
+  margin-bottom: 0;
+  font-size: 22px;
+}
+
+.menu-panel:not(#inventory-panel) .recipe-description {
+  margin: 0;
+  padding: 9px 10px;
+  border-width: 3px;
+  background: rgba(76, 47, 28, 0.36);
+  color: #fff0c2;
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .menu-panel:not(#inventory-panel) .material-grid {
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(74px, 92px));
   gap: 6px;
 }
 
 .menu-panel:not(#inventory-panel) .material-card {
-  min-height: 52px;
-  padding: 5px;
-  font-size: 12px;
+  min-height: 58px;
+  padding: 5px 4px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.15;
+}
+
+.menu-panel:not(#inventory-panel) .material-card .menu-icon .item-pixel-icon {
+  width: 26px;
+  height: 26px;
 }
 
 .menu-panel:not(#inventory-panel) .craft-button,
@@ -1200,7 +1247,8 @@ button.menu-row:hover {
   bottom: var(--inventory-window-bottom);
   width: min(1080px, calc(100vw - 34px));
   max-height: none;
-  padding: 16px 18px 18px;
+  overflow: hidden;
+  padding: 22px 24px 22px;
   border: 0;
   border-radius: 10px;
   background:
@@ -1216,11 +1264,15 @@ button.menu-row:hover {
 #inventory-panel::before,
 #inventory-panel::after {
   content: "";
-  position: sticky;
-  top: 0;
+  position: absolute;
+  top: 8px;
+  left: 78px;
+  right: 78px;
+  z-index: 0;
+  pointer-events: none;
   display: block;
   height: 12px;
-  margin: -4px 64px 0;
+  margin: 0;
   border: 3px solid #2b1a11;
   border-radius: 999px;
   background: linear-gradient(180deg, #8d542c, #4a2d1d);
@@ -1235,7 +1287,8 @@ button.menu-row:hover {
   opacity: 0.7;
 }
 
-#inventory-panel .menu-close-button {
+#inventory-panel .menu-close-button,
+.menu-chrome.is-inventory .menu-close-button {
   position: fixed;
   top: var(--menu-title-top);
   right: max(18px, calc(env(safe-area-inset-right) + 18px));
@@ -1252,7 +1305,8 @@ button.menu-row:hover {
   box-shadow: inset 0 0 0 2px #e5a26e, 0 3px 0 #2b1a11;
 }
 
-#inventory-panel .inventory-title {
+#inventory-panel .inventory-title,
+.menu-chrome.is-inventory .inventory-title {
   position: fixed;
   top: var(--menu-title-top);
   left: 50%;
@@ -1273,6 +1327,8 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-layout {
+  position: relative;
+  z-index: 1;
   grid-template-columns: minmax(292px, 0.82fr) minmax(430px, 1.18fr);
   gap: 16px;
   height: 100%;
@@ -2029,7 +2085,8 @@ button.menu-row:hover {
     font-size: 11px;
   }
 
-  .menu-panel:not(#inventory-panel) .menu-close-button {
+  .menu-panel:not(#inventory-panel) .menu-close-button,
+  .menu-chrome:not(.is-inventory) .menu-close-button {
     width: 34px;
     height: 34px;
     min-width: 34px;
@@ -2039,7 +2096,8 @@ button.menu-row:hover {
     font-size: 17px;
   }
 
-  .menu-panel:not(#inventory-panel) .menu-frame-title {
+  .menu-panel:not(#inventory-panel) .menu-frame-title,
+  .menu-chrome:not(.is-inventory) .menu-frame-title {
     padding: 4px 22px;
     border-width: 2px;
     font-size: 18px;
@@ -2067,7 +2125,8 @@ button.menu-row:hover {
     display: none;
   }
 
-  #inventory-panel .menu-close-button {
+  #inventory-panel .menu-close-button,
+  .menu-chrome.is-inventory .menu-close-button {
     width: 34px;
     height: 34px;
     min-width: 34px;
@@ -2078,7 +2137,8 @@ button.menu-row:hover {
     font-size: 17px;
   }
 
-  #inventory-panel .inventory-title {
+  #inventory-panel .inventory-title,
+  .menu-chrome.is-inventory .inventory-title {
     min-width: 150px;
     margin: 0;
     padding: 4px 22px;

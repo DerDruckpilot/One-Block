@@ -19,6 +19,7 @@ const buildPanel = document.querySelector('#build-panel');
 const cookingPanel = document.querySelector('#cooking-panel');
 const furnacePanel = document.querySelector('#furnace-panel');
 const settingsPanel = document.querySelector('#settings-panel');
+const menuChromeElement = document.querySelector('#menu-chrome');
 const touchControlsElement = document.querySelector('#touch-controls');
 const joystickElement = document.querySelector('#touch-joystick');
 const joystickKnobElement = document.querySelector('#touch-joystick-knob');
@@ -51,6 +52,7 @@ const game = new Game(canvas, hudElement, {
   inventoryPanel,
   joystickElement,
   joystickKnobElement,
+  menuChromeElement,
   settingsButton,
   settingsPanel,
   storage: getLocalStorage(),
@@ -60,7 +62,7 @@ const game = new Game(canvas, hudElement, {
 game.start();
 
 const preventGameTouchDefault = (event) => {
-  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel')) return;
+  if (event.target?.closest?.('#inventory-panel, #crafting-panel, #build-panel, #cooking-panel, #furnace-panel, #settings-panel, #menu-chrome')) return;
   event.preventDefault();
 };
 
