@@ -94,15 +94,17 @@ body {
   left: max(14px, calc(env(safe-area-inset-left) + 14px));
   bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
   display: flex;
-  gap: 4px;
-  padding: 6px 8px;
-  border: 1px solid var(--ui-border);
+  gap: 7px;
+  padding: 8px 12px;
+  border: 2px solid rgba(255, 224, 130, 0.42);
   border-radius: 999px;
-  background: rgba(33, 25, 20, 0.72);
+  background:
+    linear-gradient(180deg, rgba(90, 57, 36, 0.78), rgba(33, 25, 20, 0.78));
   color: #ff5f75;
-  font-size: 24px;
+  font-size: 42px;
   line-height: 1;
-  text-shadow: 0 2px 0 #2b1418;
+  text-shadow: 0 3px 0 #2b1418, 0 0 10px rgba(255, 95, 117, 0.24);
+  box-shadow: inset 0 2px 0 rgba(255, 244, 210, 0.16), 0 5px 0 rgba(43, 26, 17, 0.36);
   pointer-events: none;
   z-index: 6;
 }
@@ -1372,6 +1374,7 @@ button.menu-row:hover {
   gap: 5px;
   align-items: center;
   min-height: 0;
+  padding-top: 12px;
 }
 
 #inventory-panel .inventory-character-scene {
@@ -1465,10 +1468,11 @@ button.menu-row:hover {
 .character-island span:nth-child(3) { left: 128px; bottom: 10px; }
 
 #inventory-panel .equipment-slot {
+  overflow: visible;
   display: grid;
   place-items: center;
   min-height: 62px;
-  padding: 4px;
+  padding: 6px;
   border: 4px solid #5a3924;
   border-radius: 8px;
   background:
@@ -1504,11 +1508,19 @@ button.menu-row:hover {
 }
 
 #inventory-panel .equipment-label {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  width: max-content;
+  max-width: 74px;
+  transform: translateX(-50%);
   color: #4b2f1e;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 900;
   text-transform: uppercase;
+  line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 244, 210, 0.36);
+  pointer-events: none;
 }
 
 #inventory-panel .equipment-slot strong {
@@ -1516,9 +1528,9 @@ button.menu-row:hover {
 }
 
 #inventory-panel .equipment-icon {
-  width: 40px;
-  height: 40px;
-  margin: 2px auto;
+  width: 50px;
+  height: 50px;
+  margin: 0 auto;
 }
 
 .equipment-placeholder-icon {
@@ -1531,8 +1543,8 @@ button.menu-row:hover {
 
 .inventory-character-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
   padding: 5px 7px;
   border: 3px solid #8a623e;
   border-radius: 8px;
@@ -1544,7 +1556,9 @@ button.menu-row:hover {
 
 .inventory-character-stats > span {
   display: grid;
+  justify-items: center;
   gap: 2px;
+  text-align: center;
 }
 
 .inventory-character-stats .character-heart-stat {
@@ -1562,7 +1576,7 @@ button.menu-row:hover {
   justify-content: center;
   gap: 2px;
   color: #b7352d;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 244, 210, 0.34);
 }
@@ -1818,29 +1832,95 @@ button.menu-row:hover {
 }
 
 .touch-button {
+  position: relative;
+  isolation: isolate;
   width: 74px;
   height: 74px;
-  border: 2px solid rgba(255, 255, 255, 0.28);
+  border: 4px solid #4c2c18;
   border-radius: 50%;
-  background: rgba(18, 20, 32, 0.62);
-  color: var(--ui-text);
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 244, 210, 0.42), transparent 0 16px),
+    radial-gradient(circle at 50% 58%, #b5281f 0 35px, #6f1717 36px 100%);
+  color: #fff4d2;
   font: inherit;
+  font-size: 13px;
   font-weight: 900;
   cursor: pointer;
   touch-action: none;
-  backdrop-filter: blur(6px);
+  text-shadow: 0 2px 0 #2b1418;
+  box-shadow:
+    inset 0 0 0 4px #d29345,
+    inset 0 8px 0 rgba(255, 225, 122, 0.22),
+    inset 0 -8px 0 rgba(57, 19, 12, 0.44),
+    0 6px 0 #2b1a11,
+    0 0 18px rgba(181, 40, 31, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.touch-button::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  z-index: -1;
+  width: 14px;
+  height: 46px;
+  border: 3px solid #2b1a11;
+  border-radius: 999px 999px 5px 5px;
+  background: linear-gradient(90deg, #e9edf0 0 45%, #7d8790 46% 70%, #f7fbff 71%);
+  box-shadow: 0 0 0 2px rgba(255, 244, 210, 0.22);
+  transform: translate(-50%, -50%) rotate(46deg);
+}
+
+.touch-button::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 244, 210, 0.22);
+  box-shadow: inset 8px 8px 0 rgba(255, 244, 210, 0.18);
+  pointer-events: none;
 }
 
 .touch-button-action {
   width: 84px;
   height: 84px;
-  background: rgba(143, 99, 255, 0.72);
+  border-color: #4a3516;
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255, 244, 210, 0.42), transparent 0 18px),
+    radial-gradient(circle at 50% 58%, #4f9b32 0 40px, #2d631f 41px 100%);
+  box-shadow:
+    inset 0 0 0 4px #d29345,
+    inset 0 8px 0 rgba(255, 225, 122, 0.2),
+    inset 0 -8px 0 rgba(24, 61, 20, 0.44),
+    0 6px 0 #2b1a11,
+    0 0 18px rgba(90, 180, 57, 0.26);
+}
+
+.touch-button-action::before {
+  width: 36px;
+  height: 34px;
+  border: 0;
+  border-radius: 44% 56% 52% 48%;
+  background:
+    radial-gradient(circle at 34% 34%, #fff0c2 0 4px, transparent 5px),
+    linear-gradient(135deg, #ffc681 0 48%, #b86536 49% 100%);
+  box-shadow:
+    -12px 9px 0 -7px #ffc681,
+    11px 6px 0 -8px #ffc681,
+    0 0 0 3px #2b1a11;
+  transform: translate(-50%, -50%) rotate(18deg);
 }
 
 .touch-button.is-pressed,
 .touch-button:active {
   border-color: #ffe082;
   transform: translateY(2px) scale(0.96);
+  box-shadow:
+    inset 0 0 0 4px #f1c968,
+    inset 0 6px 0 rgba(255, 225, 122, 0.18),
+    inset 0 -5px 0 rgba(43, 26, 17, 0.36),
+    0 3px 0 #2b1a11;
 }
 
 #orientation-overlay {
@@ -2054,6 +2134,7 @@ button.menu-row:hover {
   .touch-button {
     width: 64px;
     height: 64px;
+    border-width: 3px;
     font-size: 12px;
   }
 
@@ -2065,8 +2146,9 @@ button.menu-row:hover {
   .heart-hud {
     left: max(126px, calc(env(safe-area-inset-left) + 126px));
     bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
-    font-size: 20px;
-    padding: 5px 7px;
+    gap: 5px;
+    font-size: 34px;
+    padding: 7px 10px;
   }
 }
 
@@ -2177,6 +2259,7 @@ button.menu-row:hover {
     grid-template-columns: 50px minmax(72px, 1fr) 50px;
     grid-template-rows: 44px minmax(76px, 1fr) 44px;
     gap: 4px;
+    padding-top: 8px;
   }
 
   #inventory-panel .inventory-character-scene {
@@ -2249,7 +2332,7 @@ button.menu-row:hover {
 
   #inventory-panel .equipment-slot {
     min-height: 44px;
-    padding: 3px;
+    padding: 4px;
     border-width: 3px;
     border-radius: 7px;
     box-shadow: inset 0 0 0 1px #8d653e, 0 2px 0 rgba(43, 26, 17, 0.36);
@@ -2257,18 +2340,23 @@ button.menu-row:hover {
 
   #inventory-panel .equipment-label,
   #inventory-panel .equipment-slot strong {
-    font-size: 8px;
+    font-size: 7px;
     line-height: 1;
   }
 
+  #inventory-panel .equipment-label {
+    top: -11px;
+    max-width: 58px;
+  }
+
   #inventory-panel .equipment-icon {
-    width: 21px;
-    height: 21px;
-    margin: 2px auto;
+    width: 28px;
+    height: 28px;
+    margin: 0 auto;
   }
 
   #inventory-panel .inventory-character-stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px 6px;
     padding: 4px 5px;
     border-width: 2px;

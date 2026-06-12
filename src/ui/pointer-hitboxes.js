@@ -109,8 +109,8 @@ export class PointerHitboxSystem {
   updateHitboxes() {
     this.hitboxes = [
       ...this.getTopMenuHitboxes(),
-      ...this.getPanelHitboxes(),
-      ...this.getHotbarHitboxes()
+      ...this.getHotbarHitboxes(),
+      ...this.getPanelHitboxes()
     ];
     return this.hitboxes;
   }

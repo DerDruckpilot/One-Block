@@ -29,6 +29,7 @@ export class MenuPanels {
     this.lastFurnaceHtml = '';
     this.lastSettingsHtml = '';
     this.lastChromeHtml = '';
+    this.lastInventoryStructureKey = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
@@ -152,6 +153,22 @@ export class MenuPanels {
 
     if (!isOpen) {
       this.setInventoryHtml('');
+      this.lastInventoryStructureKey = '';
+      return;
+    }
+
+    const resources = this.getFilteredInventoryResources();
+    const inventoryStructureKey = JSON.stringify({
+      tab: this.inventoryTab,
+      filter: this.inventoryFilter,
+      counts: resources.map((resource) => [resource, inventory.get(resource)]),
+      handItem,
+      equipment,
+      characterStats,
+      playerHearts
+    });
+    if (this.lastInventoryStructureKey === inventoryStructureKey && this.inventoryPanel.innerHTML) {
+      this.updateInventorySelectionState(selectedInventoryResource);
       return;
     }
 
@@ -163,7 +180,7 @@ export class MenuPanels {
         aria-pressed="${this.inventoryTab === tab.id ? 'true' : 'false'}"
       >${tab.label}</button>
     `).join('');
-    const rows = this.getFilteredInventoryResources()
+    const rows = resources
       .map((resource) => `
         <button
           class="inventory-slot${selectedInventoryResource === resource ? ' is-selected' : ''}"
@@ -177,8 +194,9 @@ export class MenuPanels {
         </button>
       `)
       .join('');
-    const handAcceptsSelected = selectedInventoryResource ? this.canEquipmentSlotAccept('hand', selectedInventoryResource) : false;
-    const handRejectsSelected = selectedInventoryResource ? !handAcceptsSelected : false;
+    const handSlotState = selectedInventoryResource
+      ? this.canEquipmentSlotAccept('hand', selectedInventoryResource) ? ' is-compatible' : ' is-incompatible'
+      : '';
 
     this.setInventoryHtml(`
       <div class="inventory-layout">
@@ -186,7 +204,7 @@ export class MenuPanels {
           <div class="inventory-character-name">Abenteurer</div>
           <div class="inventory-equipment-grid">
             <button
-              class="equipment-slot hand-slot${handItem ? '' : ' is-empty'}${handAcceptsSelected ? ' is-compatible' : ''}${handRejectsSelected ? ' is-incompatible' : ''}"
+              class="equipment-slot hand-slot${handItem ? '' : ' is-empty'}${handSlotState}"
               type="button"
               data-hand-slot="true"
               aria-label="Hand-Slot"
@@ -218,8 +236,8 @@ export class MenuPanels {
           <div class="inventory-character-stats" aria-hidden="true">
             <span><strong>Angriff</strong><b>${characterStats.attack}</b></span>
             <span><strong>Verteidigung</strong><b>${characterStats.defense}</b></span>
+            <span><strong>Tempo</strong><b>${characterStats.movement}%</b></span>
             <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
-            <span><strong>Bewegung</strong><b>${characterStats.movement}%</b></span>
           </div>
         </aside>
         <section class="inventory-items-panel">
@@ -238,6 +256,8 @@ export class MenuPanels {
         </section>
       </div>
     `);
+    this.lastInventoryStructureKey = inventoryStructureKey;
+    this.updateInventorySelectionState(selectedInventoryResource);
   }
 
   renderCharacterHearts(hearts = []) {
@@ -254,11 +274,12 @@ export class MenuPanels {
 
   renderEquipmentSlot(slot, label, resource = null, selectedResource = null) {
     const isEmpty = !resource;
-    const acceptsSelected = selectedResource ? this.canEquipmentSlotAccept(slot, selectedResource) : false;
-    const rejectsSelected = selectedResource ? !acceptsSelected : false;
+    const selectedState = selectedResource
+      ? this.canEquipmentSlotAccept(slot, selectedResource) ? ' is-compatible' : ' is-incompatible'
+      : '';
     return `
       <button
-        class="equipment-slot equip-${slot}${isEmpty ? ' is-empty' : ''}${acceptsSelected ? ' is-compatible' : ''}${rejectsSelected ? ' is-incompatible' : ''}"
+        class="equipment-slot equip-${slot}${isEmpty ? ' is-empty' : ''}${selectedState}"
         type="button"
         data-equipment-slot="${slot}"
         aria-label="${label}"
@@ -286,6 +307,46 @@ export class MenuPanels {
         <strong>${this.escapeHtml(label)}</strong>
         <span>${this.escapeHtml(description)}</span>
       </div>
+    `;
+  }
+
+  updateInventorySelectionState(resource) {
+    if (!this.inventoryPanel) return;
+
+    for (const slot of Array.from(this.inventoryPanel.querySelectorAll?.('[data-inventory-resource]') || [])) {
+      const isSelected = resource === slot.dataset.inventoryResource;
+      slot.classList.toggle('is-selected', isSelected);
+      slot.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+    }
+
+    const updateSlotCompatibility = (slotElement, acceptsSelected) => {
+      if (!slotElement) return;
+      const hasSelection = Boolean(resource);
+      slotElement.classList.toggle('is-compatible', hasSelection && acceptsSelected);
+      slotElement.classList.toggle('is-incompatible', hasSelection && !acceptsSelected);
+    };
+    updateSlotCompatibility(
+      this.inventoryPanel.querySelector?.('[data-hand-slot]'),
+      resource ? this.canEquipmentSlotAccept('hand', resource) : false
+    );
+    for (const slotElement of Array.from(this.inventoryPanel.querySelectorAll?.('[data-equipment-slot]') || [])) {
+      updateSlotCompatibility(
+        slotElement,
+        resource ? this.canEquipmentSlotAccept(slotElement.dataset.equipmentSlot, resource) : false
+      );
+    }
+
+    const tooltip = this.inventoryPanel.querySelector?.('.inventory-item-tooltip');
+    if (!tooltip) return;
+    if (!resource) {
+      tooltip.classList.add('is-empty');
+      tooltip.innerHTML = 'Item waehlen, dann Slot, Hotbar oder Hand anklicken.';
+      return;
+    }
+    tooltip.classList.remove('is-empty');
+    tooltip.innerHTML = `
+      <strong>${this.escapeHtml(RESOURCE_LABELS[resource] || resource)}</strong>
+      <span>${this.escapeHtml(RESOURCE_DESCRIPTIONS[resource] || 'Gegenstand im Inventar.')}</span>
     `;
   }
 
