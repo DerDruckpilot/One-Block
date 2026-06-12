@@ -182,9 +182,9 @@ export class MenuPanels {
             ${this.renderEquipmentSlot('shoes', 'Schuhe', equipment.shoesItem, selectedInventoryResource)}
           </div>
           <div class="inventory-character-stats" aria-hidden="true">
-            <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
             <span><strong>Angriff</strong><b>${characterStats.attack}</b></span>
             <span><strong>Verteidigung</strong><b>${characterStats.defense}</b></span>
+            <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
             <span><strong>Bewegung</strong><b>${characterStats.movement}%</b></span>
           </div>
         </aside>
