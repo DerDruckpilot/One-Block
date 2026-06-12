@@ -1,4 +1,4 @@
-import { RESOURCE_LABELS, RESOURCE_SHORT_LABELS } from '../config/constants.js';
+import { RESOURCE_LABELS } from '../config/constants.js';
 import { renderItemIcon } from './item-icons.js';
 
 export class HandIndicator {
@@ -12,15 +12,11 @@ export class HandIndicator {
 
     const html = handItem
       ? `
-        <span class="hand-indicator-label">Hand</span>
         ${renderItemIcon(handItem, 'hand-icon item-pixel-icon')}
-        <strong>${RESOURCE_SHORT_LABELS[handItem] || RESOURCE_LABELS[handItem] || handItem}</strong>
-        ${ammoResource ? `<span class="hand-ammo">${RESOURCE_SHORT_LABELS[ammoResource] || ammoResource}: ${ammoCount}</span>` : ''}
+        ${ammoResource ? `<span class="hand-ammo" aria-label="${RESOURCE_LABELS[ammoResource] || ammoResource}">${ammoCount}</span>` : ''}
       `
       : `
-        <span class="hand-indicator-label">Hand</span>
-        <span class="hand-icon item-pixel-icon item-icon-fallback" aria-hidden="true">--</span>
-        <strong>Leer</strong>
+        <span class="hand-icon item-pixel-icon item-icon-fallback" aria-hidden="true"></span>
       `;
 
     if (html !== this.lastHtml) {

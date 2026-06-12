@@ -1,11 +1,15 @@
 import {
+  ACCESSORY_EQUIPMENT_RESOURCES,
   BUILD_MENU_CATEGORIES,
+  CLOTHING_EQUIPMENT_RESOURCES,
+  HAND_EQUIPMENT_RESOURCES,
   HOTBAR_SLOT_COUNT,
   INVENTORY_RESOURCES,
   INVENTORY_TABS,
   RESOURCE_CATEGORIES,
+  RESOURCE_DESCRIPTIONS,
   RESOURCE_LABELS,
-  RESOURCE_SHORT_LABELS
+  SHOE_EQUIPMENT_RESOURCES
 } from '../config/constants.js';
 import { renderItemIcon } from './item-icons.js';
 
@@ -130,17 +134,15 @@ export class MenuPanels {
           type="button"
           data-inventory-resource="${resource}"
           aria-pressed="${selectedInventoryResource === resource ? 'true' : 'false'}"
+          aria-label="${this.escapeAttribute(`${RESOURCE_LABELS[resource]}: ${inventory.get(resource)}`)}"
         >
           <span class="inventory-slot-icon">${renderItemIcon(resource)}</span>
-          <span class="inventory-slot-name">${RESOURCE_LABELS[resource]}</span>
           <strong class="inventory-slot-count">${inventory.get(resource)}</strong>
         </button>
       `)
       .join('');
-
-    const selectedText = selectedInventoryResource
-      ? `${RESOURCE_LABELS[selectedInventoryResource]} ausgewählt`
-      : 'Kein Item fuer Hotbar-Zuweisung ausgewaehlt';
+    const handAcceptsSelected = selectedInventoryResource ? this.canEquipmentSlotAccept('hand', selectedInventoryResource) : false;
+    const handRejectsSelected = selectedInventoryResource ? !handAcceptsSelected : false;
 
     this.setInventoryHtml(`
       ${this.renderCloseButton('inventory')}
@@ -150,16 +152,15 @@ export class MenuPanels {
           <div class="inventory-character-name">Abenteurer</div>
           <div class="inventory-equipment-grid">
             <button
-              class="equipment-slot hand-slot${handItem ? '' : ' is-empty'}"
+              class="equipment-slot hand-slot${handItem ? '' : ' is-empty'}${handAcceptsSelected ? ' is-compatible' : ''}${handRejectsSelected ? ' is-incompatible' : ''}"
               type="button"
               data-hand-slot="true"
               aria-label="Hand-Slot"
             >
               <span class="equipment-label">Hand</span>
-              ${handItem ? renderItemIcon(handItem, 'equipment-icon item-pixel-icon') : '<span class="equipment-icon item-pixel-icon item-icon-fallback">--</span>'}
-              <strong>${handItem ? RESOURCE_LABELS[handItem] : 'Leer'}</strong>
+              ${handItem ? renderItemIcon(handItem, 'equipment-icon item-pixel-icon') : '<span class="equipment-icon item-pixel-icon item-icon-fallback"></span>'}
             </button>
-            ${this.renderEquipmentSlot('clothing', 'Kleidung', equipment.clothingItem)}
+            ${this.renderEquipmentSlot('clothing', 'Kleidung', equipment.clothingItem, selectedInventoryResource)}
             <div class="inventory-character-scene" aria-hidden="true">
               <div class="inventory-character-sprite">
                 <span class="character-hair"></span>
@@ -173,12 +174,12 @@ export class MenuPanels {
                 <span></span>
               </div>
             </div>
-            ${this.renderEquipmentSlot('accessory', 'Zubehoer', equipment.accessoryItem)}
+            ${this.renderEquipmentSlot('accessory', 'Zubehoer', equipment.accessoryItem, selectedInventoryResource)}
             <div class="equipment-slot equipment-slot-placeholder equip-offhand" aria-hidden="true">
               <span class="equipment-label">Nebenhand</span>
-              <span class="equipment-icon equipment-placeholder-icon">O</span>
+              <span class="equipment-icon equipment-placeholder-icon"></span>
             </div>
-            ${this.renderEquipmentSlot('shoes', 'Schuhe', equipment.shoesItem)}
+            ${this.renderEquipmentSlot('shoes', 'Schuhe', equipment.shoesItem, selectedInventoryResource)}
           </div>
           <div class="inventory-character-stats" aria-hidden="true">
             <span class="character-heart-stat"><strong>Gesundheit</strong>${this.renderCharacterHearts(playerHearts)}</span>
@@ -198,12 +199,11 @@ export class MenuPanels {
             </label>
             <span class="inventory-filter-button" aria-hidden="true">v</span>
           </div>
-          <div class="menu-note">${selectedText}</div>
+          ${this.renderSelectedItemTooltip(selectedInventoryResource)}
           <div class="inventory-grid">${rows}</div>
         </section>
       </div>
       <div class="inventory-hotbar-dock">
-        <div class="inventory-hotbar-title">Schnellleiste</div>
         ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
       </div>
     `);
@@ -221,19 +221,40 @@ export class MenuPanels {
     return `<span class="character-heart-row" aria-label="Lebenspunkte">${heartHtml}</span>`;
   }
 
-  renderEquipmentSlot(slot, label, resource = null) {
+  renderEquipmentSlot(slot, label, resource = null, selectedResource = null) {
     const isEmpty = !resource;
+    const acceptsSelected = selectedResource ? this.canEquipmentSlotAccept(slot, selectedResource) : false;
+    const rejectsSelected = selectedResource ? !acceptsSelected : false;
     return `
       <button
-        class="equipment-slot${isEmpty ? ' is-empty' : ''}"
+        class="equipment-slot${isEmpty ? ' is-empty' : ''}${acceptsSelected ? ' is-compatible' : ''}${rejectsSelected ? ' is-incompatible' : ''}"
         type="button"
         data-equipment-slot="${slot}"
         aria-label="${label}"
       >
         <span class="equipment-label">${label}</span>
-        ${isEmpty ? '<span class="equipment-icon item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource, 'equipment-icon item-pixel-icon')}
-        <strong>${isEmpty ? 'Leer' : RESOURCE_LABELS[resource]}</strong>
+        ${isEmpty ? '<span class="equipment-icon item-pixel-icon item-icon-fallback"></span>' : renderItemIcon(resource, 'equipment-icon item-pixel-icon')}
       </button>
+    `;
+  }
+
+  canEquipmentSlotAccept(slot, resource) {
+    if (slot === 'hand') return HAND_EQUIPMENT_RESOURCES.includes(resource);
+    if (slot === 'clothing') return CLOTHING_EQUIPMENT_RESOURCES.includes(resource);
+    if (slot === 'shoes') return SHOE_EQUIPMENT_RESOURCES.includes(resource);
+    if (slot === 'accessory') return ACCESSORY_EQUIPMENT_RESOURCES.includes(resource);
+    return false;
+  }
+
+  renderSelectedItemTooltip(resource) {
+    if (!resource) return '<div class="inventory-item-tooltip is-empty" aria-live="polite">Item waehlen, dann Slot, Hotbar oder Hand anklicken.</div>';
+    const label = RESOURCE_LABELS[resource] || resource;
+    const description = RESOURCE_DESCRIPTIONS[resource] || 'Gegenstand im Inventar.';
+    return `
+      <div class="inventory-item-tooltip" aria-live="polite">
+        <strong>${this.escapeHtml(label)}</strong>
+        <span>${this.escapeHtml(description)}</span>
+      </div>
     `;
   }
 
@@ -251,9 +272,8 @@ export class MenuPanels {
       const resource = hotbarSlots[index] || null;
       const isActive = index === activeHotbarSlot;
       const isEmpty = !resource;
-      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource);
+      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback"></span>' : renderItemIcon(resource);
       const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
-      const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
       const amount = isEmpty ? 0 : inventory.get(resource);
       slots.push(`
         <button
@@ -263,10 +283,8 @@ export class MenuPanels {
           aria-pressed="${isActive ? 'true' : 'false'}"
           aria-label="Hotbar ${index + 1}: ${label}"
         >
-          <span class="hotbar-key">${index + 1}</span>
           <span class="hotbar-icon">${icon}</span>
-          <span class="hotbar-label">${shortLabel}</span>
-          <span class="hotbar-count">${amount}</span>
+          ${isEmpty ? '' : `<span class="hotbar-count">${amount}</span>`}
         </button>
       `);
     }
@@ -413,6 +431,7 @@ export class MenuPanels {
     return `
       <h3>${recipe.name}</h3>
       <div class="recipe-result"><span class="menu-icon">${renderItemIcon(recipe.result)}</span> ${RESOURCE_LABELS[recipe.result]}</div>
+      <div class="recipe-description">${this.escapeHtml(RESOURCE_DESCRIPTIONS[recipe.result] || 'Handwerklicher Gegenstand fuer deine Insel.')}</div>
       <div class="material-grid">${costs}</div>
       ${lockedText}
       ${missingText}
@@ -517,6 +536,14 @@ export class MenuPanels {
 
   escapeAttribute(value) {
     return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+  }
+
+  escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;');
   }
 
   setInventoryHtml(html) {
