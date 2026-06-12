@@ -60,6 +60,8 @@ export const ITEM_ICON_PATHS = {
 };
 
 const itemIconImages = new Map();
+const loadedItemIconResources = new Set();
+const failedItemIconResources = new Set();
 
 const ICON_FALLBACKS = {
   earth: 'soil',
@@ -133,7 +135,18 @@ export function preloadItemIcons() {
     if (itemIconImages.has(resource)) return;
     const image = new Image();
     image.decoding = 'async';
+    image.onload = () => {
+      loadedItemIconResources.add(resource);
+      failedItemIconResources.delete(resource);
+    };
+    image.onerror = () => {
+      loadedItemIconResources.delete(resource);
+      failedItemIconResources.add(resource);
+    };
     image.src = path;
+    if (image.complete === true && image.naturalWidth > 0) {
+      loadedItemIconResources.add(resource);
+    }
     itemIconImages.set(resource, image);
   });
 }
@@ -144,13 +157,18 @@ export function getLoadedItemIconImage(resource) {
   return image;
 }
 
+export function hasPersistentItemIcon(resource) {
+  return Boolean(getItemIconPath(resource)) && !failedItemIconResources.has(resource);
+}
+
 export function renderItemIcon(resource, className = 'item-pixel-icon') {
   const fallback = RESOURCE_ICONS[resource] || '?';
   const iconPath = getItemIconPath(resource);
+  const hasImageClass = hasPersistentItemIcon(resource) ? ' has-image' : '';
   const image = iconPath
-    ? `<img class="item-icon-image" src="${iconPath}" alt="" decoding="async" loading="eager" draggable="false" onload="this.parentElement.classList.add('has-image')" onerror="this.remove()" />`
+    ? `<img class="item-icon-image" src="${iconPath}" alt="" decoding="async" loading="eager" draggable="false" onload="this.parentElement.classList.add('has-image')" onerror="this.parentElement.classList.remove('has-image'); this.remove()" />`
     : '';
-  return `<span class="${className} item-icon-${getItemIconKind(resource)}" aria-hidden="true">${image}<span class="item-icon-fallback-text">${fallback}</span></span>`;
+  return `<span class="${className} item-icon-${getItemIconKind(resource)}${hasImageClass}" aria-hidden="true">${image}<span class="item-icon-fallback-text">${fallback}</span></span>`;
 }
 
 export function drawItemIcon(context, resource, x, y, size = 16) {
