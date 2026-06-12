@@ -1,6 +1,5 @@
 import {
-  RESOURCE_LABELS,
-  RESOURCE_SHORT_LABELS
+  RESOURCE_LABELS
 } from '../config/constants.js';
 import { renderItemIcon } from './item-icons.js';
 
@@ -17,8 +16,7 @@ export class Hotbar {
       const isActive = index === activeSlot;
       const isEmpty = !resource;
       const label = isEmpty ? 'Leer' : RESOURCE_LABELS[resource];
-      const shortLabel = isEmpty ? 'Leer' : RESOURCE_SHORT_LABELS[resource];
-      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback">--</span>' : renderItemIcon(resource);
+      const icon = isEmpty ? '<span class="item-pixel-icon item-icon-fallback"></span>' : renderItemIcon(resource);
       const amount = isEmpty ? 0 : inventory[resource] || 0;
 
       return `
@@ -30,10 +28,8 @@ export class Hotbar {
           aria-pressed="${isActive ? 'true' : 'false'}"
           aria-label="${index + 1}: ${label}"
         >
-          <span class="hotbar-key">${index + 1}</span>
           <span class="hotbar-icon">${icon}</span>
-          <span class="hotbar-label">${shortLabel}</span>
-          <span class="hotbar-count">${amount}</span>
+          ${isEmpty ? '' : `<span class="hotbar-count">${amount}</span>`}
         </button>
       `;
     }).join('');

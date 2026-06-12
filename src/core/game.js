@@ -2587,23 +2587,67 @@ export class Game {
   }
 
   render() {
+    const now = performance.now();
+    const crystalDepthY = this.renderSystem.getCrystalDepthY(this.tileMap);
+    const depthLayers = this.getCrystalDepthLayers(crystalDepthY);
+
     this.backgroundSystem.render(this.context, this.camera, this.dayNightSystem);
     this.renderSystem.renderWorld(this.tileMap, this.camera);
-    this.renderSystem.renderCrystal(this.tileMap, this.camera, performance.now(), this.crystalLevel, this.attackFeedback);
+    this.renderSystem.renderCrystalBase(this.tileMap, this.camera);
     this.renderSystem.renderObjects(this.tileMap, this.camera);
-    this.renderSystem.renderDrops(this.dropSystem.drops, this.camera);
-    this.renderSystem.renderAnimals(this.animalSystem.animals, this.camera);
-    this.renderSystem.renderEnemies(this.enemySystem.enemies, this.camera);
-    this.renderSystem.renderFlyingEnemies(this.flyingEnemySystem.enemies, this.camera);
+    this.renderSystem.renderDrops(depthLayers.behindDrops, this.camera);
+    this.renderSystem.renderAnimals(depthLayers.behindAnimals, this.camera);
+    this.renderSystem.renderEnemies(depthLayers.behindEnemies, this.camera);
+    this.renderSystem.renderFlyingEnemies(depthLayers.behindFlyingEnemies, this.camera);
+    if (depthLayers.playerBehindCrystal) {
+      this.renderSystem.renderPlayer(this.player, this.camera);
+    }
+    this.renderSystem.renderCrystal(this.tileMap, this.camera, now, this.crystalLevel, this.attackFeedback);
+    this.renderSystem.renderDrops(depthLayers.frontDrops, this.camera);
+    this.renderSystem.renderAnimals(depthLayers.frontAnimals, this.camera);
+    this.renderSystem.renderEnemies(depthLayers.frontEnemies, this.camera);
+    this.renderSystem.renderFlyingEnemies(depthLayers.frontFlyingEnemies, this.camera);
+    if (!depthLayers.playerBehindCrystal) {
+      this.renderSystem.renderPlayer(this.player, this.camera);
+    }
     this.renderSystem.renderProjectiles(this.projectileSystem.projectiles, this.camera);
     if (!this.isGamePaused()) {
       this.renderSystem.renderPlacementPreview(this.removeMode ? this.getRemovalPreview() : this.getPlacementPreview(), this.camera);
     }
     this.renderSystem.renderAttackFeedback(this.attackFeedback, this.camera);
-    this.renderSystem.renderPlayer(this.player, this.camera);
     this.renderSystem.renderForegroundBarriers(this.tileMap, this.camera, this.getBarrierDepthSubjects());
     this.renderSystem.renderForegroundObjects(this.tileMap, this.camera);
     this.renderSystem.renderLighting(this.dayNightSystem, this.tileMap, this.camera, GAME_VIEW);
+  }
+
+  getCrystalDepthLayers(crystalDepthY) {
+    const splitByDepth = (items, getDepth) => {
+      const behind = [];
+      const front = [];
+      for (const item of items) {
+        (getDepth(item) < crystalDepthY ? behind : front).push(item);
+      }
+      return { behind, front };
+    };
+
+    const drops = splitByDepth(this.dropSystem.drops, (drop) => drop.y);
+    const animals = splitByDepth(this.animalSystem.animals, (animal) => animal.getFootPosition().y);
+    const enemies = splitByDepth(this.enemySystem.enemies, (enemy) => enemy.getFootPosition().y);
+    const flyingEnemies = splitByDepth(this.flyingEnemySystem.enemies, (enemy) => {
+      const center = enemy.getCenterPosition();
+      return center.y + enemy.height / 2;
+    });
+    return {
+      behindDrops: drops.behind,
+      frontDrops: drops.front,
+      behindAnimals: animals.behind,
+      frontAnimals: animals.front,
+      behindEnemies: enemies.behind,
+      frontEnemies: enemies.front,
+      behindFlyingEnemies: flyingEnemies.behind,
+      frontFlyingEnemies: flyingEnemies.front,
+      playerBehindCrystal: this.player.getFootPosition().y < crystalDepthY
+    };
   }
 
   getBarrierDepthSubjects() {
@@ -2643,7 +2687,7 @@ export class Game {
       this.topMenuElement.hidden = menuOpen;
     }
     if (this.settingsButton) {
-      this.settingsButton.hidden = menuOpen && !this.settingsOpen;
+      this.settingsButton.hidden = menuOpen;
     }
     if (this.helpElement) {
       this.helpElement.hidden = menuOpen;

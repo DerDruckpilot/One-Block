@@ -49,14 +49,20 @@ import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-
 import { getBerryBushAssetPath, getTreeAssetPath, getTreeAssetSpec, stableVariantIndex } from '../src/systems/world-object-assets.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
+import { HandIndicator } from '../src/ui/hand-indicator.js';
 import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
+import { RenderSystem } from '../src/systems/render-system.js';
 import { isPortraitViewport, updateOrientationState } from '../src/ui/orientation.js';
 import { PointerHitboxSystem } from '../src/ui/pointer-hitboxes.js';
 
 const inputWith = (...pressedKeys) => ({
   isDown: (...keys) => keys.some((key) => pressedKeys.includes(key))
 });
+
+globalThis.window ??= {
+  addEventListener() {}
+};
 
 const createSpawnedPlayer = () => new Player(
   PLAYER_SPAWN_TILE.x * TILE_SIZE + TILE_SIZE / 2 - PLAYER_SIZE / 2,
@@ -228,8 +234,10 @@ const map = new TileMap();
   assert.equal(styles.includes('width: min(100vw, calc(100vh * 16 / 9))'), false, 'game canvas no longer letterboxes landscape into a fixed 16:9 box');
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
-  assert.equal(styles.includes('#inventory-panel .inventory-slot-name'), true, 'inventory item labels have dedicated compact styling');
-  assert.equal(styles.includes('-webkit-line-clamp: 2'), true, 'long inventory labels are clamped to avoid slot overflow');
+  assert.equal(styles.includes('#inventory-panel .inventory-slot-name'), true, 'inventory item label selector remains covered by CSS');
+  assert.equal(styles.includes('.inventory-slot-name {\n  display: none;'), true, 'inventory item labels are hidden so icons carry the slot');
+  assert.equal(styles.includes('.inventory-item-tooltip'), true, 'inventory selected-item tooltip is styled');
+  assert.equal(styles.includes('.recipe-description'), true, 'recipe descriptions are styled');
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
@@ -283,6 +291,94 @@ const map = new TileMap();
   const drewPng = drawItemIcon(context, 'earth', 16, 16, 24);
   assert.equal(drewPng, false, 'canvas item drawing keeps fallback when PNG image is not loaded');
   assert.equal(context.calls.some((call) => call.fn === 'fillRect'), true, 'canvas fallback still draws a pixel icon');
+}
+
+{
+  const renderSystem = new RenderSystem(createDrawContext(), new TerrainRenderer());
+  const tileMap = new TileMap();
+  const still = renderSystem.getCrystalLayerMetrics(tileMap, { x: 0, y: 0 }, 0);
+  const hovering = renderSystem.getCrystalLayerMetrics(tileMap, { x: 0, y: 0 }, 820);
+  assert.equal(still.baseTop, hovering.baseTop, 'crystal base remains fixed during hover animation');
+  assert.notEqual(still.coreTop, hovering.coreTop, 'only the purple crystal core moves during hover animation');
+  assert.equal(renderSystem.getCrystalDepthY(tileMap), still.depthY, 'crystal depth helper uses the same stable layer depth');
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  const crystalDepthY = game.renderSystem.getCrystalDepthY(game.tileMap);
+  game.dropSystem.spawn({ resource: 'earth', amount: 1, x: 0, y: crystalDepthY - 2 });
+  game.dropSystem.spawn({ resource: 'stone', amount: 1, x: 0, y: crystalDepthY + 2 });
+  setGamePlayerOnTile(game, 0, -1, { x: 0, y: 1 });
+  let layers = game.getCrystalDepthLayers(crystalDepthY);
+  assert.equal(layers.playerBehindCrystal, true, 'player behind the crystal is assigned behind the crystal layer');
+  assert.equal(layers.behindDrops.length, 1, 'drop behind crystal is rendered before the crystal core');
+  assert.equal(layers.frontDrops.length, 1, 'drop in front of crystal is rendered after the crystal core');
+  setGamePlayerOnTile(game, 0, 1, { x: 0, y: -1 });
+  layers = game.getCrystalDepthLayers(crystalDepthY);
+  assert.equal(layers.playerBehindCrystal, false, 'player in front of the crystal is assigned in front of the crystal layer');
+}
+
+{
+  const element = { innerHTML: '' };
+  const hotbar = new Hotbar(element);
+  hotbar.update({ inventory: { earth: 7 }, activeSlot: 0, slots: ['earth', null, null, null] });
+  assert.equal(element.innerHTML.includes('hotbar-key'), false, 'game hotbar slots do not render visible slot-number elements');
+  assert.equal(element.innerHTML.includes('hotbar-label'), false, 'game hotbar slots do not render item abbreviation elements');
+  assert.equal(element.innerHTML.includes('hotbar-count'), true, 'game hotbar keeps a compact amount display');
+
+  const handElement = { innerHTML: '' };
+  const handIndicator = new HandIndicator(handElement);
+  handIndicator.update({ handItem: 'bow', ammoResource: 'arrow', ammoCount: 6 });
+  assert.equal(handElement.innerHTML.includes('BO'), false, 'hand indicator does not render weapon abbreviations');
+  assert.equal(handElement.innerHTML.includes('aria-label="Pfeil"'), true, 'hand indicator keeps the ammo name as an accessibility label');
+  assert.equal(handElement.innerHTML.includes('>6<'), true, 'hand indicator keeps the ammo count');
+}
+
+{
+  const inventory = new ResourceInventory();
+  inventory.add('bow', 1);
+  inventory.add('earth', 4);
+  inventory.add('linenTunic', 1);
+  const inventoryPanel = { hidden: true, innerHTML: '', addEventListener() {} };
+  const menus = new MenuPanels({
+    inventoryPanel,
+    craftingPanel: { hidden: true, innerHTML: '' },
+    buildPanel: { hidden: true, innerHTML: '' },
+    cookingPanel: { hidden: true, innerHTML: '' },
+    furnacePanel: { hidden: true, innerHTML: '' },
+    settingsPanel: { hidden: true, innerHTML: '' }
+  });
+  menus.renderInventory(inventory, true, 'bow', ['earth', null, null, null], 0, null, [], {}, {});
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-title'), false, 'inventory hotbar renders without the old title element');
+  assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), false, 'inventory hotbar no longer renders a headline');
+  assert.equal(inventoryPanel.innerHTML.includes('hotbar-key'), false, 'inventory hotbar slots do not render slot-number elements');
+  assert.equal(inventoryPanel.innerHTML.includes('hotbar-label'), false, 'inventory hotbar slots do not render abbreviations');
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-slot-name'), false, 'inventory item slots do not render item names inside slots');
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-item-tooltip'), true, 'selected inventory item renders an info tooltip');
+  assert.equal(inventoryPanel.innerHTML.includes('Bogen'), true, 'selected item tooltip includes the item name');
+  assert.equal(inventoryPanel.innerHTML.includes('Verbraucht Pfeile'), true, 'selected item tooltip includes the item function');
+  assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-compatible'), true, 'hand slot highlights a selected valid hand item');
+  menus.renderInventory(inventory, true, 'earth', ['earth', null, null, null], 0, null, [], {}, {});
+  assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-incompatible'), true, 'hand slot marks an invalid selected item as incompatible');
+}
+
+{
+  const inventory = new ResourceInventory();
+  const crafting = new CraftingSystem(inventory);
+  const craftingPanel = { hidden: true, innerHTML: '' };
+  const menus = new MenuPanels({
+    inventoryPanel: { hidden: true, innerHTML: '', addEventListener() {} },
+    craftingPanel,
+    buildPanel: { hidden: true, innerHTML: '' },
+    cookingPanel: { hidden: true, innerHTML: '' },
+    furnacePanel: { hidden: true, innerHTML: '' },
+    settingsPanel: { hidden: true, innerHTML: '' }
+  });
+  menus.selectCraftingRecipe('workbench');
+  menus.renderCrafting(inventory, true, crafting.getRecipeStates({ craftingContext: 'normal' }), 'normal');
+  assert.equal(craftingPanel.innerHTML.includes('recipe-description'), true, 'crafting detail area renders a recipe description');
+  assert.equal(craftingPanel.innerHTML.includes('Ermoeglicht fortgeschrittenes Crafting'), true, 'crafting recipe description explains the selected result');
 }
 
 {
@@ -1312,7 +1408,7 @@ const map = new TileMap();
   game.settingsOpen = true;
   game.update(0.016);
   assert.equal(topMenuElement.hidden, true, 'top menu buttons are hidden while settings is open');
-  assert.equal(settingsButton.hidden, false, 'settings button remains available for the settings menu state');
+  assert.equal(settingsButton.hidden, true, 'settings button is hidden while settings is open');
 
   game.settingsOpen = false;
   game.craftingOpen = true;
@@ -1529,7 +1625,8 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-tab="tools"'), true, 'inventory panel exposes category tabs');
   assert.equal(inventoryPanel.innerHTML.includes('data-inventory-filter="true"'), true, 'inventory panel exposes a filter field');
   assert.equal(inventoryPanel.innerHTML.includes('Item anklicken, dann Hand-Slot oder Hotbar-Slot anklicken.'), false, 'inventory panel omits bulky hotbar assignment helper text');
-  assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), true, 'inventory panel keeps compact hotbar assignment area');
+  assert.equal(inventoryPanel.innerHTML.includes('Schnellleiste'), false, 'inventory panel omits the old hotbar headline');
+  assert.equal(inventoryPanel.innerHTML.includes('inventory-hotbar-assignment'), true, 'inventory panel keeps compact hotbar assignment slots');
   assert.equal(inventoryPanel.innerHTML.includes('data-hand-slot="true"'), true, 'inventory panel exposes a hand equipment slot');
   assert.equal(inventoryPanel.innerHTML.includes('character-heart-row'), true, 'inventory character panel renders true HP hearts');
   assert.equal(inventoryPanel.innerHTML.includes('heart-full'), true, 'inventory character panel renders full hearts');

@@ -40,53 +40,95 @@ export class RenderSystem {
     });
   }
 
-  renderCrystal(tileMap, camera, timeMs, level = 1, feedback = null) {
+  getCrystalLayerMetrics(tileMap, camera, timeMs = 0) {
     const { x, y } = tileMap.crystal;
     const screenX = Math.round(x * TILE_SIZE - camera.x);
     const screenY = Math.round(y * TILE_SIZE - camera.y);
     const hover = Math.round(Math.sin(timeMs / 820) * 3);
-    const pulse = (Math.sin(timeMs / 640) + 1) / 2;
-    const feedbackStrength = this.getCrystalFeedbackStrength(feedback);
-    const feedbackKind = feedback?.type === 'crystalHit' ? feedback.kind || 'activate' : null;
+    const cx = screenX + TILE_SIZE / 2;
+    const anchorY = screenY + TILE_SIZE + 4;
+    return {
+      screenX,
+      screenY,
+      cx,
+      anchorY,
+      hover,
+      baseTop: Math.round(anchorY - 27),
+      coreTop: Math.round(anchorY - 96 + hover),
+      depthY: y * TILE_SIZE + TILE_SIZE * 0.72
+    };
+  }
+
+  renderCrystalBase(tileMap, camera) {
+    const { x, y } = tileMap.crystal;
+    const metrics = this.getCrystalLayerMetrics(tileMap, camera, 0);
 
     this.terrainRenderer.drawTile(
       this.context,
       { x, y, type: TILE_TYPES.crystal },
       tileMap,
-      screenX,
-      screenY
+      metrics.screenX,
+      metrics.screenY
     );
 
-    const cx = screenX + TILE_SIZE / 2;
-    const anchorY = screenY + TILE_SIZE + 4;
-    const cy = screenY + TILE_SIZE / 2 - 18 + hover;
+    const image = getLoadedCrystalImage();
+    this.context.save();
+    this.context.imageSmoothingEnabled = false;
+    if (image && typeof this.context.drawImage === 'function') {
+      this.context.drawImage(
+        image,
+        0,
+        104,
+        96,
+        40,
+        Math.round(metrics.cx - 32),
+        metrics.baseTop,
+        64,
+        27
+      );
+    } else {
+      this.drawCrystalBaseFallback(metrics.cx, metrics.screenY);
+    }
+    this.context.restore();
+  }
+
+  renderCrystal(tileMap, camera, timeMs, level = 1, feedback = null) {
+    const metrics = this.getCrystalLayerMetrics(tileMap, camera, timeMs);
+    const pulse = (Math.sin(timeMs / 640) + 1) / 2;
+    const feedbackStrength = this.getCrystalFeedbackStrength(feedback);
+    const feedbackKind = feedback?.type === 'crystalHit' ? feedback.kind || 'activate' : null;
+    const cy = metrics.screenY + TILE_SIZE / 2 - 18 + metrics.hover;
     const image = getLoadedCrystalImage();
 
     this.context.save();
     this.context.imageSmoothingEnabled = false;
-    this.drawCrystalGlow(cx, cy, level, pulse, feedbackStrength, feedbackKind);
-    this.drawCrystalParticles(cx, cy, timeMs, pulse);
+    this.drawCrystalGlow(metrics.cx, cy, level, pulse, feedbackStrength, feedbackKind);
+    this.drawCrystalParticles(metrics.cx, cy, timeMs, pulse);
 
     if (image && typeof this.context.drawImage === 'function') {
       const width = 64;
-      const height = 96;
+      const height = 70;
       this.context.drawImage(
         image,
         0,
         0,
         96,
-        144,
-        Math.round(cx - width / 2),
-        Math.round(anchorY - height + hover),
+        104,
+        Math.round(metrics.cx - width / 2),
+        metrics.coreTop,
         width,
         height
       );
     } else {
-      this.drawCrystalFallback(cx, screenY, cy, level, pulse, hover);
+      this.drawCrystalFallback(metrics.cx, metrics.screenY, cy, level, pulse, metrics.hover);
     }
 
-    this.drawCrystalParticles(cx, cy, timeMs + 900, pulse, true);
+    this.drawCrystalParticles(metrics.cx, cy, timeMs + 900, pulse, true);
     this.context.restore();
+  }
+
+  getCrystalDepthY(tileMap) {
+    return this.getCrystalLayerMetrics(tileMap, { x: 0, y: 0 }, 0).depthY;
   }
 
   getCrystalFeedbackStrength(feedback) {
@@ -133,9 +175,7 @@ export class RenderSystem {
     this.context.globalAlpha = 1;
   }
 
-  drawCrystalFallback(cx, screenY, cy, level, pulse, hover) {
-    const legacyPulse = pulse * 4 - 2;
-
+  drawCrystalBaseFallback(cx, screenY) {
     this.context.save();
     this.context.fillStyle = '#31251f';
     this.context.fillRect(cx - 14, screenY + 19, 28, 7);
@@ -145,7 +185,13 @@ export class RenderSystem {
     this.context.fillRect(cx - 9, screenY + 15, 18, 3);
     this.context.fillStyle = '#d78cff';
     this.context.fillRect(cx - 4, screenY + 17, 8, 2);
+    this.context.restore();
+  }
 
+  drawCrystalFallback(cx, screenY, cy, level, pulse, hover) {
+    const legacyPulse = pulse * 4 - 2;
+
+    this.context.save();
     const levelGlow = Math.max(0, level - 1) * 3;
     this.context.globalAlpha = 0.28 + Math.min(0.18, level * 0.04);
     this.context.fillStyle = level >= 3 ? '#ff8cff' : level >= 2 ? '#b58cff' : '#d974ff';
