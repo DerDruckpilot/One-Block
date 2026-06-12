@@ -27,8 +27,8 @@ export class EnemySystem {
     return events;
   }
 
-  spawnNearCrystal(tileMap, level = 1, random = Math.random) {
-    if (this.enemies.length >= 1) {
+  spawnNearCrystal(tileMap, level = 1, random = Math.random, { maxActive = 1 } = {}) {
+    if (this.enemies.length >= maxActive) {
       return {
         spawned: false,
         message: 'Es ist bereits eine Kreatur da.'

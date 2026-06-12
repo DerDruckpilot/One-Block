@@ -1,5 +1,7 @@
 const TREE_ASSET_BASE_PATH = 'assets/generated/objects/trees';
 const BERRY_BUSH_ASSET_BASE_PATH = 'assets/generated/objects/berry_bushes';
+const BUILDING_ASSET_BASE_PATH = 'assets/generated/objects/building';
+const FLOOR_ASSET_BASE_PATH = 'assets/generated/tiles/floors_96';
 
 export const TREE_ASSET_PATHS = {
   sapling: `${TREE_ASSET_BASE_PATH}/tree_sapling_01.png`,
@@ -29,6 +31,19 @@ export const BERRY_BUSH_ASSET_PATHS = {
   ]
 };
 
+export const FLOOR_OVERLAY_ASSET_PATHS = {
+  woodFloor: `${FLOOR_ASSET_BASE_PATH}/wood_floor_96.png`,
+  stoneFloor: `${FLOOR_ASSET_BASE_PATH}/stone_floor_96.png`
+};
+
+export const BUILDING_OBJECT_ASSET_SPECS = {
+  window: { path: `${BUILDING_ASSET_BASE_PATH}/window_96.png`, width: 42, height: 44 },
+  rug: { path: `${BUILDING_ASSET_BASE_PATH}/rug_96.png`, width: 30, height: 22 },
+  plantPot: { path: `${BUILDING_ASSET_BASE_PATH}/plant_pot_96.png`, width: 30, height: 34 },
+  shelf: { path: `${BUILDING_ASSET_BASE_PATH}/shelf_96.png`, width: 36, height: 42 },
+  floorLantern: { path: `${BUILDING_ASSET_BASE_PATH}/floor_lantern_96.png`, width: 24, height: 32 }
+};
+
 const worldObjectImages = new Map();
 
 export function stableVariantIndex(x, y, salt, count) {
@@ -52,8 +67,18 @@ function collectAssetPaths() {
     BERRY_BUSH_ASSET_PATHS.small,
     BERRY_BUSH_ASSET_PATHS.growing,
     ...BERRY_BUSH_ASSET_PATHS.unripe,
-    ...BERRY_BUSH_ASSET_PATHS.ripe
+    ...BERRY_BUSH_ASSET_PATHS.ripe,
+    ...Object.values(FLOOR_OVERLAY_ASSET_PATHS),
+    ...Object.values(BUILDING_OBJECT_ASSET_SPECS).map((spec) => spec.path)
   ];
+}
+
+export function getFloorOverlayAssetPath(type) {
+  return FLOOR_OVERLAY_ASSET_PATHS[type] || null;
+}
+
+export function getBuildingObjectAssetSpec(type) {
+  return BUILDING_OBJECT_ASSET_SPECS[type] || null;
 }
 
 export function preloadWorldObjectAssets() {

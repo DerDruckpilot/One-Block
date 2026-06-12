@@ -404,7 +404,11 @@ export class MenuPanels {
     const missingText = recipeState.missing.length > 0
       ? `<div class="menu-note">Fehlt: ${recipeState.missing.map((cost) => `${cost.missing}x ${cost.label}`).join(', ')}</div>`
       : '<div class="menu-note">Alle Materialien verfuegbar.</div>';
-    const lockedText = recipeState.isAvailable ? '' : '<div class="menu-note">Werkbank benoetigt.</div>';
+    const lockedText = recipeState.isAvailable
+      ? recipeState.isCrystalLevelUnlocked === false
+        ? `<div class="menu-note">Ab Kristallstufe ${recipeState.requiredCrystalLevel}.</div>`
+        : ''
+      : '<div class="menu-note">Werkbank benoetigt.</div>';
 
     return `
       <h3>${recipe.name}</h3>

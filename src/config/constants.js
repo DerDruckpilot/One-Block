@@ -90,8 +90,13 @@ export const OBJECT_TYPES = {
   torch: 'torch',
   campfire: 'campfire',
   woodWall: 'woodWall',
+  window: 'window',
   table: 'table',
   chair: 'chair',
+  rug: 'rug',
+  plantPot: 'plantPot',
+  shelf: 'shelf',
+  floorLantern: 'floorLantern',
   fence: 'fence',
   gate: 'gate',
   door: 'door',
@@ -106,7 +111,7 @@ export const OBJECT_TYPES = {
 };
 
 export const CONNECTABLE_BARRIER_GROUPS = {
-  wall: [OBJECT_TYPES.woodWall, OBJECT_TYPES.door],
+  wall: [OBJECT_TYPES.woodWall, OBJECT_TYPES.door, OBJECT_TYPES.window],
   fence: [OBJECT_TYPES.fence, OBJECT_TYPES.gate]
 };
 
@@ -120,7 +125,10 @@ export const BARRIER_COLLISION_THICKNESS = 8;
 export const PLAYER_BLOCKING_OBJECTS = [
   OBJECT_TYPES.workbench,
   OBJECT_TYPES.table,
+  OBJECT_TYPES.plantPot,
+  OBJECT_TYPES.shelf,
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.window,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.door,
@@ -132,7 +140,10 @@ export const PLAYER_BLOCKING_OBJECTS = [
 export const GROUND_ENTITY_BLOCKING_OBJECTS = [
   OBJECT_TYPES.workbench,
   OBJECT_TYPES.table,
+  OBJECT_TYPES.plantPot,
+  OBJECT_TYPES.shelf,
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.window,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.door,
@@ -143,6 +154,7 @@ export const GROUND_ENTITY_BLOCKING_OBJECTS = [
 
 export const FLYING_ENTITY_BLOCKING_OBJECTS = [
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.window,
   OBJECT_TYPES.door,
   OBJECT_TYPES.tree
 ];
@@ -152,8 +164,13 @@ export const REMOVABLE_OBJECT_TYPES = [
   OBJECT_TYPES.torch,
   OBJECT_TYPES.campfire,
   OBJECT_TYPES.woodWall,
+  OBJECT_TYPES.window,
   OBJECT_TYPES.table,
   OBJECT_TYPES.chair,
+  OBJECT_TYPES.rug,
+  OBJECT_TYPES.plantPot,
+  OBJECT_TYPES.shelf,
+  OBJECT_TYPES.floorLantern,
   OBJECT_TYPES.fence,
   OBJECT_TYPES.gate,
   OBJECT_TYPES.door,
@@ -191,8 +208,15 @@ export const RESOURCE_LABELS = {
   torch: 'Fackel',
   campfire: 'Lagerfeuer',
   woodWall: 'Holzwand',
+  window: 'Fenster',
+  woodFloor: 'Holzboden',
+  stoneFloor: 'Steinboden',
   table: 'Tisch',
   chair: 'Stuhl',
+  rug: 'Matte',
+  plantPot: 'Pflanzenkübel',
+  shelf: 'Regal',
+  floorLantern: 'Laterne',
   lasso: 'Lasso',
   fence: 'Zaun',
   gate: 'Tor',
@@ -222,11 +246,12 @@ export const RESOURCE_LABELS = {
 export const BASE_RESOURCES = ['earth', 'rawWood', 'fiber', 'grassSeed'];
 export const WORLD_RESOURCES = ['earth', 'stone', 'clay', 'clayBrick', 'unfiredBowl', 'bowl', 'unfiredJug', 'jug'];
 export const FOOD_RESOURCES = ['berry', 'rawMeat', 'roastedBerries', 'cookedSteak', 'egg', 'friedEgg'];
-export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'furnace', 'woodWall', 'door', 'fence', 'gate', 'bed', 'chickenNest', 'feedTrough', 'waterTrough', 'table', 'chair'];
+export const FLOOR_OVERLAY_RESOURCES = ['woodFloor', 'stoneFloor'];
+export const TOOL_RESOURCES = ['workbench', 'woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso', 'torch', 'campfire', 'furnace', 'woodWall', 'window', 'door', 'fence', 'gate', 'bed', 'chickenNest', 'feedTrough', 'waterTrough', 'table', 'chair', 'rug', 'plantPot', 'shelf', 'floorLantern'];
 export const AMMO_RESOURCES = ['arrow', 'stoneBall'];
 export const ANIMAL_PRODUCT_RESOURCES = ['wool'];
 export const EQUIPMENT_RESOURCES = ['ammoPouch', 'quiver', 'linenTunic', 'travelBoots'];
-export const INVENTORY_RESOURCES = [...WORLD_RESOURCES, 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...ANIMAL_PRODUCT_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES, ...EQUIPMENT_RESOURCES];
+export const INVENTORY_RESOURCES = [...WORLD_RESOURCES, ...FLOOR_OVERLAY_RESOURCES, 'rawWood', 'fiber', 'grassSeed', 'treeSeed', 'springDrop', ...FOOD_RESOURCES, ...ANIMAL_PRODUCT_RESOURCES, ...AMMO_RESOURCES, ...TOOL_RESOURCES, ...EQUIPMENT_RESOURCES];
 export const HOTBAR_SLOT_COUNT = 4;
 export const HAND_EQUIPMENT_RESOURCES = [
   'woodenPickaxe',
@@ -253,7 +278,10 @@ export const HOTBAR_ALLOWED_RESOURCES = [
   'workbench',
   'torch',
   'campfire',
+  'woodFloor',
+  'stoneFloor',
   'woodWall',
+  'window',
   'door',
   'fence',
   'gate',
@@ -263,7 +291,11 @@ export const HOTBAR_ALLOWED_RESOURCES = [
   'waterTrough',
   'furnace',
   'table',
-  'chair'
+  'chair',
+  'rug',
+  'plantPot',
+  'shelf',
+  'floorLantern'
 ];
 export const DEFAULT_HOTBAR_SLOTS = ['earth', 'grassSeed', null, null];
 
@@ -288,9 +320,16 @@ export const RESOURCE_SHORT_LABELS = {
   stoneBall: 'SB',
   torch: 'TO',
   campfire: 'CF',
+  woodFloor: 'HF',
+  stoneFloor: 'SF',
   woodWall: 'WW',
+  window: 'FE',
   table: 'TA',
   chair: 'CH',
+  rug: 'MA',
+  plantPot: 'PK',
+  shelf: 'RG',
+  floorLantern: 'LA',
   lasso: 'LA',
   fence: 'ZA',
   gate: 'TO',
@@ -338,9 +377,16 @@ export const RESOURCE_ICONS = {
   stoneBall: 'o',
   torch: '!',
   campfire: '^',
+  woodFloor: '==',
+  stoneFloor: '[]',
   woodWall: '|#|',
+  window: '|o|',
   table: 'T',
   chair: 'h',
+  rug: '__',
+  plantPot: 'p',
+  shelf: 'sh',
+  floorLantern: 'l',
   lasso: 'o-',
   fence: '|=',
   gate: '[]',
@@ -382,6 +428,8 @@ export const RESOURCE_CATEGORIES = {
   earth: ['resources', 'building'],
   stone: ['resources', 'building'],
   clay: ['resources', 'building'],
+  woodFloor: ['building'],
+  stoneFloor: ['building'],
   rawWood: ['resources'],
   fiber: ['resources'],
   grassSeed: ['seeds'],
@@ -415,6 +463,7 @@ export const RESOURCE_CATEGORIES = {
   torch: ['building'],
   campfire: ['building'],
   woodWall: ['building'],
+  window: ['building'],
   door: ['building'],
   bed: ['building'],
   chickenNest: ['building'],
@@ -423,6 +472,10 @@ export const RESOURCE_CATEGORIES = {
   furnace: ['building'],
   table: ['building'],
   chair: ['building'],
+  rug: ['building'],
+  plantPot: ['building'],
+  shelf: ['building'],
+  floorLantern: ['building'],
   lasso: ['tools'],
   fence: ['building'],
   gate: ['building']
@@ -430,10 +483,11 @@ export const RESOURCE_CATEGORIES = {
 
 export const BUILD_MENU_CATEGORIES = [
   { id: 'terrain', label: 'Gelände', resources: ['earth', 'stone', 'clay'] },
+  { id: 'floor', label: 'Boden', resources: ['woodFloor', 'stoneFloor'] },
   { id: 'nature', label: 'Natur', resources: ['grassSeed', 'treeSeed'] },
   { id: 'light', label: 'Licht', resources: ['torch', 'campfire'] },
-  { id: 'furniture', label: 'Moebel', resources: ['table', 'chair', 'bed', 'chickenNest', 'feedTrough', 'waterTrough'] },
-  { id: 'building', label: 'Bau', resources: ['woodWall', 'door', 'fence', 'gate'] },
+  { id: 'furniture', label: 'Moebel', resources: ['table', 'chair', 'bed', 'rug', 'plantPot', 'shelf', 'floorLantern', 'chickenNest', 'feedTrough', 'waterTrough'] },
+  { id: 'building', label: 'Bau', resources: ['woodWall', 'window', 'door', 'fence', 'gate'] },
   { id: 'stations', label: 'Stationen', resources: ['workbench', 'furnace'] }
 ];
 
@@ -572,6 +626,32 @@ export const CAMPFIRE_RECIPE = {
   costs: {
     stone: 3,
     rawWood: 2
+  }
+};
+
+export const WOOD_FLOOR_RECIPE = {
+  id: 'woodFloor',
+  name: 'Holzboden',
+  result: 'woodFloor',
+  resultAmount: 2,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    rawWood: 2
+  }
+};
+
+export const STONE_FLOOR_RECIPE = {
+  id: 'stoneFloor',
+  name: 'Steinboden',
+  result: 'stoneFloor',
+  resultAmount: 2,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    stone: 3
   }
 };
 
@@ -747,6 +827,21 @@ export const WOOD_WALL_RECIPE = {
   }
 };
 
+export const WINDOW_RECIPE = {
+  id: 'window',
+  name: 'Fenster',
+  result: 'window',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    rawWood: 4,
+    fiber: 2,
+    clay: 1
+  }
+};
+
 export const TABLE_RECIPE = {
   id: 'table',
   name: 'Tisch',
@@ -770,6 +865,63 @@ export const CHAIR_RECIPE = {
   costs: {
     rawWood: 4,
     fiber: 1
+  }
+};
+
+export const RUG_RECIPE = {
+  id: 'rug',
+  name: 'Matte',
+  result: 'rug',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    fiber: 6,
+    wool: 1
+  }
+};
+
+export const PLANT_POT_RECIPE = {
+  id: 'plantPot',
+  name: 'Pflanzenkübel',
+  result: 'plantPot',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    clay: 3,
+    grassSeed: 1
+  }
+};
+
+export const SHELF_RECIPE = {
+  id: 'shelf',
+  name: 'Regal',
+  result: 'shelf',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    rawWood: 6,
+    fiber: 1
+  }
+};
+
+export const FLOOR_LANTERN_RECIPE = {
+  id: 'floorLantern',
+  name: 'Laterne',
+  result: 'floorLantern',
+  resultAmount: 1,
+  craftingContext: 'workbench',
+  requiresWorkbench: true,
+  minCrystalLevel: 4,
+  costs: {
+    rawWood: 2,
+    fiber: 2,
+    stone: 1
   }
 };
 
@@ -990,6 +1142,8 @@ export const CRAFTING_RECIPES = [
   WORKBENCH_RECIPE,
   TORCH_RECIPE,
   CAMPFIRE_RECIPE,
+  WOOD_FLOOR_RECIPE,
+  STONE_FLOOR_RECIPE,
   ARROW_RECIPE,
   STONE_BALL_RECIPE,
   UNFIRED_BOWL_RECIPE,
@@ -1006,6 +1160,7 @@ export const CRAFTING_RECIPES = [
   SCYTHE_RECIPE,
   LASSO_RECIPE,
   WOOD_WALL_RECIPE,
+  WINDOW_RECIPE,
   DOOR_RECIPE,
   FENCE_RECIPE,
   GATE_RECIPE,
@@ -1015,7 +1170,11 @@ export const CRAFTING_RECIPES = [
   WATER_TROUGH_RECIPE,
   FURNACE_RECIPE,
   TABLE_RECIPE,
-  CHAIR_RECIPE
+  CHAIR_RECIPE,
+  RUG_RECIPE,
+  PLANT_POT_RECIPE,
+  SHELF_RECIPE,
+  FLOOR_LANTERN_RECIPE
 ];
 
 export const COOKING_RECIPES = [

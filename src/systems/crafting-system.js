@@ -11,13 +11,13 @@ export class CraftingSystem {
     this.inventory = inventory;
   }
 
-  getRecipeStates({ hasWorkbenchAccess = false, craftingContext = 'normal' } = {}) {
+  getRecipeStates({ hasWorkbenchAccess = false, craftingContext = 'normal', crystalLevel = Infinity } = {}) {
     return ALL_RECIPES
       .filter((recipe) => recipe.craftingContext === craftingContext)
-      .map((recipe) => this.getRecipeState(recipe, hasWorkbenchAccess));
+      .map((recipe) => this.getRecipeState(recipe, hasWorkbenchAccess, crystalLevel));
   }
 
-  getRecipeState(recipe, hasWorkbenchAccess = false) {
+  getRecipeState(recipe, hasWorkbenchAccess = false, crystalLevel = Infinity) {
     const missing = Object.entries(recipe.costs)
       .map(([resource, amount]) => ({
         resource,
@@ -28,13 +28,17 @@ export class CraftingSystem {
       }))
       .filter((cost) => cost.missing > 0);
     const isAvailable = !recipe.requiresWorkbench || hasWorkbenchAccess;
+    const requiredCrystalLevel = Number(recipe.minCrystalLevel || 1);
+    const isCrystalLevelUnlocked = crystalLevel >= requiredCrystalLevel;
     const remainingCapacity = this.inventory.getRemainingCapacity?.(recipe.result) ?? Infinity;
     const hasResultCapacity = remainingCapacity > 0;
 
     return {
       recipe,
-      canCraft: isAvailable && missing.length === 0 && hasResultCapacity,
+      canCraft: isAvailable && isCrystalLevelUnlocked && missing.length === 0 && hasResultCapacity,
       isAvailable,
+      isCrystalLevelUnlocked,
+      requiredCrystalLevel,
       missing,
       hasResultCapacity,
       remainingCapacity
@@ -45,8 +49,8 @@ export class CraftingSystem {
     return this.getRecipeStates().find((state) => state.recipe.id === 'workbench');
   }
 
-  craft(recipeId, { hasWorkbenchAccess = false, craftingContext = getRecipeContext(recipeId) } = {}) {
-    const state = this.getRecipeStates({ hasWorkbenchAccess, craftingContext })
+  craft(recipeId, { hasWorkbenchAccess = false, craftingContext = getRecipeContext(recipeId), crystalLevel = Infinity } = {}) {
+    const state = this.getRecipeStates({ hasWorkbenchAccess, craftingContext, crystalLevel })
       .find((recipeState) => recipeState.recipe.id === recipeId);
 
     if (!state) {
@@ -60,6 +64,13 @@ export class CraftingSystem {
       return {
         crafted: false,
         message: 'Werkbank benötigt.'
+      };
+    }
+
+    if (!state.isCrystalLevelUnlocked) {
+      return {
+        crafted: false,
+        message: `Kristallstufe ${state.requiredCrystalLevel} benötigt.`
       };
     }
 

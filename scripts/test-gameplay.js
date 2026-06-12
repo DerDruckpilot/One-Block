@@ -4894,4 +4894,187 @@ const map = new TileMap();
   assert.equal(game.tileMap.objectsToJSON().find((object) => object.x === 0 && object.y === 1).feed, 1, 'wool production consumes feed');
 }
 
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.tileMap.setWorkbench(1, 1);
+  game.inventory.add('rawWood', 20);
+  game.inventory.add('stone', 20);
+  game.inventory.add('fiber', 20);
+  game.inventory.add('clay', 20);
+  game.inventory.add('wool', 4);
+  game.inventory.add('grassSeed', 2);
+  game.craftingContext = 'workbench';
+  game.crystalLevel = 3;
+  assert.equal(game.tryCraft('woodFloor'), false, 'wood floor recipe is locked before crystal level 4');
+  assert.equal(game.crystalSystem.lastMessage, 'Kristallstufe 4 benötigt.', 'locked recipe explains the required crystal level');
+  game.crystalLevel = 4;
+  assert.equal(game.tryCraft('woodFloor'), true, 'wood floor can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('stoneFloor'), true, 'stone floor can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('window'), true, 'window can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('rug'), true, 'rug can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('plantPot'), true, 'plant pot can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('shelf'), true, 'shelf can be crafted at crystal level 4');
+  assert.equal(game.tryCraft('floorLantern'), true, 'floor lantern can be crafted at crystal level 4');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.inventory.add('woodFloor', 1);
+  game.inventory.add('stoneFloor', 1);
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  game.selectHotbarResource('woodFloor');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'wood floor can be placed on existing ground');
+  assert.equal(game.tileMap.getFloorOverlay(1, 1), 'woodFloor', 'wood floor is stored as a floor overlay');
+  setGamePlayerOnTile(game, -1, 0, { x: 0, y: -1 });
+  game.selectHotbarResource('stoneFloor');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'stone floor can be placed on existing ground');
+  assert.equal(game.tileMap.getFloorOverlay(-1, -1), 'stoneFloor', 'stone floor is stored as a floor overlay');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getFloorOverlay(1, 1), 'woodFloor', 'wood floor saves and loads');
+  assert.equal(loadedGame.tileMap.getFloorOverlay(-1, -1), 'stoneFloor', 'stone floor saves and loads');
+  loadedGame.removeMode = true;
+  setGamePlayerOnTile(loadedGame, 0, 1, { x: 1, y: 0 });
+  assert.equal(loadedGame.tryRemoveTarget(), true, 'remove mode can remove floor overlays');
+  assert.equal(loadedGame.tileMap.getFloorOverlay(1, 1), null, 'removed floor overlay clears from tile map');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  for (const resource of ['window', 'rug', 'plantPot', 'shelf', 'floorLantern']) {
+    game.inventory.add(resource, 1);
+  }
+  setGamePlayerOnTile(game, 0, 1, { x: 1, y: 0 });
+  game.selectHotbarResource('window');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'window can be placed');
+  setGamePlayerOnTile(game, 0, 1, { x: -1, y: 0 });
+  game.selectHotbarResource('rug');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'rug can be placed');
+  setGamePlayerOnTile(game, -1, 0, { x: 0, y: -1 });
+  game.selectHotbarResource('plantPot');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'plant pot can be placed');
+  game.tileMap.setEarth(0, 2);
+  setGamePlayerOnTile(game, 0, 1, { x: 0, y: 1 });
+  game.selectHotbarResource('shelf');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'shelf can be placed');
+  game.tileMap.setEarth(2, 0);
+  setGamePlayerOnTile(game, 1, 0, { x: 1, y: 0 });
+  game.selectHotbarResource('floorLantern');
+  assert.equal(game.tryPlaceSelectedItem(), true, 'floor lantern can be placed');
+  assert.equal(game.tileMap.isBlockedForPlayer(-1, 1), false, 'rug is walkable');
+  assert.equal(game.tileMap.isBlockedForPlayer(2, 0), false, 'floor lantern is walkable');
+  assert.equal(game.tileMap.isBlockedForPlayer(-1, -1), true, 'plant pot blocks movement');
+  assert.equal(game.tileMap.isBlockedForPlayer(0, 2), true, 'shelf blocks movement');
+  game.saveGame();
+  const loadedGame = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  assert.equal(loadedGame.tileMap.getObject(1, 1), OBJECT_TYPES.window, 'window saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(-1, 1), OBJECT_TYPES.rug, 'rug saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(-1, -1), OBJECT_TYPES.plantPot, 'plant pot saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(0, 2), OBJECT_TYPES.shelf, 'shelf saves and loads');
+  assert.equal(loadedGame.tileMap.getObject(2, 0), OBJECT_TYPES.floorLantern, 'floor lantern saves and loads');
+}
+
+{
+  const { TileMap } = await import('../src/world/tile-map.js');
+  const tileMap = new TileMap();
+  tileMap.setObject(0, 1, OBJECT_TYPES.window);
+  tileMap.setObject(-1, 1, OBJECT_TYPES.woodWall);
+  tileMap.setObject(1, 1, OBJECT_TYPES.door);
+  tileMap.setObject(0, 0, OBJECT_TYPES.window);
+  const connections = tileMap.getConnectableConnections(0, 1);
+  assert.equal(connections.left, true, 'window connects to wood wall');
+  assert.equal(connections.right, true, 'window connects to door');
+  assert.equal(connections.up, true, 'window connects to another window');
+  tileMap.setObject(0, 2, OBJECT_TYPES.fence);
+  assert.equal(tileMap.getConnectableConnections(0, 1).down, false, 'window does not connect to fence');
+  tileMap.setObject(0, 2, OBJECT_TYPES.gate);
+  assert.equal(tileMap.getConnectableConnections(0, 1).down, false, 'window does not connect to gate');
+}
+
+{
+  const inventory = new ResourceInventory();
+  for (const resource of ['woodFloor', 'stoneFloor', 'window', 'rug', 'plantPot', 'shelf', 'floorLantern']) {
+    inventory.add(resource, 1);
+  }
+  const buildPanel = { hidden: true, innerHTML: '' };
+  const menus = new MenuPanels({
+    inventoryPanel: { hidden: true, innerHTML: '', addEventListener() {} },
+    craftingPanel: { hidden: true, innerHTML: '' },
+    buildPanel,
+    cookingPanel: { hidden: true, innerHTML: '' },
+    furnacePanel: { hidden: true, innerHTML: '' },
+    settingsPanel: { hidden: true, innerHTML: '' }
+  });
+  menus.renderBuildMenu(inventory, true, null, false);
+  for (const resource of ['woodFloor', 'stoneFloor', 'window', 'rug', 'plantPot', 'shelf', 'floorLantern']) {
+    assert.equal(buildPanel.innerHTML.includes(`data-build-resource="${resource}"`), true, `${resource} appears in the build menu`);
+  }
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  for (const resource of ['woodFloor', 'stoneFloor', 'window', 'rug', 'plantPot', 'shelf', 'floorLantern']) {
+    assert.equal(game.selectHotbarResource(resource), true, `${resource} can be assigned to the hotbar`);
+  }
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.advanceCrystalProgress(CRYSTAL_LEVEL_THRESHOLDS[2].xp);
+  assert.equal(game.crystalLevel, 4, 'crystal can reach level 4');
+  assert.equal(game.consumeCrystalLevelUpMessage(), true, 'crystal level-up event is consumed');
+  assert.equal(game.logSystem.toJSON().some((entry) => entry.includes('Der Kristall erreicht Stufe 4.')), true, 'crystal level-up logs the level');
+  assert.equal(game.logSystem.toJSON().some((entry) => entry.includes('Neue Möglichkeiten wurden freigeschaltet.')), true, 'crystal level-up logs unlock feedback');
+  assert.equal(game.attackFeedback.kind, 'levelUp', 'crystal level-up creates visible feedback');
+  assert.equal(game.dropSystem.drops.some((drop) => drop.resource === 'ammoPouch'), true, 'crystal level-up can create a special reward drop');
+  assert.equal(game.enemySystem.activeCount() <= 3, true, 'level-up enemy wave respects the level 4 wave limit');
+  for (const enemy of game.enemySystem.enemies) {
+    const tile = game.tileMap.getTileAtWorldPosition(enemy.getFootPosition().x, enemy.getFootPosition().y);
+    assert.equal(game.tileMap.isGround(tile.x, tile.y), true, 'level-up wave enemies spawn on valid ground');
+  }
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalLevel = 5;
+  const wave = game.spawnCrystalEnemyWave(5);
+  assert.equal(wave.spawned <= 4, true, 'manual crystal wave respects the max event limit');
+  assert.equal(game.enemySystem.activeCount(), wave.spawned, 'wave count matches active enemies');
+  for (const enemy of game.enemySystem.enemies) {
+    const tile = game.tileMap.getTileAtWorldPosition(enemy.getFootPosition().x, enemy.getFootPosition().y);
+    assert.equal(game.tileMap.isGround(tile.x, tile.y), true, 'crystal wave does not spawn enemies in the void');
+  }
+}
+
+{
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' });
+  game.crystalLevel = 4;
+  const randomValues = [0, 0];
+  game.crystalSystem.random = () => randomValues.shift() ?? 0.9;
+  assert.equal(game.trySpawnCrystalEncounter(), true, 'rare peaceful crystal event can spawn livestock');
+  assert.equal(game.animalSystem.animals.some((animal) => animal.type === 'sheep'), true, 'rare peaceful event can use sheep content');
+}
+
+{
+  const storage = createMemoryStorage();
+  const { Game } = await import('../src/core/game.js');
+  const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
+  game.saveManualSaveSlot(1);
+  game.tileMap.setFloorOverlay(1, 1, 'woodFloor');
+  game.tileMap.setObject(-1, 1, OBJECT_TYPES.window);
+  game.resetGame();
+  assert.equal(game.tileMap.getFloorOverlay(1, 1), null, 'reset removes floor overlays with the world');
+  assert.equal(game.tileMap.getObject(-1, 1), null, 'reset removes new build objects with the world');
+  assert.notEqual(game.saveSystem.loadSlot(1), null, 'reset keeps manual save slots');
+}
+
 console.log('Gameplay-Basics OK.');
