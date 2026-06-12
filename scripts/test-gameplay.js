@@ -260,6 +260,10 @@ const map = new TileMap();
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
   assert.equal(styles.includes('#inventory-panel .inventory-character-stats .character-heart-row'), true, 'inventory character hearts are explicitly laid out horizontally');
   assert.equal(/\.inventory-character-stats\s+\.character-heart-stat\s*\{[^}]*grid-column:\s*2;/.test(styles), true, 'inventory health is positioned under the defense column');
+  assert.equal(styles.includes('font-size: 42px;'), true, 'normal game HUD hearts are rendered larger for mobile readability');
+  assert.equal(/#inventory-panel\s+\.equipment-label\s*\{[^}]*position:\s*absolute;[^}]*top:\s*-16px;/.test(styles), true, 'equipment labels sit above inventory equipment slots');
+  assert.equal(styles.includes('.touch-button::before'), true, 'attack button has a graphic icon layer');
+  assert.equal(styles.includes('.touch-button-action::before'), true, 'action button has a graphic icon layer');
   assert.equal(/\.menu-chrome\.is-inventory\s+\.inventory-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory title sits in the external chrome layer');
   assert.equal(/\.menu-chrome\.is-inventory\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory close button sits in the external chrome layer');
   assert.equal(/\.hand-indicator\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'hand item indicator remains screen-positioned');
@@ -470,11 +474,19 @@ const map = new TileMap();
   assert.equal(inventoryPanel.innerHTML.includes('Bogen'), true, 'selected item tooltip includes the item name');
   assert.equal(inventoryPanel.innerHTML.includes('Verbraucht Pfeile'), true, 'selected item tooltip includes the item function');
   assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-compatible'), true, 'hand slot highlights a selected valid hand item');
+  const attackIndex = inventoryPanel.innerHTML.indexOf('<strong>Angriff</strong>');
+  const defenseIndex = inventoryPanel.innerHTML.indexOf('<strong>Verteidigung</strong>');
+  const speedIndex = inventoryPanel.innerHTML.indexOf('<strong>Tempo</strong>');
+  const healthIndex = inventoryPanel.innerHTML.indexOf('<strong>Gesundheit</strong>');
   assert.equal(
-    inventoryPanel.innerHTML.indexOf('<strong>Gesundheit</strong>') > inventoryPanel.innerHTML.indexOf('<strong>Verteidigung</strong>'),
+    attackIndex > -1 && defenseIndex > attackIndex && speedIndex > defenseIndex && healthIndex > speedIndex,
     true,
-    'inventory character health is rendered below defense in the compact stats box'
+    'inventory character stats render as attack, defense, speed, and health'
   );
+  const renderedInventoryHtml = inventoryPanel.innerHTML;
+  menus.renderInventory(inventory, true, 'earth', ['earth', null, null, null], 0, null, [], {}, {});
+  assert.equal(inventoryPanel.innerHTML, renderedInventoryHtml, 'selection-only inventory updates keep the existing icon DOM stable');
+  menus.lastInventoryStructureKey = '';
   menus.renderInventory(inventory, true, 'earth', ['earth', null, null, null], 0, null, [], {}, {});
   assert.equal(inventoryPanel.innerHTML.includes('hand-slot is-empty is-incompatible'), true, 'hand slot marks an invalid selected item as incompatible');
 }
