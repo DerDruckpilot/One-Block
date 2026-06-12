@@ -32,7 +32,7 @@ export class TouchInput {
 
   static isDefaultUiTarget(target) {
     return Boolean(target?.closest?.(
-      '#inventory-panel, #crafting-panel, #top-menu, #hotbar, #touch-action, #touch-attack, button, input, textarea'
+      '#inventory-panel, #crafting-panel, #menu-chrome, #top-menu, #hotbar, #touch-action, #touch-attack, button, input, textarea'
     ));
   }
 

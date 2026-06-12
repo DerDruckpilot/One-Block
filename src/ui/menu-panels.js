@@ -14,19 +14,21 @@ import {
 import { renderItemIcon } from './item-icons.js';
 
 export class MenuPanels {
-  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel }) {
+  constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel, menuChromeElement = null }) {
     this.inventoryPanel = inventoryPanel;
     this.craftingPanel = craftingPanel;
     this.buildPanel = buildPanel;
     this.cookingPanel = cookingPanel;
     this.furnacePanel = furnacePanel;
     this.settingsPanel = settingsPanel;
+    this.menuChromeElement = menuChromeElement;
     this.lastInventoryHtml = '';
     this.lastCraftingHtml = '';
     this.lastBuildHtml = '';
     this.lastCookingHtml = '';
     this.lastFurnaceHtml = '';
     this.lastSettingsHtml = '';
+    this.lastChromeHtml = '';
     this.inventoryTab = 'all';
     this.inventoryFilter = '';
     this.selectedCraftingRecipeId = null;
@@ -71,6 +73,15 @@ export class MenuPanels {
     settingsOpen = false,
     saveSlots = []
   }) {
+    this.renderMenuChrome({
+      inventoryOpen,
+      craftingOpen,
+      craftingContext,
+      cookingOpen,
+      furnaceOpen,
+      buildOpen,
+      settingsOpen
+    });
     this.renderInventory(inventory, inventoryOpen, selectedInventoryResource, hotbarSlots, activeHotbarSlot, handItem, playerHearts, equipment, characterStats);
     this.renderCrafting(inventory, craftingOpen, recipeStates, craftingContext);
     this.renderCooking(inventory, cookingOpen, cookingRecipeStates);
@@ -110,6 +121,31 @@ export class MenuPanels {
     return `<button class="menu-close-button" type="button" data-menu-close="${menuId}" aria-label="Menue schliessen">x</button>`;
   }
 
+  renderMenuChrome({ inventoryOpen, craftingOpen, craftingContext, cookingOpen, furnaceOpen, buildOpen, settingsOpen }) {
+    if (!this.menuChromeElement) return;
+
+    let activeMenu = null;
+    if (inventoryOpen) activeMenu = { id: 'inventory', title: 'Inventar', className: 'is-inventory' };
+    else if (craftingOpen) activeMenu = { id: 'crafting', title: craftingContext === 'workbench' ? 'Werkbank' : 'Crafting' };
+    else if (cookingOpen) activeMenu = { id: 'cooking', title: 'Kochen' };
+    else if (furnaceOpen) activeMenu = { id: 'furnace', title: 'Ofen' };
+    else if (buildOpen) activeMenu = { id: 'build', title: 'Bauen' };
+    else if (settingsOpen) activeMenu = { id: 'settings', title: 'Einstellungen' };
+
+    this.menuChromeElement.hidden = !activeMenu;
+    if (!activeMenu) {
+      this.setChromeHtml('');
+      this.menuChromeElement.className = 'menu-chrome';
+      return;
+    }
+
+    this.menuChromeElement.className = `menu-chrome ${activeMenu.className || ''}`.trim();
+    this.setChromeHtml(`
+      ${this.renderCloseButton(activeMenu.id)}
+      <div class="menu-frame-title${activeMenu.id === 'inventory' ? ' inventory-title' : ''}">${activeMenu.title}</div>
+    `);
+  }
+
   renderInventory(inventory, isOpen, selectedInventoryResource = null, hotbarSlots = [], activeHotbarSlot = 0, handItem = null, playerHearts = [], equipment = {}, characterStats = { attack: 10, defense: 0, movement: 100 }) {
     if (!this.inventoryPanel) return;
     this.inventoryPanel.hidden = !isOpen;
@@ -145,8 +181,6 @@ export class MenuPanels {
     const handRejectsSelected = selectedInventoryResource ? !handAcceptsSelected : false;
 
     this.setInventoryHtml(`
-      ${this.renderCloseButton('inventory')}
-      <div class="menu-frame-title inventory-title">Inventar</div>
       <div class="inventory-layout">
         <aside class="inventory-character-panel">
           <div class="inventory-character-name">Abenteurer</div>
@@ -202,9 +236,6 @@ export class MenuPanels {
           ${this.renderSelectedItemTooltip(selectedInventoryResource)}
           <div class="inventory-grid">${rows}</div>
         </section>
-      </div>
-      <div class="inventory-hotbar-dock">
-        ${this.renderInventoryHotbar(inventory, hotbarSlots, activeHotbarSlot)}
       </div>
     `);
   }
@@ -323,8 +354,6 @@ export class MenuPanels {
       : '<div class="recipe-detail-empty">Keine Rezepte verfuegbar.</div>';
 
     this.setCraftingHtml(`
-      ${this.renderCloseButton('crafting')}
-      <div class="menu-frame-title">${title}</div>
       <div class="crafting-layout">
         <div class="recipe-list" data-craft-scroll="${craftingContext}">${recipes}</div>
         <div class="recipe-detail">${detail}</div>
@@ -348,8 +377,6 @@ export class MenuPanels {
       : '<div class="recipe-detail-empty">Keine Kochrezepte verfuegbar.</div>';
 
     this.setCookingHtml(`
-      ${this.renderCloseButton('cooking')}
-      <div class="menu-frame-title">Kochen</div>
       <div class="crafting-layout">
         <div class="recipe-list" data-craft-scroll="cooking">${recipes}</div>
         <div class="recipe-detail">${detail}</div>
@@ -373,8 +400,6 @@ export class MenuPanels {
       : '<div class="recipe-detail-empty">Keine Ofenrezepte verfuegbar.</div>';
 
     this.setFurnaceHtml(`
-      ${this.renderCloseButton('furnace')}
-      <div class="menu-frame-title">Ofen</div>
       <div class="crafting-layout">
         <div class="recipe-list" data-craft-scroll="furnace">${recipes}</div>
         <div class="recipe-detail">${detail}</div>
@@ -430,7 +455,6 @@ export class MenuPanels {
 
     return `
       <h3>${recipe.name}</h3>
-      <div class="recipe-result"><span class="menu-icon">${renderItemIcon(recipe.result)}</span> ${RESOURCE_LABELS[recipe.result]}</div>
       <div class="recipe-description">${this.escapeHtml(RESOURCE_DESCRIPTIONS[recipe.result] || 'Handwerklicher Gegenstand fuer deine Insel.')}</div>
       <div class="material-grid">${costs}</div>
       ${lockedText}
@@ -476,8 +500,6 @@ export class MenuPanels {
     }).join('');
 
     this.setBuildHtml(`
-      ${this.renderCloseButton('build')}
-      <div class="menu-frame-title">Bauen</div>
       <button
         class="build-remove-toggle${removeMode ? ' is-selected' : ''}"
         type="button"
@@ -518,8 +540,6 @@ export class MenuPanels {
     }).join('');
 
     this.setSettingsHtml(`
-      ${this.renderCloseButton('settings')}
-      <div class="menu-frame-title">Einstellungen</div>
       <div class="settings-panel-content">
         <section>
           <h3>Manuelle Speicherstaende</h3>
@@ -578,6 +598,14 @@ export class MenuPanels {
           nextFilter.setSelectionRange(cursorStart, cursorEnd);
         }
       }
+    }
+  }
+
+  setChromeHtml(html) {
+    if (!this.menuChromeElement) return;
+    if (html !== this.lastChromeHtml) {
+      this.menuChromeElement.innerHTML = html;
+      this.lastChromeHtml = html;
     }
   }
 

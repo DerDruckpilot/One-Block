@@ -261,17 +261,27 @@ local function drawWallBase(img, variant, doorState)
   local any = has(c, "up") or has(c, "down") or has(c, "left") or has(c, "right")
   drawShadow(img, 48, 69, 31, 7)
   if not any or has(c, "left") or has(c, "right") then
-    local full = has(c, "left") or has(c, "right")
-    rect(img, has(c, "left") and 0 or 16, 30, full and 96 or 64, 34, C.outline)
-    rect(img, has(c, "left") and 0 or 18, 33, full and 96 or 60, 26, C.woodDark)
-    rect(img, has(c, "left") and 0 or 20, 37, full and 96 or 56, 5, C.woodLight)
-    rect(img, has(c, "left") and 0 or 20, 49, full and 96 or 56, 3, C.wood)
+    local left = 16
+    local right = 80
+    if any then
+      left = has(c, "left") and 0 or 38
+      right = has(c, "right") and 96 or 58
+    end
+    rect(img, left, 30, right - left, 34, C.outline)
+    rect(img, left + (left == 0 and 0 or 2), 33, right - left - (left == 0 and 0 or 4), 26, C.woodDark)
+    rect(img, left + (left == 0 and 0 or 4), 37, right - left - (left == 0 and 0 or 8), 5, C.woodLight)
+    rect(img, left + (left == 0 and 0 or 4), 49, right - left - (left == 0 and 0 or 8), 3, C.wood)
   end
   if has(c, "up") or has(c, "down") or (not any) then
-    local full = has(c, "up") or has(c, "down")
-    rect(img, 38, has(c, "up") and 0 or 20, 20, full and 96 or 58, C.outline)
-    rect(img, 41, has(c, "up") and 0 or 23, 14, full and 96 or 52, C.woodDark)
-    rect(img, 44, has(c, "up") and 0 or 27, 4, full and 92 or 44, C.woodLight)
+    local top = 20
+    local bottom = 78
+    if any then
+      top = has(c, "up") and 0 or 44
+      bottom = has(c, "down") and 96 or 56
+    end
+    rect(img, 38, top, 20, bottom - top, C.outline)
+    rect(img, 41, top + (top == 0 and 0 or 3), 14, bottom - top - (top == 0 and 0 or 6), C.woodDark)
+    rect(img, 44, top + (top == 0 and 0 or 7), 4, math.max(4, bottom - top - (top == 0 and 4 or 14)), C.woodLight)
   end
   rect(img, 35, 29, 26, 36, C.outline)
   rect(img, 39, 33, 18, 28, C.wood)
@@ -296,18 +306,34 @@ local function drawFenceBase(img, variant, gateState)
     rect(img, px - 2, py - 14, 2, 25, C.woodLight)
   end
   if not any or has(c, "left") or has(c, "right") then
-    line(img, has(c, "left") and 0 or 24, 48, has(c, "right") and 96 or 72, 48, 8, C.outline)
-    line(img, has(c, "left") and 0 or 24, 48, has(c, "right") and 96 or 72, 48, 4, C.wood)
-    line(img, has(c, "left") and 0 or 24, 61, has(c, "right") and 96 or 72, 61, 8, C.outline)
-    line(img, has(c, "left") and 0 or 24, 61, has(c, "right") and 96 or 72, 61, 4, C.woodMid)
-    post(24, 58)
-    post(72, 58)
+    local left = 24
+    local right = 72
+    if any then
+      left = has(c, "left") and 0 or 48
+      right = has(c, "right") and 96 or 48
+    end
+    line(img, left, 48, right, 48, 8, C.outline)
+    line(img, left, 48, right, 48, 4, C.wood)
+    line(img, left, 61, right, 61, 8, C.outline)
+    line(img, left, 61, right, 61, 4, C.woodMid)
+    if not any then
+      post(24, 58)
+      post(72, 58)
+    else
+      post(48, 58)
+    end
   end
   if has(c, "up") or has(c, "down") or (not any) then
-    line(img, 48, has(c, "up") and 0 or 25, 48, has(c, "down") and 96 or 72, 8, C.outline)
-    line(img, 48, has(c, "up") and 0 or 25, 48, has(c, "down") and 96 or 72, 4, C.wood)
-    line(img, 59, has(c, "up") and 0 or 25, 59, has(c, "down") and 96 or 72, 7, C.outline)
-    line(img, 59, has(c, "up") and 0 or 25, 59, has(c, "down") and 96 or 72, 3, C.woodMid)
+    local top = 25
+    local bottom = 72
+    if any then
+      top = has(c, "up") and 0 or 58
+      bottom = has(c, "down") and 96 or 58
+    end
+    line(img, 48, top, 48, bottom, 8, C.outline)
+    line(img, 48, top, 48, bottom, 4, C.wood)
+    line(img, 59, top, 59, bottom, 7, C.outline)
+    line(img, 59, top, 59, bottom, 3, C.woodMid)
     post(48, 58)
   end
   if gateState == "closed" then
