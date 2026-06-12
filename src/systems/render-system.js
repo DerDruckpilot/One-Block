@@ -2,10 +2,12 @@ import { DROP_ANIMATION_SECONDS, OBJECT_TYPES, PLAYER_SIZE, TILE_SIZE, TILE_TYPE
 import { TerrainRenderer } from './terrain-renderer.js';
 import { drawItemIcon, getLoadedItemIconImage } from '../ui/item-icons.js';
 import {
+  getBarrierObjectAssetSpec,
   getBuildingObjectAssetSpec,
   getBerryBushAssetPath,
   getFloorOverlayAssetPath,
   getLoadedWorldObjectImage,
+  getPlaceableObjectAssetSpec,
   getTreeAssetSpec,
   preloadWorldObjectAssets
 } from './world-object-assets.js';
@@ -533,6 +535,7 @@ export class RenderSystem {
   }
 
   drawBed(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.bed, x, y)) return;
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.2)';
     this.context.fillRect(x + 4, y + 23, 24, 5);
@@ -551,6 +554,7 @@ export class RenderSystem {
   }
 
   drawChickenNest(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.chickenNest, x, y)) return;
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.16)';
     this.context.fillRect(x + 7, y + 23, 18, 4);
@@ -569,6 +573,7 @@ export class RenderSystem {
   }
 
   drawFeedTrough(x, y, feed = 0) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.feedTrough, x, y, { feed })) return;
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.18)';
     this.context.fillRect(x + 5, y + 23, 22, 5);
@@ -585,6 +590,7 @@ export class RenderSystem {
   }
 
   drawWaterTrough(x, y, filled = false) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.waterTrough, x, y, { filled })) return;
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.18)';
     this.context.fillRect(x + 5, y + 23, 22, 5);
@@ -602,6 +608,7 @@ export class RenderSystem {
   }
 
   drawFurnace(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.furnace, x, y)) return;
     this.context.save();
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
     this.context.fillRect(x + 5, y + 25, 22, 5);
@@ -636,6 +643,7 @@ export class RenderSystem {
   }
 
   drawWorkbench(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.workbench, x, y)) return;
     this.context.save();
     this.context.fillStyle = '#3a2418';
     this.context.fillRect(x + 6, y + 15, 20, 12);
@@ -653,6 +661,7 @@ export class RenderSystem {
   }
 
   drawTorch(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.torch, x, y)) return;
     this.context.save();
     this.context.fillStyle = '#5b331c';
     this.context.fillRect(x + 14, y + 12, 4, 16);
@@ -664,6 +673,7 @@ export class RenderSystem {
   }
 
   drawCampfire(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.campfire, x, y)) return;
     this.context.save();
     this.context.fillStyle = '#3b281d';
     this.context.fillRect(x + 7, y + 22, 18, 5);
@@ -679,12 +689,14 @@ export class RenderSystem {
   }
 
   drawWoodWall(x, y, shape = null) {
+    if (this.drawBarrierObjectAsset(OBJECT_TYPES.woodWall, x, y, shape)) return;
     this.context.save();
     this.drawBarrierShape(x, y, shape, this.getBarrierPalette(OBJECT_TYPES.woodWall));
     this.context.restore();
   }
 
   drawTable(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.table, x, y)) return;
     this.context.save();
     this.context.fillStyle = '#3a2418';
     this.context.fillRect(x + 7, y + 15, 18, 8);
@@ -697,6 +709,7 @@ export class RenderSystem {
   }
 
   drawChair(x, y) {
+    if (this.drawPlaceableObjectAsset(OBJECT_TYPES.chair, x, y)) return;
     this.context.save();
     this.context.fillStyle = '#7d4e2d';
     this.context.fillRect(x + 11, y + 8, 10, 13);
@@ -709,18 +722,21 @@ export class RenderSystem {
   }
 
   drawFence(x, y, shape = null) {
+    if (this.drawBarrierObjectAsset(OBJECT_TYPES.fence, x, y, shape)) return;
     this.context.save();
     this.drawBarrierShape(x, y, shape, this.getBarrierPalette(OBJECT_TYPES.fence));
     this.context.restore();
   }
 
   drawGate(x, y, open = false, shape = null) {
+    if (this.drawBarrierObjectAsset(OBJECT_TYPES.gate, x, y, shape, open)) return;
     this.context.save();
     this.drawGateShape(x, y, shape, this.getBarrierPalette(OBJECT_TYPES.gate, open));
     this.context.restore();
   }
 
   drawDoor(x, y, open = false, shape = null) {
+    if (this.drawBarrierObjectAsset(OBJECT_TYPES.door, x, y, shape, open)) return;
     this.context.save();
     this.drawBarrierShape(x, y, shape, this.getBarrierPalette(OBJECT_TYPES.door, open));
     this.context.restore();
@@ -1098,6 +1114,15 @@ export class RenderSystem {
 
     this.context.save();
     if (profile.kind === 'wall' || profile.kind === 'door' || profile.kind === 'window') {
+      const windowSpec = profile.kind === 'window' ? getBuildingObjectAssetSpec(OBJECT_TYPES.window) : null;
+      const drewAsset = windowSpec
+        ? this.drawWorldObjectAsset(windowSpec.path, x, y, windowSpec.width, windowSpec.height)
+        : this.drawBarrierObjectAsset(type, x, y, shape, open);
+      if (drewAsset) {
+        this.context.restore();
+        return;
+      }
+
       const top = centerY - (palette.height || palette.capHeight) + 4;
       const height = palette.height || palette.capHeight;
       this.context.fillStyle = palette.main;
@@ -1196,6 +1221,34 @@ export class RenderSystem {
     this.context.drawImage(image, left, top, width, height);
     this.context.restore();
     return true;
+  }
+
+  drawPlaceableObjectAsset(type, x, y, state = {}) {
+    const spec = getPlaceableObjectAssetSpec(type, state);
+    if (!spec) return false;
+    return this.drawWorldObjectAsset(
+      spec.path,
+      x,
+      y,
+      spec.width,
+      spec.height,
+      spec.anchorX ?? 0.5,
+      spec.anchorY ?? 1
+    );
+  }
+
+  drawBarrierObjectAsset(type, x, y, shape = null, open = false) {
+    const spec = getBarrierObjectAssetSpec(type, shape, open);
+    if (!spec) return false;
+    return this.drawWorldObjectAsset(
+      spec.path,
+      x,
+      y,
+      spec.width,
+      spec.height,
+      spec.anchorX ?? 0.5,
+      spec.anchorY ?? 1
+    );
   }
 
   drawFloorOverlay(type, x, y) {

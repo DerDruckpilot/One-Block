@@ -1,6 +1,7 @@
 const TREE_ASSET_BASE_PATH = 'assets/generated/objects/trees';
 const BERRY_BUSH_ASSET_BASE_PATH = 'assets/generated/objects/berry_bushes';
 const BUILDING_ASSET_BASE_PATH = 'assets/generated/objects/building';
+const PLACEABLE_ASSET_BASE_PATH = 'assets/generated/objects/placeables_96';
 const FLOOR_ASSET_BASE_PATH = 'assets/generated/tiles/floors_96';
 
 export const TREE_ASSET_PATHS = {
@@ -44,6 +45,55 @@ export const BUILDING_OBJECT_ASSET_SPECS = {
   floorLantern: { path: `${BUILDING_ASSET_BASE_PATH}/floor_lantern_96.png`, width: 24, height: 32 }
 };
 
+export const CONNECTABLE_BARRIER_ASSET_VARIANTS = [
+  'single',
+  'horizontal',
+  'vertical',
+  'corner-up-left',
+  'corner-up-right',
+  'corner-down-left',
+  'corner-down-right',
+  'tee-up',
+  'tee-right',
+  'tee-down',
+  'tee-left',
+  'cross',
+  'end-up',
+  'end-right',
+  'end-down',
+  'end-left'
+];
+
+export const PLACEABLE_OBJECT_ASSET_SPECS = {
+  workbench: { path: `${PLACEABLE_ASSET_BASE_PATH}/workbench_96.png`, width: 46, height: 44 },
+  torch: { path: `${PLACEABLE_ASSET_BASE_PATH}/torch_96.png`, width: 30, height: 48 },
+  campfire: { path: `${PLACEABLE_ASSET_BASE_PATH}/campfire_96.png`, width: 46, height: 42 },
+  furnace: { path: `${PLACEABLE_ASSET_BASE_PATH}/furnace_96.png`, width: 48, height: 52 },
+  bed: { path: `${PLACEABLE_ASSET_BASE_PATH}/bed_96.png`, width: 58, height: 46 },
+  chickenNest: { path: `${PLACEABLE_ASSET_BASE_PATH}/chicken_nest_96.png`, width: 44, height: 34 },
+  feedTrough: {
+    path: `${PLACEABLE_ASSET_BASE_PATH}/feed_trough_empty_96.png`,
+    filledPath: `${PLACEABLE_ASSET_BASE_PATH}/feed_trough_full_96.png`,
+    width: 48,
+    height: 34
+  },
+  waterTrough: {
+    path: `${PLACEABLE_ASSET_BASE_PATH}/water_trough_empty_96.png`,
+    filledPath: `${PLACEABLE_ASSET_BASE_PATH}/water_trough_full_96.png`,
+    width: 48,
+    height: 34
+  },
+  table: { path: `${PLACEABLE_ASSET_BASE_PATH}/table_96.png`, width: 48, height: 42 },
+  chair: { path: `${PLACEABLE_ASSET_BASE_PATH}/chair_96.png`, width: 38, height: 46 }
+};
+
+export const BARRIER_OBJECT_ASSET_SPECS = {
+  woodWall: { prefix: 'wood_wall', width: 48, height: 48 },
+  door: { prefix: 'door', openable: true, width: 48, height: 50 },
+  fence: { prefix: 'fence', width: 46, height: 44 },
+  gate: { prefix: 'gate', openable: true, width: 48, height: 46 }
+};
+
 const worldObjectImages = new Map();
 
 export function stableVariantIndex(x, y, salt, count) {
@@ -69,7 +119,26 @@ function collectAssetPaths() {
     ...BERRY_BUSH_ASSET_PATHS.unripe,
     ...BERRY_BUSH_ASSET_PATHS.ripe,
     ...Object.values(FLOOR_OVERLAY_ASSET_PATHS),
-    ...Object.values(BUILDING_OBJECT_ASSET_SPECS).map((spec) => spec.path)
+    ...Object.values(BUILDING_OBJECT_ASSET_SPECS).map((spec) => spec.path),
+    ...getPlaceableWorldAssetPaths()
+  ];
+}
+
+export function getPlaceableWorldAssetPaths() {
+  const objectPaths = Object.values(PLACEABLE_OBJECT_ASSET_SPECS).flatMap((spec) =>
+    [spec.path, spec.filledPath].filter(Boolean)
+  );
+  const barrierPaths = Object.values(BARRIER_OBJECT_ASSET_SPECS).flatMap((spec) => {
+    const states = spec.openable ? ['closed', 'open'] : [null];
+    return states.flatMap((state) => CONNECTABLE_BARRIER_ASSET_VARIANTS.map((variant) => {
+      const stem = state ? `${spec.prefix}_${state}_${variant}` : `${spec.prefix}_${variant}`;
+      return `${PLACEABLE_ASSET_BASE_PATH}/${stem}_96.png`;
+    }));
+  });
+
+  return [
+    ...objectPaths,
+    ...barrierPaths
   ];
 }
 
@@ -79,6 +148,29 @@ export function getFloorOverlayAssetPath(type) {
 
 export function getBuildingObjectAssetSpec(type) {
   return BUILDING_OBJECT_ASSET_SPECS[type] || null;
+}
+
+export function getPlaceableObjectAssetSpec(type, state = {}) {
+  const spec = PLACEABLE_OBJECT_ASSET_SPECS[type];
+  if (!spec) return null;
+  const filled = state.filled === true || (state.feed || 0) > 0;
+  return {
+    ...spec,
+    path: filled && spec.filledPath ? spec.filledPath : spec.path
+  };
+}
+
+export function getBarrierObjectAssetSpec(type, shape = null, open = false) {
+  const spec = BARRIER_OBJECT_ASSET_SPECS[type];
+  if (!spec) return null;
+  const variant = CONNECTABLE_BARRIER_ASSET_VARIANTS.includes(shape?.variant)
+    ? shape.variant
+    : 'single';
+  const state = spec.openable ? `${open ? 'open' : 'closed'}_` : '';
+  return {
+    ...spec,
+    path: `${PLACEABLE_ASSET_BASE_PATH}/${spec.prefix}_${state}${variant}_96.png`
+  };
 }
 
 export function preloadWorldObjectAssets() {

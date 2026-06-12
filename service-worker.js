@@ -1,4 +1,48 @@
-const CACHE_NAME = 'one-block-v0-5-8';
+const CACHE_NAME = 'one-block-v0-5-9';
+
+const CONNECTABLE_BARRIER_ASSET_VARIANTS = [
+  'single',
+  'horizontal',
+  'vertical',
+  'corner-up-left',
+  'corner-up-right',
+  'corner-down-left',
+  'corner-down-right',
+  'tee-up',
+  'tee-right',
+  'tee-down',
+  'tee-left',
+  'cross',
+  'end-up',
+  'end-right',
+  'end-down',
+  'end-left'
+];
+
+const PLACEABLE_WORLD_OBJECT_ASSETS = [
+  './assets/generated/objects/placeables_96/workbench_96.png',
+  './assets/generated/objects/placeables_96/torch_96.png',
+  './assets/generated/objects/placeables_96/campfire_96.png',
+  './assets/generated/objects/placeables_96/furnace_96.png',
+  './assets/generated/objects/placeables_96/bed_96.png',
+  './assets/generated/objects/placeables_96/chicken_nest_96.png',
+  './assets/generated/objects/placeables_96/feed_trough_empty_96.png',
+  './assets/generated/objects/placeables_96/feed_trough_full_96.png',
+  './assets/generated/objects/placeables_96/water_trough_empty_96.png',
+  './assets/generated/objects/placeables_96/water_trough_full_96.png',
+  './assets/generated/objects/placeables_96/table_96.png',
+  './assets/generated/objects/placeables_96/chair_96.png',
+  ...CONNECTABLE_BARRIER_ASSET_VARIANTS.map((variant) => `./assets/generated/objects/placeables_96/wood_wall_${variant}_96.png`),
+  ...CONNECTABLE_BARRIER_ASSET_VARIANTS.flatMap((variant) => [
+    `./assets/generated/objects/placeables_96/door_closed_${variant}_96.png`,
+    `./assets/generated/objects/placeables_96/door_open_${variant}_96.png`
+  ]),
+  ...CONNECTABLE_BARRIER_ASSET_VARIANTS.map((variant) => `./assets/generated/objects/placeables_96/fence_${variant}_96.png`),
+  ...CONNECTABLE_BARRIER_ASSET_VARIANTS.flatMap((variant) => [
+    `./assets/generated/objects/placeables_96/gate_closed_${variant}_96.png`,
+    `./assets/generated/objects/placeables_96/gate_open_${variant}_96.png`
+  ])
+];
 
 const CORE_ASSETS = [
   './',
@@ -116,6 +160,7 @@ const CORE_ASSETS = [
   './assets/generated/objects/building/rug_96.png',
   './assets/generated/objects/building/shelf_96.png',
   './assets/generated/objects/building/window_96.png',
+  ...PLACEABLE_WORLD_OBJECT_ASSETS,
   './assets/generated/objects/trees/tree_halfgrown_01.png',
   './assets/generated/objects/trees/tree_mature_01.png',
   './assets/generated/objects/trees/tree_mature_02.png',

@@ -47,11 +47,20 @@ import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
 import { getCrystalAssetPath } from '../src/systems/crystal-assets.js';
 import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
-import { getBerryBushAssetPath, getTreeAssetPath, getTreeAssetSpec, stableVariantIndex } from '../src/systems/world-object-assets.js';
+import {
+  CONNECTABLE_BARRIER_ASSET_VARIANTS,
+  getBarrierObjectAssetSpec,
+  getBerryBushAssetPath,
+  getPlaceableObjectAssetSpec,
+  getPlaceableWorldAssetPaths,
+  getTreeAssetPath,
+  getTreeAssetSpec,
+  stableVariantIndex
+} from '../src/systems/world-object-assets.js';
 import { Hud } from '../src/ui/hud.js';
 import { Hotbar } from '../src/ui/hotbar.js';
 import { HandIndicator } from '../src/ui/hand-indicator.js';
-import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, renderItemIcon } from '../src/ui/item-icons.js';
+import { ITEM_ICON_PATHS, drawItemIcon, getItemIconPath, hasPersistentItemIcon, renderItemIcon } from '../src/ui/item-icons.js';
 import { MenuPanels } from '../src/ui/menu-panels.js';
 import { RenderSystem } from '../src/systems/render-system.js';
 import { isPortraitViewport, updateOrientationState } from '../src/ui/orientation.js';
@@ -343,11 +352,50 @@ const map = new TileMap();
   const earthIconHtml = renderItemIcon('earth');
   assert.equal(earthIconHtml.includes('item-icon-image'), true, 'rendered item icon includes a PNG image element');
   assert.equal(earthIconHtml.includes('assets/generated/icons/inventory_96/grass_block.png'), true, 'rendered item icon points at the 96px PNG');
+  assert.equal(earthIconHtml.includes('has-image'), true, 'mapped item icons keep the image-visible class across inventory rerenders');
+  assert.equal(hasPersistentItemIcon('earth'), true, 'mapped item icons are treated as persistent UI assets');
+  assert.equal(hasPersistentItemIcon('yellow_ore_or_clay_lump'), false, 'preview-only icons do not suppress the canvas fallback');
 
   const context = createDrawContext();
   const drewPng = drawItemIcon(context, 'earth', 16, 16, 24);
   assert.equal(drewPng, false, 'canvas item drawing keeps fallback when PNG image is not loaded');
   assert.equal(context.calls.some((call) => call.fn === 'fillRect'), true, 'canvas fallback still draws a pixel icon');
+}
+
+{
+  const serviceWorker = readFileSync('service-worker.js', 'utf8');
+  const objectSpec = getPlaceableObjectAssetSpec(OBJECT_TYPES.workbench);
+  assert.equal(objectSpec.path, 'assets/generated/objects/placeables_96/workbench_96.png', 'workbench uses the upgraded placeable PNG asset');
+  assert.equal(getPlaceableObjectAssetSpec(OBJECT_TYPES.feedTrough, { feed: 0 }).path.endsWith('feed_trough_empty_96.png'), true, 'empty feed trough uses the empty placeable asset');
+  assert.equal(getPlaceableObjectAssetSpec(OBJECT_TYPES.feedTrough, { feed: 1 }).path.endsWith('feed_trough_full_96.png'), true, 'filled feed trough uses the filled placeable asset');
+  assert.equal(getPlaceableObjectAssetSpec(OBJECT_TYPES.waterTrough, { filled: true }).path.endsWith('water_trough_full_96.png'), true, 'filled water trough uses the water-filled placeable asset');
+  assert.equal(
+    getBarrierObjectAssetSpec(OBJECT_TYPES.woodWall, { variant: 'corner-down-right' }).path,
+    'assets/generated/objects/placeables_96/wood_wall_corner-down-right_96.png',
+    'wood wall corners map to connected PNG variants'
+  );
+  assert.equal(
+    getBarrierObjectAssetSpec(OBJECT_TYPES.door, { variant: 'horizontal' }, true).path,
+    'assets/generated/objects/placeables_96/door_open_horizontal_96.png',
+    'open doors map to open connected PNG variants'
+  );
+  assert.equal(
+    getBarrierObjectAssetSpec(OBJECT_TYPES.gate, { variant: 'end-left' }, false).path,
+    'assets/generated/objects/placeables_96/gate_closed_end-left_96.png',
+    'closed gates map to closed connected PNG variants'
+  );
+  assert.equal(CONNECTABLE_BARRIER_ASSET_VARIANTS.length, 16, 'all canonical wall/fence connection variants have PNG asset names');
+  for (const path of getPlaceableWorldAssetPaths()) {
+    assert.equal(existsSync(path), true, `${path} exists`);
+    const png = readFileSync(path);
+    assert.equal(png.readUInt32BE(16), 96, `${path} is exported at 96px width`);
+    assert.equal(png.readUInt32BE(20), 96, `${path} is exported at 96px height`);
+  }
+  assert.equal(serviceWorker.includes('PLACEABLE_WORLD_OBJECT_ASSETS'), true, 'service worker caches upgraded placeable world assets');
+  assert.equal(serviceWorker.includes('./assets/generated/objects/placeables_96/workbench_96.png'), true, 'service worker includes regular placeable assets');
+  assert.equal(serviceWorker.includes('wood_wall_${variant}_96.png'), true, 'service worker generates connected wall asset cache paths');
+  assert.equal(existsSync('assets/generated/objects/placeables_96/placeable_world_objects_preview.png'), true, 'placeable object preview is generated for review');
+  assert.equal(existsSync('assets/generated/objects/placeables_96/connected_barriers_preview.png'), true, 'connected barrier preview is generated for review');
 }
 
 {
