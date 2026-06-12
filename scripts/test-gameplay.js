@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import {
   DAY_NIGHT_CYCLE_SECONDS,
@@ -17,6 +17,7 @@ import {
   CRYSTAL_ENCOUNTER_DROPS,
   FLYING_ENEMY_MAX_TILE_DISTANCE,
   GATE_INTERACTION_DISTANCE,
+  INVENTORY_RESOURCES,
   LASSO_INTERACTION_DISTANCE,
   OBJECT_TYPES,
   PICKAXE_RESOURCE_DROPS,
@@ -235,17 +236,18 @@ const map = new TileMap();
   assert.equal(styles.includes('height: 100dvh;'), true, 'game canvas fills the dynamic viewport height');
   assert.equal(styles.includes('bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));'), true, 'mobile hotbar sits close to the safe-area edge');
   assert.equal(styles.includes('#inventory-panel .inventory-slot-name'), true, 'inventory item label selector remains covered by CSS');
-  assert.equal(styles.includes('.inventory-slot-name {\n  display: none;'), true, 'inventory item labels are hidden so icons carry the slot');
+  assert.equal(/#inventory-panel\s+\.inventory-slot-name\s*\{[^}]*display:\s*none;/.test(styles), true, 'inventory item labels are hidden so icons carry the slot');
   assert.equal(styles.includes('.inventory-item-tooltip'), true, 'inventory selected-item tooltip is styled');
   assert.equal(styles.includes('.recipe-description'), true, 'recipe descriptions are styled');
   assert.equal(styles.includes('touch-action: pan-y;'), true, 'inventory item slots allow vertical pan scrolling over items');
   assert.equal(styles.includes('touch-action: pan-x;'), true, 'inventory tabs allow horizontal pan scrolling over tab buttons');
   assert.equal(styles.includes('.character-heart-row'), true, 'inventory character panel has compact heart styling');
   assert.equal(styles.includes('#inventory-panel .inventory-character-stats .character-heart-row'), true, 'inventory character hearts are explicitly laid out horizontally');
-  assert.equal(styles.includes('position: fixed;\n  top: max(10px, calc(env(safe-area-inset-top) + 10px));'), true, 'inventory title and close button can sit above the menu window');
-  assert.equal(styles.includes('#inventory-panel .inventory-hotbar-dock {\n  position: fixed;'), true, 'inventory hotbar is fixed outside the inventory window');
-  assert.equal(styles.includes('.hand-indicator {\n  position: fixed;'), true, 'hand item indicator remains screen-positioned');
-  assert.equal(styles.includes('.hand-indicator') && styles.includes('background: transparent;'), true, 'hand item indicator renders without an extra box');
+  assert.equal(/#inventory-panel\s+\.inventory-title\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory title can sit above the menu window');
+  assert.equal(/#inventory-panel\s+\.menu-close-button\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory close button can sit above the menu window');
+  assert.equal(/#inventory-panel\s+\.inventory-hotbar-dock\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'inventory hotbar is fixed outside the inventory window');
+  assert.equal(/\.hand-indicator\s*\{[^}]*position:\s*fixed;/.test(styles), true, 'hand item indicator remains screen-positioned');
+  assert.equal(/\.hand-indicator\s*\{[^}]*background:\s*transparent;/.test(styles), true, 'hand item indicator renders without an extra box');
   assert.equal(styles.includes('.stat-stamina'), false, 'inventory character panel no longer styles a stamina bar');
   assert.equal(styles.includes('.menu-panel:not(#inventory-panel)'), true, 'non-inventory menus share the inventory-style frame direction');
   assert.equal(styles.includes('.item-icon-image'), true, 'item icons can render real PNG image assets');
@@ -279,6 +281,7 @@ const map = new TileMap();
 }
 
 {
+  const serviceWorker = readFileSync('service-worker.js', 'utf8');
   assert.equal(getItemIconPath('earth'), 'assets/generated/icons/inventory_96/grass_block.png', 'earth uses the 96px grass block icon');
   assert.equal(getItemIconPath('rawWood'), 'assets/generated/icons/inventory_96/raw_wood_log.png', 'raw wood uses the 96px log icon');
   assert.equal(getItemIconPath('grassSeed'), 'assets/generated/icons/inventory_96/grass_seeds.png', 'grass seeds use the 96px seed icon');
@@ -286,6 +289,55 @@ const map = new TileMap();
   assert.equal(getItemIconPath('slingshot'), 'assets/generated/icons/inventory_96/wooden_slingshot.png', 'slingshot uses the 96px slingshot icon');
   assert.equal(getItemIconPath('arrow'), 'assets/generated/icons/inventory_96/wooden_arrows.png', 'arrows use the 96px arrow bundle icon');
   assert.equal(getItemIconPath('stoneBall'), 'assets/generated/icons/inventory_96/small_rock.png', 'stone balls use the small rock icon');
+  assert.equal(getItemIconPath('springDrop'), 'assets/generated/icons/inventory_96/spring_drop.png', 'spring drops use the upgraded 96px source-drop icon');
+  assert.equal(getItemIconPath('torch'), 'assets/generated/icons/inventory_96/torch.png', 'torch uses the upgraded 96px torch icon');
+  assert.equal(getItemIconPath('lasso'), 'assets/generated/icons/inventory_96/lasso.png', 'lasso uses the upgraded 96px lasso icon');
+  const remainingIconResources = [
+    'clayBrick',
+    'unfiredBowl',
+    'bowl',
+    'unfiredJug',
+    'jug',
+    'springDrop',
+    'treeSeed',
+    'berry',
+    'roastedBerries',
+    'cookedSteak',
+    'axe',
+    'scythe',
+    'lasso',
+    'torch',
+    'campfire',
+    'furnace',
+    'woodWall',
+    'door',
+    'fence',
+    'gate',
+    'bed',
+    'chickenNest',
+    'feedTrough',
+    'waterTrough',
+    'table',
+    'chair'
+  ];
+  assert.deepEqual(
+    INVENTORY_RESOURCES.filter((resource) => !getItemIconPath(resource)),
+    [],
+    'all gameplay inventory resources have upgraded PNG icon paths'
+  );
+  for (const resource of remainingIconResources) {
+    const path = getItemIconPath(resource);
+    assert.equal(existsSync(path), true, `${resource} upgraded PNG icon exists`);
+    const png = readFileSync(path);
+    assert.equal(png.readUInt32BE(16), 96, `${resource} upgraded PNG icon is 96px wide`);
+    assert.equal(png.readUInt32BE(20), 96, `${resource} upgraded PNG icon is 96px tall`);
+    assert.equal(serviceWorker.includes(`./${path}`), true, `${resource} upgraded PNG icon is cached by the service worker`);
+  }
+  assert.equal(
+    existsSync('assets/generated/icons/inventory_96/remaining_item_icons_preview.png'),
+    true,
+    'remaining item icon preview is generated for review'
+  );
   assert.equal(ITEM_ICON_PATHS.yellow_ore_or_clay_lump, undefined, 'unmatched preview-only icon is not introduced as a gameplay item');
 
   const earthIconHtml = renderItemIcon('earth');
