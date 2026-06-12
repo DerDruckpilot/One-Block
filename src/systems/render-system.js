@@ -13,6 +13,7 @@ import {
 } from './world-object-assets.js';
 import { getLoadedCrystalImage, preloadCrystalAssets } from './crystal-assets.js';
 import { getLoadedAnimalImage, preloadAnimalAssets } from './animal-assets.js';
+import { getLoadedPlayerSpriteSheet, getPlayerFrameSource, preloadPlayerAssets } from './player-assets.js';
 
 export class RenderSystem {
   constructor(context, terrainRenderer = new TerrainRenderer()) {
@@ -21,6 +22,7 @@ export class RenderSystem {
     preloadWorldObjectAssets();
     preloadCrystalAssets();
     preloadAnimalAssets();
+    preloadPlayerAssets();
   }
 
   renderWorld(tileMap, camera) {
@@ -507,6 +509,7 @@ export class RenderSystem {
   renderPlayer(player, camera) {
     const x = Math.round(player.x - camera.x);
     const y = Math.round(player.y - camera.y);
+    const spriteSheet = getLoadedPlayerSpriteSheet();
 
     this.context.save();
     if (player.hitFlashSeconds > 0) {
@@ -514,6 +517,24 @@ export class RenderSystem {
     }
     this.context.fillStyle = 'rgba(0, 0, 0, 0.22)';
     this.context.fillRect(x + 12, y + 38, 24, 7);
+
+    if (spriteSheet && typeof this.context.drawImage === 'function') {
+      const frame = getPlayerFrameSource(player);
+      this.context.imageSmoothingEnabled = false;
+      this.context.drawImage(
+        spriteSheet,
+        frame.sx,
+        frame.sy,
+        frame.sw,
+        frame.sh,
+        x,
+        y,
+        PLAYER_SIZE,
+        PLAYER_SIZE
+      );
+      this.context.restore();
+      return;
+    }
 
     this.context.fillStyle = '#8f5f3d';
     this.context.fillRect(x + 16, y + 8, 16, 12);

@@ -1395,6 +1395,18 @@ button.menu-row:hover {
   transform: translateX(-50%);
 }
 
+#inventory-panel .inventory-character-sprite.inventory-character-image {
+  top: auto;
+  bottom: 20px;
+  width: 132px;
+  height: 172px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 3px 0 rgba(43, 26, 17, 0.32));
+  pointer-events: none;
+}
+
 #inventory-panel .character-hair {
   left: 29px;
   top: 7px;
@@ -2035,6 +2047,14 @@ button.menu-row:hover {
     transform: scale(0.82);
   }
 
+  #inventory-panel .inventory-character-sprite.inventory-character-image {
+    top: auto;
+    bottom: 12px;
+    width: 86px;
+    height: 118px;
+    transform: translateX(-50%);
+  }
+
   .equipment-slot {
     min-height: 62px;
   }
@@ -2270,6 +2290,13 @@ button.menu-row:hover {
     width: 68px;
     height: 100px;
     top: 38px;
+  }
+
+  #inventory-panel .inventory-character-sprite.inventory-character-image {
+    top: auto;
+    bottom: 12px;
+    width: 86px;
+    height: 118px;
   }
 
   #inventory-panel .character-hair {

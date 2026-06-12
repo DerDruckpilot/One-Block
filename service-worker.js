@@ -1,4 +1,4 @@
-const CACHE_NAME = 'one-block-v0-5-9';
+const CACHE_NAME = 'one-block-v0-5-10';
 
 const CONNECTABLE_BARRIER_ASSET_VARIANTS = [
   'single',
@@ -71,6 +71,7 @@ const CORE_ASSETS = [
   './src/systems/flying-enemy-system.js',
   './src/systems/log-system.js',
   './src/systems/plant-system.js',
+  './src/systems/player-assets.js',
   './src/systems/projectile-system.js',
   './src/systems/resource-inventory.js',
   './src/systems/save-system.js',
@@ -155,6 +156,9 @@ const CORE_ASSETS = [
   './assets/generated/tiles/water_96/water_tileset_96.png',
   './assets/generated/tiles/water_96/water_transitions_96.png',
   './assets/generated/objects/crystal/crystal_core_96.png',
+  './assets/generated/sprites/player/player_final_48.png',
+  './assets/generated/sprites/player/player_final_48.json',
+  './assets/generated/sprites/player/player_inventory_portrait.png',
   './assets/generated/objects/building/floor_lantern_96.png',
   './assets/generated/objects/building/plant_pot_96.png',
   './assets/generated/objects/building/rug_96.png',

@@ -46,6 +46,12 @@ import { EnemySystem } from '../src/systems/enemy-system.js';
 import { DropSystem } from '../src/systems/drop-system.js';
 import { LogSystem } from '../src/systems/log-system.js';
 import { getCrystalAssetPath } from '../src/systems/crystal-assets.js';
+import {
+  getPlayerDirectionKey,
+  getPlayerFrameSource,
+  PLAYER_INVENTORY_PORTRAIT_PATH,
+  PLAYER_SPRITE_SHEET_PATH
+} from '../src/systems/player-assets.js';
 import { getGroundTileAssetPath, TerrainRenderer } from '../src/systems/terrain-renderer.js';
 import {
   CONNECTABLE_BARRIER_ASSET_VARIANTS,
@@ -277,7 +283,11 @@ const map = new TileMap();
   assert.equal(serviceWorker.includes('./assets/generated/tiles/water_96/water_tileset_96.png'), true, 'service worker caches 96px water tiles');
   assert.equal(serviceWorker.includes('./assets/generated/tiles/moist_earth_96/moist_earth_tileset_96.png'), true, 'service worker caches 96px moist earth tiles');
   assert.equal(serviceWorker.includes('./src/systems/crystal-assets.js'), true, 'service worker caches the crystal asset loader');
+  assert.equal(serviceWorker.includes('./src/systems/player-assets.js'), true, 'service worker caches the player asset loader');
   assert.equal(serviceWorker.includes('./assets/generated/objects/crystal/crystal_core_96.png'), true, 'service worker caches the upgraded crystal asset');
+  assert.equal(serviceWorker.includes('./assets/generated/sprites/player/player_final_48.png'), true, 'service worker caches the final player sprite sheet');
+  assert.equal(serviceWorker.includes('./assets/generated/sprites/player/player_inventory_portrait.png'), true, 'service worker caches the inventory player portrait');
+  assert.equal(styles.includes('inventory-character-image'), true, 'inventory character portrait has dedicated image styling');
   assert.equal(serviceWorker.includes('./assets/generated/objects/trees/tree_mature_01.png'), true, 'service worker caches upgraded tree assets');
   assert.equal(serviceWorker.includes('./assets/generated/objects/berry_bushes/berry_bush_ripe_01.png'), true, 'service worker caches upgraded berry bush assets');
   assert.equal(serviceWorker.includes('./src/systems/world-object-assets.js'), true, 'service worker caches the world object asset loader');
@@ -4562,6 +4572,22 @@ const map = new TileMap();
 }
 
 {
+  assert.equal(PLAYER_SPRITE_SHEET_PATH, 'assets/generated/sprites/player/player_final_48.png', 'final player sprite sheet path is centralised');
+  assert.equal(PLAYER_INVENTORY_PORTRAIT_PATH, 'assets/generated/sprites/player/player_inventory_portrait.png', 'inventory player portrait path is centralised');
+  const player = createSpawnedPlayer();
+  assert.equal(getPlayerDirectionKey({ x: 0, y: 1 }), 'down', 'positive Y player facing maps to down animation');
+  player.facing = { x: 1, y: 0 };
+  player.isMoving = true;
+  player.isRunning = false;
+  player.animationSeconds = 0.2;
+  assert.equal(getPlayerFrameSource(player).sy, 6 * 48, 'walking right uses the right-facing walk row');
+  player.isRunning = true;
+  assert.equal(getPlayerFrameSource(player).sy, 10 * 48, 'running right uses the right-facing run row');
+  player.startAttackAnimation();
+  assert.equal(getPlayerFrameSource(player).sy, 14 * 48, 'attacking right uses the right-facing attack row');
+}
+
+{
   const storage = createMemoryStorage();
   const { Game } = await import('../src/core/game.js');
   const game = new Game({ getContext: () => ({}) }, { innerHTML: '' }, { storage });
@@ -4794,6 +4820,8 @@ const map = new TileMap();
   renderWithOpenMenu({ inventoryOpen: true });
   assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="inventory"'), true, 'inventory menu has an X close button');
   assert.equal(menuChromeElement.innerHTML.includes('Inventar'), true, 'inventory menu has a title');
+  assert.equal(inventoryPanel.innerHTML.includes('player_inventory_portrait.png'), true, 'inventory character panel renders the final player portrait asset');
+  assert.equal(inventoryPanel.innerHTML.includes('character-hair'), false, 'inventory character panel no longer renders the CSS placeholder character');
   renderWithOpenMenu({ craftingOpen: true });
   assert.equal(menuChromeElement.innerHTML.includes('data-menu-close="crafting"'), true, 'crafting menu has an X close button');
   renderWithOpenMenu({ buildOpen: true });

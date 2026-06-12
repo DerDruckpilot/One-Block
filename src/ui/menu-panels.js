@@ -12,6 +12,7 @@ import {
   SHOE_EQUIPMENT_RESOURCES
 } from '../config/constants.js';
 import { renderItemIcon } from './item-icons.js';
+import { PLAYER_INVENTORY_PORTRAIT_PATH } from '../systems/player-assets.js';
 
 export class MenuPanels {
   constructor({ inventoryPanel, craftingPanel, buildPanel, cookingPanel, furnacePanel, settingsPanel, menuChromeElement = null }) {
@@ -214,12 +215,14 @@ export class MenuPanels {
             </button>
             ${this.renderEquipmentSlot('clothing', 'Kleidung', equipment.clothingItem, selectedInventoryResource)}
             <div class="inventory-character-scene" aria-hidden="true">
-              <div class="inventory-character-sprite">
-                <span class="character-hair"></span>
-                <span class="character-face"></span>
-                <span class="character-shirt"></span>
-                <span class="character-legs"></span>
-              </div>
+              <img
+                class="inventory-character-sprite inventory-character-image"
+                src="${PLAYER_INVENTORY_PORTRAIT_PATH}"
+                alt=""
+                draggable="false"
+                loading="eager"
+                decoding="async"
+              />
               <div class="character-island">
                 <span></span>
                 <span></span>

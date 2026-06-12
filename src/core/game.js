@@ -476,6 +476,10 @@ export class Game {
     if (this.isGamePaused()) return false;
 
     const activeItem = this.getEquippedHandItem();
+    const attackAnimatedItems = ['woodenPickaxe', 'woodenSpear', 'slingshot', 'bow', 'axe', 'scythe', 'lasso'];
+    if (attackAnimatedItems.includes(activeItem) && this.inventory.get(activeItem) > 0) {
+      this.player.startAttackAnimation?.();
+    }
 
     if (activeItem === 'woodenPickaxe' && this.inventory.get('woodenPickaxe') > 0) {
       return this.usePickaxeAttack();

@@ -18,16 +18,24 @@ export class Player {
     this.hp = PLAYER_MAX_HP;
     this.damageCooldownSeconds = 0;
     this.hitFlashSeconds = 0;
+    this.animationSeconds = 0;
+    this.isMoving = false;
+    this.isRunning = false;
+    this.attackAnimationSeconds = 0;
+    this.attackAnimationDuration = 0.32;
   }
 
   update(deltaSeconds, input, tileMap, speedMultiplier = 1) {
     this.updateDamageTimers(deltaSeconds);
     const movement = this.readMovement(input);
-    if (movement.x !== 0 || movement.y !== 0) {
+    this.isMoving = movement.x !== 0 || movement.y !== 0;
+    this.isRunning = input.isDown('Shift');
+    this.animationSeconds += deltaSeconds;
+    if (this.isMoving) {
       this.facing = this.primaryFacing(movement);
     }
 
-    const speed = (input.isDown('Shift') ? MOVEMENT.runSpeed : MOVEMENT.walkSpeed) * Math.max(0.5, Number(speedMultiplier) || 1);
+    const speed = (this.isRunning ? MOVEMENT.runSpeed : MOVEMENT.walkSpeed) * Math.max(0.5, Number(speedMultiplier) || 1);
     const nextX = this.x + movement.x * speed * deltaSeconds;
     const nextY = this.y + movement.y * speed * deltaSeconds;
 
@@ -43,6 +51,13 @@ export class Player {
   updateDamageTimers(deltaSeconds) {
     this.damageCooldownSeconds = Math.max(0, this.damageCooldownSeconds - deltaSeconds);
     this.hitFlashSeconds = Math.max(0, this.hitFlashSeconds - deltaSeconds);
+    this.attackAnimationSeconds = Math.max(0, this.attackAnimationSeconds - deltaSeconds);
+  }
+
+  startAttackAnimation(duration = 0.32) {
+    this.attackAnimationDuration = duration;
+    this.attackAnimationSeconds = duration;
+    this.animationSeconds = 0;
   }
 
   takeDamage(amount) {
