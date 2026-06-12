@@ -173,8 +173,9 @@ body {
 .menu-panel {
   position: fixed;
   top: max(70px, calc(env(safe-area-inset-top) + 70px));
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   width: min(820px, calc(100vw - 28px));
   max-height: min(430px, calc(100dvh - 132px));
   overflow: auto;
@@ -697,8 +698,8 @@ button.menu-row:hover {
   bottom: max(14px, calc(env(safe-area-inset-bottom) + 14px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(4, 66px);
-  gap: 7px;
+  grid-template-columns: repeat(4, 72px);
+  gap: 8px;
   padding: 7px;
   border: 1px solid var(--ui-border);
   border-radius: 14px;
@@ -716,9 +717,9 @@ button.menu-row:hover {
   position: relative;
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 58px;
-  padding: 4px;
+  width: 72px;
+  height: 62px;
+  padding: 3px;
   border: 2px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
   background: rgba(12, 16, 25, 0.72);
@@ -730,9 +731,9 @@ button.menu-row:hover {
 
 .inventory-hotbar-assignment {
   display: grid;
-  grid-template-columns: repeat(4, 66px);
+  grid-template-columns: repeat(4, 72px);
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   margin-top: 0;
   padding: 7px;
   border: 1px solid var(--ui-border);
@@ -741,13 +742,16 @@ button.menu-row:hover {
 }
 
 .inventory-hotbar-dock {
-  position: sticky;
-  bottom: 0;
-  margin: 8px auto -4px;
+  position: fixed;
+  left: 50%;
+  bottom: max(8px, calc(env(safe-area-inset-bottom) + 8px));
+  width: max-content;
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  z-index: 2;
+  transform: translateX(-50%);
+  z-index: 24;
 }
 
 .item-pixel-icon {
@@ -839,12 +843,12 @@ button.menu-row:hover {
   bottom: max(26px, calc(env(safe-area-inset-bottom) + 26px));
   display: grid;
   place-items: center;
-  min-width: 42px;
-  min-height: 42px;
-  padding: 5px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: var(--ui-bg);
+  min-width: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   pointer-events: none;
   z-index: 6;
 }
@@ -856,16 +860,18 @@ button.menu-row:hover {
 .hand-indicator-label,
 .hand-ammo {
   position: absolute;
-  left: 4px;
-  top: 3px;
-  font-size: 10px;
+  left: -2px;
+  top: -4px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 900;
   color: #ffffff;
   text-shadow: 0 2px 0 #21140d;
 }
 
 .hand-icon {
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
 }
 
 .settings-save-grid,
@@ -1105,13 +1111,11 @@ button.menu-row:hover {
 .inventory-hotbar-slot {
   position: relative;
   display: grid;
-  grid-template-columns: 26px 1fr;
-  grid-template-rows: 26px 18px;
-  align-items: center;
-  width: 100%;
+  place-items: center;
+  width: 72px;
   min-width: 0;
-  height: 58px;
-  padding: 5px;
+  height: 62px;
+  padding: 3px;
   border: 2px solid rgba(255, 255, 255, 0.22);
   border-radius: 8px;
   background: rgba(12, 16, 25, 0.72);
@@ -1146,11 +1150,12 @@ button.menu-row:hover {
 .hotbar-icon {
   display: grid;
   place-items: center;
+  z-index: 1;
 }
 
 .hotbar-icon .item-pixel-icon {
-  width: 42px;
-  height: 42px;
+  width: 52px;
+  height: 52px;
 }
 
 .hotbar-label {
@@ -1161,6 +1166,8 @@ button.menu-row:hover {
   position: absolute;
   left: 5px;
   top: 3px;
+  z-index: 2;
+  min-width: 14px;
   font-size: 12px;
   font-weight: 900;
   color: #ffffff;
@@ -1169,7 +1176,7 @@ button.menu-row:hover {
 
 #inventory-panel {
   width: min(1080px, calc(100vw - 34px));
-  max-height: min(620px, calc(100dvh - 94px));
+  max-height: min(620px, calc(100dvh - 108px));
   padding: 16px 18px 18px;
   border: 0;
   border-radius: 10px;
@@ -1206,14 +1213,16 @@ button.menu-row:hover {
 }
 
 #inventory-panel .menu-close-button {
-  position: sticky;
-  top: 4px;
-  float: right;
+  position: fixed;
+  top: max(10px, calc(env(safe-area-inset-top) + 10px));
+  right: max(18px, calc(env(safe-area-inset-right) + 18px));
+  z-index: 26;
+  float: none;
   width: 48px;
   height: 48px;
   min-width: 48px;
   min-height: 48px;
-  margin: -4px -2px 0 8px;
+  margin: 0;
   border: 4px solid #4d2f1d;
   border-radius: 8px;
   background: linear-gradient(180deg, #b96e45, #793626);
@@ -1221,10 +1230,11 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-title {
-  position: sticky;
-  top: 2px;
-  z-index: 2;
-  margin: -20px auto 12px;
+  position: fixed;
+  top: max(10px, calc(env(safe-area-inset-top) + 10px));
+  left: 50%;
+  z-index: 25;
+  margin: 0;
   min-width: 240px;
   padding: 8px 40px;
   border-color: #2b1a11;
@@ -1235,13 +1245,15 @@ button.menu-row:hover {
   letter-spacing: 0;
   text-transform: uppercase;
   box-shadow: inset 0 3px 0 #d59a55, 0 4px 0 rgba(43, 26, 17, 0.55);
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 #inventory-panel .inventory-layout {
   grid-template-columns: minmax(292px, 0.82fr) minmax(430px, 1.18fr);
   gap: 16px;
-  height: min(396px, calc(100dvh - 230px));
-  min-height: 330px;
+  height: min(430px, calc(100dvh - 172px));
+  min-height: 354px;
 }
 
 #inventory-panel .inventory-character-panel,
@@ -1261,9 +1273,9 @@ button.menu-row:hover {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: auto 1fr auto;
-  gap: 10px;
+  gap: 7px;
   min-height: 0;
-  padding: 14px;
+  padding: 10px;
   overflow: hidden;
 }
 
@@ -1276,9 +1288,9 @@ button.menu-row:hover {
 
 .inventory-equipment-grid {
   display: grid;
-  grid-template-columns: 80px minmax(104px, 1fr) 80px;
-  grid-template-rows: minmax(76px, 0.9fr) minmax(112px, 1.2fr) minmax(76px, 0.9fr);
-  gap: 10px;
+  grid-template-columns: 74px minmax(118px, 1fr) 74px;
+  grid-template-rows: 72px minmax(136px, 1fr) 72px;
+  gap: 8px;
   align-items: center;
   min-height: 0;
 }
@@ -1288,13 +1300,13 @@ button.menu-row:hover {
   grid-row: 1 / 4;
   position: relative;
   align-self: stretch;
-  min-height: 236px;
+  min-height: 258px;
 }
 
 #inventory-panel .inventory-character-sprite {
   position: absolute;
   left: 50%;
-  top: clamp(24px, 12%, 36px);
+  top: clamp(44px, 18%, 58px);
   z-index: 2;
   width: 104px;
   height: 154px;
@@ -1347,9 +1359,9 @@ button.menu-row:hover {
 .character-island {
   position: absolute;
   left: 50%;
-  bottom: 34px;
-  width: 158px;
-  height: 58px;
+  bottom: 14px;
+  width: 164px;
+  height: 56px;
   transform: translateX(-50%);
   border: 4px solid #37632c;
   border-radius: 36px 36px 18px 18px;
@@ -1376,7 +1388,7 @@ button.menu-row:hover {
 #inventory-panel .equipment-slot {
   display: grid;
   place-items: center;
-  min-height: 76px;
+  min-height: 70px;
   padding: 6px;
   border: 4px solid #5a3924;
   border-radius: 8px;
@@ -1397,7 +1409,7 @@ button.menu-row:hover {
   grid-row: 1;
 }
 
-#inventory-panel .equip-jewelry {
+#inventory-panel .equip-accessory {
   grid-column: 3;
   grid-row: 2;
 }
@@ -1440,20 +1452,20 @@ button.menu-row:hover {
 
 .inventory-character-stats {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 10px;
-  padding: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px 8px;
+  padding: 6px 8px;
   border: 3px solid #8a623e;
   border-radius: 8px;
   background: rgba(255, 223, 157, 0.22);
   color: #4a2d1d;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
-.inventory-character-stats span {
+.inventory-character-stats > span {
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .inventory-character-stats .character-heart-stat {
@@ -1464,13 +1476,18 @@ button.menu-row:hover {
   color: #2b1a11;
 }
 
-.character-heart-row {
+#inventory-panel .inventory-character-stats .character-heart-row {
   display: flex;
+  flex-wrap: nowrap;
   gap: 3px;
   color: #b7352d;
   font-size: 15px;
   line-height: 1;
   text-shadow: 0 1px 0 rgba(255, 244, 210, 0.34);
+}
+
+#inventory-panel .inventory-character-stats .character-heart-row .heart {
+  display: inline-block;
 }
 
 .character-heart-row .heart-empty {
@@ -1597,15 +1614,7 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-slot-name {
-  align-self: end;
-  color: #f8e2b2;
-  font-size: 11px;
-  line-height: 1.05;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow-wrap: anywhere;
+  display: none;
 }
 
 #inventory-panel .inventory-slot-count {
@@ -1619,15 +1628,18 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-hotbar-dock {
-  position: sticky;
-  bottom: 0;
-  margin: 8px auto -8px;
+  position: fixed;
+  left: 50%;
+  bottom: max(8px, calc(env(safe-area-inset-bottom) + 8px));
+  margin: 0;
   width: max-content;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  transform: translateX(-50%);
+  z-index: 24;
 }
 
 .inventory-hotbar-title {
@@ -1635,8 +1647,8 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-hotbar-assignment {
-  grid-template-columns: repeat(4, 66px);
-  gap: 7px;
+  grid-template-columns: repeat(4, 72px);
+  gap: 8px;
   margin-top: 0;
   padding: 7px;
   border: 1px solid var(--ui-border);
@@ -1645,8 +1657,8 @@ button.menu-row:hover {
 }
 
 #inventory-panel .inventory-hotbar-slot {
-  width: 66px;
-  height: 58px;
+  width: 72px;
+  height: 62px;
   border: 2px solid rgba(255, 255, 255, 0.22);
   background: rgba(12, 16, 25, 0.72);
   box-shadow: none;
@@ -1908,14 +1920,19 @@ button.menu-row:hover {
 
   #hotbar {
     bottom: max(6px, calc(env(safe-area-inset-bottom) + 6px));
-    grid-template-columns: repeat(4, 58px);
+    grid-template-columns: repeat(4, 64px);
     gap: 6px;
     padding: 6px;
   }
 
   .hotbar-slot {
-    width: 58px;
-    height: 50px;
+    width: 64px;
+    height: 54px;
+  }
+
+  .hotbar-icon .item-pixel-icon {
+    width: 46px;
+    height: 46px;
   }
 
   #help {
@@ -2234,34 +2251,34 @@ button.menu-row:hover {
   }
 
   #inventory-panel .inventory-hotbar-dock {
-    bottom: 0;
+    position: fixed;
+    left: 50%;
+    bottom: max(5px, calc(env(safe-area-inset-bottom) + 5px));
     width: max-content;
-    margin: 7px auto -5px;
+    margin: 0;
     padding: 0;
     border-width: 0;
     border-radius: 0;
     box-shadow: none;
+    transform: translateX(-50%);
+    z-index: 24;
   }
 
   #inventory-panel .inventory-hotbar-title {
-    margin: -17px auto 3px;
-    padding: 2px 16px;
-    border-width: 2px;
-    border-radius: 5px;
-    font-size: 12px;
+    display: none;
   }
 
   #inventory-panel .inventory-hotbar-assignment {
-    grid-template-columns: repeat(4, 52px);
+    grid-template-columns: repeat(4, 58px);
     gap: 5px;
     margin-top: 0;
     padding: 5px;
   }
 
   #inventory-panel .inventory-hotbar-slot {
-    width: 52px;
-    height: 46px;
-    min-height: 46px;
+    width: 58px;
+    height: 50px;
+    min-height: 50px;
     padding: 3px;
     border-width: 2px;
     border-radius: 7px;
